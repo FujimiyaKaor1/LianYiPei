@@ -1,0 +1,192 @@
+{% extends "layout/base.html" %}
+
+{% block title %}外部接口配置 - 链易配{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="bi bi-plug"></i> 外部数据接口配置</h4>
+    <button class="btn btn-outline-primary btn-sm" onclick="checkAllInterfaces()">
+      <i class="bi bi-arrow-repeat"></i> 检测所有接口
+    </button>
+  </div>
+
+  <div id="alertBox"></div>
+
+  <div class="row g-3" id="configCards">
+    {% for config in configs %}
+    <div class="col-md-6 col-xl-4" id="card-{{ config.interface_type }}">
+      <div class="card h-100">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-hdd-network"></i> {{ config.interface_name }}</span>
+          <span class="badge
+            {% if config.last_check_status == 'ok' %}bg-success
+            {% elif config.last_check_status == 'error' %}bg-danger
+            {% else %}bg-secondary{% endif %}">
+            {% if config.last_check_status == 'ok' %}正常
+            {% elif config.last_check_status == 'error' %}异常
+            {% else %}未检测{% endif %}
+          </span>
+        </div>
+        <div class="card-body">
+          <form onsubmit="saveConfig(event, '{{ config.interface_type }}')">
+            <div class="mb-2">
+              <label class="form-label small fw-bold">接口地址</label>
+              <input type="url" class="form-control form-control-sm"
+                name="base_url" value="{{ config.base_url or '' }}"
+                placeholder="https://api.example.com">
+            </div>
+            <div class="mb-2">
+              <label class="form-label small fw-bold">认证方式</label>
+              <select class="form-select form-select-sm" name="auth_type"
+                onchange="toggleAuthFields(this, '{{ config.interface_type }}')">
+                <option value="api_key" {% if config.auth_type == 'api_key' %}selected{% endif %}>API密钥</option>
+                <option value="oauth2" {% if config.auth_type == 'oauth2' %}selected{% endif %}>OAuth2</option>
+                <option value="none" {% if config.auth_type == 'none' %}selected{% endif %}>无认证</option>
+              </select>
+            </div>
+            <div class="mb-2 auth-apikey-{{ config.interface_type }}"
+              {% if config.auth_type != 'api_key' %}style="display:none"{% endif %}>
+              <label class="form-label small fw-bold">API密钥</label>
+              <input type="password" class="form-control form-control-sm"
+                name="api_key" placeholder="留空保持不变">
+            </div>
+            <div class="auth-oauth2-{{ config.interface_type }}"
+              {% if config.auth_type != 'oauth2' %}style="display:none"{% endif %}>
+              <div class="mb-2">
+                <label class="form-label small fw-bold">Client ID</label>
+                <input type="text" class="form-control form-control-sm"
+                  name="client_id" value="{{ '' }}" placeholder="OAuth2 Client ID">
+              </div>
+              <div class="mb-2">
+                <label class="form-label small fw-bold">Client Secret</label>
+                <input type="password" class="form-control form-control-sm"
+                  name="client_secret" placeholder="留空保持不变">
+              </div>
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-6">
+                <label class="form-label small fw-bold">超时（秒）</label>
+                <input type="number" class="form-control form-control-sm"
+                  name="timeout_seconds" value="{{ config.timeout_seconds }}" min="1" max="60">
+              </div>
+              <div class="col-6">
+                <label class="form-label small fw-bold">最大重试</label>
+                <input type="number" class="form-control form-control-sm"
+                  name="max_retries" value="{{ config.max_retries }}" min="0" max="5">
+              </div>
+            </div>
+            <div class="mb-3">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="is_enabled"
+                  id="enabled-{{ config.interface_type }}"
+                  {% if config.is_enabled %}checked{% endif %}>
+                <label class="form-check-label small" for="enabled-{{ config.interface_type }}">启用接口</label>
+              </div>
+            </div>
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-primary btn-sm flex-grow-1">
+                <i class="bi bi-save"></i> 保存
+              </button>
+              <button type="button" class="btn btn-outline-secondary btn-sm"
+                onclick="checkInterface('{{ config.interface_type }}')">
+                <i class="bi bi-wifi"></i> 测试
+              </button>
+            </div>
+          </form>
+          {% if config.last_check_at %}
+          <div class="mt-2 text-muted small">
+            上次检测: {{ config.last_check_at[:19] if config.last_check_at else '—' }}
+            {% if config.last_check_error %}
+            <br><span class="text-danger">{{ config.last_check_error }}</span>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+function toggleAuthFields(select, ifType) {
+  const apikeyDiv = document.querySelector(`.auth-apikey-${ifType}`);
+  const oauth2Div = document.querySelector(`.auth-oauth2-${ifType}`);
+  if (apikeyDiv) apikeyDiv.style.display = select.value === 'api_key' ? '' : 'none';
+  if (oauth2Div) oauth2Div.style.display = select.value === 'oauth2' ? '' : 'none';
+}
+
+function saveConfig(event, ifType) {
+  event.preventDefault();
+  const form = event.target;
+  const fd = new FormData(form);
+  const payload = {};
+  for (const [k, v] of fd.entries()) {
+    if (v !== '') payload[k] = v;
+  }
+  payload.is_enabled = form.querySelector('[name=is_enabled]').checked;
+
+  fetch(`/admin/external-interfaces/api/configs/${ifType}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  })
+  .then(r => r.json())
+  .then(data => showAlert(data.success ? 'success' : 'danger', data.message))
+  .catch(() => showAlert('danger', '保存失败，请重试'));
+}
+
+function checkInterface(ifType) {
+  showAlert('info', '正在检测接口可用性...');
+  fetch(`/admin/external-interfaces/api/configs/${ifType}/check`, {method: 'POST'})
+  .then(r => r.json())
+  .then(data => {
+    const msg = data.status === 'ok' ? `接口正常` : `接口异常: ${data.message}`;
+    showAlert(data.status === 'ok' ? 'success' : 'danger', msg);
+    // 刷新状态徽章
+    const card = document.getElementById(`card-${ifType}`);
+    if (card) {
+      const badge = card.querySelector('.badge');
+      if (badge) {
+        badge.className = `badge ${data.status === 'ok' ? 'bg-success' : 'bg-danger'}`;
+        badge.textContent = data.status === 'ok' ? '正常' : '异常';
+      }
+    }
+  })
+  .catch(() => showAlert('danger', '检测请求失败'));
+}
+
+function checkAllInterfaces() {
+  showAlert('info', '正在检测所有接口...');
+  fetch('/admin/external-interfaces/api/configs/check-all', {method: 'POST'})
+  .then(r => r.json())
+  .then(data => {
+    const results = data.data || [];
+    const ok = results.filter(r => r.status === 'ok').length;
+    const err = results.filter(r => r.status !== 'ok').length;
+    showAlert(err > 0 ? 'warning' : 'success',
+      `检测完成：${ok} 个正常，${err} 个异常`);
+    results.forEach(r => {
+      const card = document.getElementById(`card-${r.interface_type}`);
+      if (card) {
+        const badge = card.querySelector('.badge');
+        if (badge) {
+          badge.className = `badge ${r.status === 'ok' ? 'bg-success' : 'bg-danger'}`;
+          badge.textContent = r.status === 'ok' ? '正常' : '异常';
+        }
+      }
+    });
+  })
+  .catch(() => showAlert('danger', '检测请求失败'));
+}
+
+function showAlert(type, msg) {
+  const box = document.getElementById('alertBox');
+  box.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">
+    ${msg}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>`;
+}
+</script>
+{% endblock %}

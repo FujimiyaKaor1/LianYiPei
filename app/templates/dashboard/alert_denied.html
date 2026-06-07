@@ -1,0 +1,9 @@
+{% extends "layout/base.html" %}
+{% block title %}无权限 - 链易配{% endblock %}
+{% block content %}
+<div class="alert alert-danger">
+    <h4><i class="bi bi-lock"></i> 无权限访问</h4>
+    <p>预警阈值设置与补链报告下载仅限政府管理员使用。</p>
+    <a href="{{ url_for('main.index') }}" class="btn btn-primary">返回首页</a>
+</div>
+{% endblock %}

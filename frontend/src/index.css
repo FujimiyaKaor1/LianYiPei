@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-display: "Inter", -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+
+  --color-primary: #000000;
+  --color-surface: #F8F9FA;
+  --color-on-surface: #1A1C1E;
+  --color-surface-container-lowest: #FFFFFF;
+  --color-surface-container-low: #F3F4F5;
+  --color-surface-container-high: #E7E8E9;
+  --color-surface-container-highest: #E1E3E4;
+  --color-outline-variant: #C6C6C6;
+  --color-error: #BA1A1A;
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-on-surface font-sans antialiased;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display tracking-tight;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-surface-container-lowest/85 backdrop-blur-xl;
+  }
+  
+  .ghost-border {
+    @apply border border-outline-variant/20;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Safari and Chrome */
+  }
+}
+

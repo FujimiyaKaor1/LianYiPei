@@ -1,0 +1,354 @@
+{% extends "base.html" %}
+
+{% block title %}消息中心 - 链易配{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="bi bi-envelope"></i> 消息中心
+                    {% if stats.unread > 0 %}
+                    <span class="badge bg-danger">{{ stats.unread }}</span>
+                    {% endif %}
+                </h2>
+                <div>
+                    <button class="btn btn-outline-primary" id="markAllReadBtn">
+                        <i class="bi bi-check-all"></i> 全部标记为已读
+                    </button>
+                    <button class="btn btn-outline-danger" id="deleteSelectedBtn" disabled>
+                        <i class="bi bi-trash"></i> 删除选中
+                    </button>
+                </div>
+            </div>
+
+            <!-- 统计卡片 -->
+            <div class="row mb-4">
+                <div class="col-md-2">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ stats.total }}</h5>
+                            <p class="card-text text-muted">全部消息</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title text-danger">{{ stats.unread }}</h5>
+                            <p class="card-text text-muted">未读消息</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title text-warning">{{ stats.unread_by_type.alert }}</h5>
+                            <p class="card-text text-muted">预警消息</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title text-info">{{ stats.unread_by_type.transaction }}</h5>
+                            <p class="card-text text-muted">交易消息</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title text-success">{{ stats.unread_by_type.inquiry }}</h5>
+                            <p class="card-text text-muted">询价消息</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title text-primary">{{ stats.unread_by_type.credit }}</h5>
+                            <p class="card-text text-muted">信用分消息</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 筛选器 -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <form method="get" class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">消息类型</label>
+                            <select name="type" class="form-select" onchange="this.form.submit()">
+                                <option value="">全部类型</option>
+                                <option value="alert" {% if current_type == 'alert' %}selected{% endif %}>预警消息</option>
+                                <option value="transaction" {% if current_type == 'transaction' %}selected{% endif %}>交易消息</option>
+                                <option value="inquiry" {% if current_type == 'inquiry' %}selected{% endif %}>询价消息</option>
+                                <option value="credit" {% if current_type == 'credit' %}selected{% endif %}>信用分消息</option>
+                                <option value="system" {% if current_type == 'system' %}selected{% endif %}>系统消息</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">已读状态</label>
+                            <select name="read" class="form-select" onchange="this.form.submit()">
+                                <option value="">全部状态</option>
+                                <option value="false" {% if current_read == 'false' %}selected{% endif %}>未读</option>
+                                <option value="true" {% if current_read == 'true' %}selected{% endif %}>已读</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">&nbsp;</label>
+                            <div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-funnel"></i> 筛选
+                                </button>
+                                <a href="{{ url_for('messages.index') }}" class="btn btn-secondary">
+                                    <i class="bi bi-x-circle"></i> 清除
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 消息列表 -->
+            <div class="card">
+                <div class="card-body p-0">
+                    {% if messages %}
+                    <div class="list-group list-group-flush">
+                        {% for message in messages %}
+                        <div class="list-group-item {% if not message.is_read %}bg-light{% endif %} {% if message.message_type == 'alert' %}border-start border-danger border-4{% endif %}">
+                            <div class="d-flex align-items-start">
+                                <div class="form-check me-3">
+                                    <input class="form-check-input message-checkbox" type="checkbox" value="{{ message.id }}">
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div>
+                                            <h6 class="mb-1">
+                                                {% if message.message_type == 'alert' %}
+                                                <span class="badge bg-danger me-2">预警</span>
+                                                {% elif message.message_type == 'transaction' %}
+                                                <span class="badge bg-info me-2">交易</span>
+                                                {% elif message.message_type == 'inquiry' %}
+                                                <span class="badge bg-success me-2">询价</span>
+                                                {% elif message.message_type == 'credit' %}
+                                                <span class="badge bg-primary me-2">信用分</span>
+                                                {% elif message.message_type == 'system' %}
+                                                <span class="badge bg-secondary me-2">系统</span>
+                                                {% endif %}
+                                                
+                                                {% if message.priority == 'high' %}
+                                                <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+                                                {% endif %}
+                                                
+                                                <a href="{{ url_for('messages.detail', message_id=message.id) }}" class="text-decoration-none {% if not message.is_read %}fw-bold{% endif %}">
+                                                    {{ message.title }}
+                                                </a>
+                                                
+                                                {% if not message.is_read %}
+                                                <span class="badge bg-danger ms-2">未读</span>
+                                                {% endif %}
+                                            </h6>
+                                            {% if message.content %}
+                                            <p class="mb-1 text-muted small">
+                                                {{ message.content[:100] }}{% if message.content|length > 100 %}...{% endif %}
+                                            </p>
+                                            {% endif %}
+                                        </div>
+                                        <small class="text-muted">{{ message.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                                    </div>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        {% if message.link_url %}
+                                        <a href="{{ message.link_url }}" class="btn btn-outline-primary btn-sm">
+                                            <i class="bi bi-box-arrow-up-right"></i> 查看详情
+                                        </a>
+                                        {% endif %}
+                                        {% if message.is_read %}
+                                        <button class="btn btn-outline-secondary btn-sm mark-unread-btn" data-id="{{ message.id }}">
+                                            <i class="bi bi-envelope"></i> 标记未读
+                                        </button>
+                                        {% else %}
+                                        <button class="btn btn-outline-success btn-sm mark-read-btn" data-id="{{ message.id }}">
+                                            <i class="bi bi-envelope-open"></i> 标记已读
+                                        </button>
+                                        {% endif %}
+                                        <button class="btn btn-outline-danger btn-sm delete-btn" data-id="{{ message.id }}">
+                                            <i class="bi bi-trash"></i> 删除
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
+                        <p class="text-muted mt-3">暂无消息</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 分页 -->
+            {% if pagination.pages > 1 %}
+            <nav class="mt-4">
+                <ul class="pagination justify-content-center">
+                    <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('messages.index', page=pagination.page-1, type=current_type, read=current_read) }}">上一页</a>
+                    </li>
+                    {% for p in range(1, pagination.pages + 1) %}
+                    <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('messages.index', page=p, type=current_type, read=current_read) }}">{{ p }}</a>
+                    </li>
+                    {% endfor %}
+                    <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                        <a class="page-link" href="{{ url_for('messages.index', page=pagination.page+1, type=current_type, read=current_read) }}">下一页</a>
+                    </li>
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 全选/取消全选
+    const checkboxes = document.querySelectorAll('.message-checkbox');
+    const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
+    
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', function() {
+            const anyChecked = Array.from(checkboxes).some(c => c.checked);
+            deleteSelectedBtn.disabled = !anyChecked;
+        });
+    });
+    
+    // 标记已读
+    document.querySelectorAll('.mark-read-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const messageId = this.dataset.id;
+            fetch(`/messages/${messageId}/mark-read`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert(data.message);
+                }
+            });
+        });
+    });
+    
+    // 标记未读
+    document.querySelectorAll('.mark-unread-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const messageId = this.dataset.id;
+            fetch(`/messages/${messageId}/mark-unread`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert(data.message);
+                }
+            });
+        });
+    });
+    
+    // 删除消息
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (!confirm('确定要删除这条消息吗？')) return;
+            
+            const messageId = this.dataset.id;
+            fetch(`/messages/${messageId}/delete`, {
+                method: 'POST',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert(data.message);
+                }
+            });
+        });
+    });
+    
+    // 全部标记为已读
+    document.getElementById('markAllReadBtn').addEventListener('click', function() {
+        if (!confirm('确定要将所有消息标记为已读吗？')) return;
+        
+        const formData = new FormData();
+        formData.append('type', '{{ current_type }}');
+        
+        fetch('/messages/mark-all-read', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.message);
+            }
+        });
+    });
+    
+    // 批量删除
+    deleteSelectedBtn.addEventListener('click', function() {
+        const selectedIds = Array.from(checkboxes)
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+        
+        if (selectedIds.length === 0) {
+            alert('请选择要删除的消息');
+            return;
+        }
+        
+        if (!confirm(`确定要删除选中的 ${selectedIds.length} 条消息吗？`)) return;
+        
+        const formData = new FormData();
+        selectedIds.forEach(id => formData.append('message_ids[]', id));
+        
+        fetch('/messages/delete-batch', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.message);
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

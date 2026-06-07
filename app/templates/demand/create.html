@@ -1,0 +1,65 @@
+{% extends "layout/base.html" %}
+
+{% block title %}发布供需 - 链易配{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="bi bi-plus-circle"></i> 发布供需信息</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="type" class="form-label">类型 *</label>
+                        <select class="form-select" id="type" name="type" required>
+                            <option value="supply">供应</option>
+                            <option value="demand">需求</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="product_name" class="form-label">产品名称 *</label>
+                        <input type="text" class="form-control" id="product_name" name="product_name" required list="product-list" placeholder="输入或选择产品">
+                        <datalist id="product-list">
+                            {% for product in products %}
+                            <option value="{{ product.name }}">
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="quantity" class="form-label">数量</label>
+                                <input type="number" class="form-control" id="quantity" name="quantity" min="1">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="unit" class="form-label">单位</label>
+                                <select class="form-select" id="unit" name="unit">
+                                    <option value="件">件</option>
+                                    <option value="台">台</option>
+                                    <option value="吨">吨</option>
+                                    <option value="千克">千克</option>
+                                    <option value="米">米</option>
+                                    <option value="套">套</option>
+                                    <option value="批">批</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">详细描述</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" placeholder="请输入产品规格、质量要求等详细信息"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> 发布
+                    </button>
+                    <a href="{{ url_for('demand.list_demands') }}" class="btn btn-secondary">取消</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

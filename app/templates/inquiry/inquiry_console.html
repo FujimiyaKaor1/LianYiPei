@@ -1,0 +1,1048 @@
+{% extends "layout/base.html" %}
+{% block title %}询价控制台 - 链易配{% endblock %}
+{% block extra_css %}
+<style>
+    :root {
+        --console-sidebar-w: 280px;
+        --console-insight-w: 300px;
+        --header-h: 64px;
+        --chat-header-h: 52px;
+        --input-area-h: 72px;
+        --radius-lg: 20px;
+        --radius-md: 14px;
+        --radius-sm: 8px;
+    }
+
+    .console-layout {
+        display: grid;
+        grid-template-columns: var(--console-sidebar-w) 1fr var(--console-insight-w);
+        height: calc(100vh - var(--header-h));
+        overflow: hidden;
+        background: var(--bg);
+    }
+
+    /* ── 左侧会话列表 ── */
+    .console-sidebar {
+        background: #fff;
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .sidebar-header {
+        padding: 16px 20px 12px;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+    }
+
+    .sidebar-header h5 {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 10px;
+    }
+
+    .sidebar-tabs {
+        display: flex;
+        gap: 4px;
+    }
+
+    .sidebar-tabs .tab-btn {
+        flex: 1;
+        padding: 5px 0;
+        font-size: 12px;
+        font-weight: 500;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+
+    .sidebar-tabs .tab-btn.active {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: #fff;
+    }
+
+    .chat-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 12px;
+    }
+
+    .chat-list::-webkit-scrollbar { width: 4px; }
+    .chat-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .chat-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        transition: background 0.15s;
+        border: 1px solid transparent;
+        margin-bottom: 4px;
+    }
+
+    .chat-item:hover { background: var(--primary-light); }
+    .chat-item.active { background: var(--primary-light); border-color: var(--primary); }
+    .chat-item.has-unread .chat-name { font-weight: 700; }
+
+    .chat-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        font-weight: 700;
+        flex-shrink: 0;
+    }
+
+    .chat-avatar.buyer-mode { background: #EEF2FF; color: var(--primary); }
+    .chat-avatar.sales-mode { background: #FFF7E6; color: #E6A23C; }
+
+    .chat-info { flex: 1; min-width: 0; }
+
+    .chat-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .chat-preview {
+        font-size: 11px;
+        color: var(--text-light);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-top: 2px;
+    }
+
+    .chat-meta {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+        flex-shrink: 0;
+    }
+
+    .chat-time { font-size: 10px; color: var(--text-light); }
+    .unread-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); }
+
+    /* ── 中间聊天区 ── */
+    .console-main {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background: var(--bg);
+    }
+
+    .chat-header {
+        height: var(--chat-header-h);
+        padding: 0 20px;
+        background: #fff;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-shrink: 0;
+    }
+
+    .chat-header-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--primary-light);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--primary);
+        font-size: 14px;
+    }
+
+    .chat-header-title { font-size: 14px; font-weight: 600; color: var(--text); }
+    .chat-header-sub { font-size: 11px; color: var(--text-light); }
+
+    .chat-header-status { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+
+    .status-badge {
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 500;
+    }
+
+    .status-badge.active { background: #E8F8E8; color: #00B42A; }
+    .status-badge.quoted { background: #FFF3E0; color: #E6A23C; }
+    .status-badge.closed { background: #F5F5F5; color: var(--text-light); }
+
+    .messages-area {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .messages-area::-webkit-scrollbar { width: 4px; }
+    .messages-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .msg-row { display: flex; gap: 10px; max-width: 75%; }
+    .msg-row.mine { flex-direction: row-reverse; margin-left: auto; }
+
+    .msg-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 700;
+        align-self: flex-end;
+    }
+
+    .msg-row.theirs .msg-avatar { background: #EEF2FF; color: var(--primary); }
+    .msg-row.mine .msg-avatar { background: var(--primary); color: #fff; }
+
+    .msg-bubble {
+        padding: 10px 14px;
+        border-radius: var(--radius-md);
+        font-size: 13px;
+        line-height: 1.6;
+    }
+
+    .msg-row.theirs .msg-bubble { background: #fff; color: var(--text); border: 1px solid var(--border); }
+    .msg-row.mine .msg-bubble { background: var(--primary); color: #fff; }
+
+    .msg-time { font-size: 10px; color: var(--text-light); margin-top: 4px; }
+    .msg-row.mine .msg-time { text-align: right; }
+    .msg-row.theirs .msg-time { text-align: left; }
+
+    .msg-system { text-align: center; font-size: 11px; color: var(--text-light); padding: 4px 0; }
+    .msg-system span {
+        background: var(--bg);
+        padding: 4px 12px;
+        border-radius: 20px;
+        border: 1px solid var(--border);
+    }
+
+    .msg-ai {
+        background: linear-gradient(135deg, #EEF2FF 0%, #fff 100%);
+        border: 1px solid #C7D2FE;
+        color: var(--text);
+    }
+
+    .msg-ai .ai-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--primary);
+        margin-bottom: 6px;
+        letter-spacing: 0.05em;
+    }
+
+    .input-area {
+        height: var(--input-area-h);
+        padding: 12px 20px;
+        background: #fff;
+        border-top: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-shrink: 0;
+    }
+
+    .input-area input {
+        flex: 1;
+        padding: 10px 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        font-size: 13px;
+        outline: none;
+        transition: border-color 0.15s;
+    }
+
+    .input-area input:focus { border-color: var(--primary); }
+
+    .btn-send {
+        padding: 10px 20px;
+        background: var(--primary);
+        color: #fff;
+        border: none;
+        border-radius: var(--radius-md);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.15s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .btn-send:hover { background: #1E5AE8; }
+
+    .btn-quote {
+        padding: 10px 16px;
+        background: #FFF7E6;
+        color: #E6A23C;
+        border: 1px solid #FFD699;
+        border-radius: var(--radius-md);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.15s;
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .btn-quote:hover { background: #FFF3E0; border-color: #E6A23C; }
+
+    /* ── 右侧 AI 评估面板 ── */
+    .console-insights {
+        background: #fff;
+        border-left: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .insights-header {
+        padding: 16px 20px 12px;
+        border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+    }
+
+    .insights-header h6 {
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--text-light);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-bottom: 2px;
+    }
+
+    .insights-header h4 { font-size: 16px; font-weight: 700; color: var(--text); }
+
+    .insights-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .insights-body::-webkit-scrollbar { width: 4px; }
+    .insights-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .insight-card {
+        background: var(--bg);
+        border-radius: var(--radius-md);
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+    }
+
+    .insight-card-label { font-size: 11px; color: var(--text-light); margin-bottom: 6px; }
+
+    .insight-card-value {
+        font-size: 22px;
+        font-weight: 800;
+        color: var(--primary);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    .insight-sub { font-size: 10px; color: var(--text-light); margin-top: 4px; }
+    .insight-sub .positive { color: #00B42A; font-weight: 600; }
+
+    .progress-bar-custom {
+        height: 4px;
+        background: var(--border);
+        border-radius: 2px;
+        margin-top: 8px;
+        overflow: hidden;
+    }
+
+    .progress-bar-custom .fill {
+        height: 100%;
+        background: var(--primary);
+        border-radius: 2px;
+        transition: width 0.6s ease;
+    }
+
+    .risk-low { color: #00B42A; }
+    .risk-mid { color: #E6A23C; }
+    .risk-high { color: #F53F3F; }
+
+    .insight-footer {
+        padding: 12px 16px;
+        border-top: 1px solid var(--border);
+        flex-shrink: 0;
+    }
+
+    .btn-report {
+        width: 100%;
+        padding: 10px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: all 0.15s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    .btn-report:hover {
+        background: var(--primary-light);
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    /* ── 报价 Modal ── */
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(2px);
+        z-index: 1050;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .modal-box {
+        background: #fff;
+        border-radius: var(--radius-lg);
+        width: 100%;
+        max-width: 480px;
+        box-shadow: 0 24px 64px rgba(0, 0, 0, 0.14);
+        overflow: hidden;
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 20px 24px 16px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .modal-header-label {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.15em;
+        color: var(--text-light);
+        text-transform: uppercase;
+    }
+
+    .modal-header h3 { font-size: 16px; font-weight: 700; color: var(--text); margin-top: 4px; }
+    .modal-header .buyer-tag { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+    .modal-body {
+        padding: 20px 24px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .form-field label {
+        display: block;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        margin-bottom: 6px;
+    }
+
+    .form-field label .required { color: #F53F3F; margin-left: 2px; }
+
+    .form-field input,
+    .form-field textarea {
+        width: 100%;
+        padding: 10px 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        font-size: 13px;
+        outline: none;
+        transition: border-color 0.15s;
+    }
+
+    .form-field input:focus,
+    .form-field textarea:focus { border-color: var(--primary); }
+
+    .form-field textarea { resize: none; }
+
+    .credit-hint {
+        background: var(--bg);
+        border-radius: var(--radius-sm);
+        padding: 10px 14px;
+        font-size: 11px;
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .credit-hint .score { font-weight: 700; color: var(--text); }
+
+    .credit-limit-warning {
+        background: #FFF1F0;
+        border: 1px solid #FFCCC7;
+        border-radius: var(--radius-sm);
+        padding: 10px 14px;
+        font-size: 11px;
+        color: #F53F3F;
+    }
+
+    .modal-footer {
+        padding: 16px 24px 20px;
+        display: flex;
+        gap: 10px;
+    }
+
+    .btn-cancel {
+        flex: 1;
+        padding: 12px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        cursor: pointer;
+    }
+
+    .btn-cancel:hover { background: #E8E8E8; }
+
+    .btn-submit-quote {
+        flex: 2;
+        padding: 12px;
+        background: var(--primary);
+        border: none;
+        border-radius: var(--radius-md);
+        font-size: 13px;
+        font-weight: 600;
+        color: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    .btn-submit-quote:hover { background: #1E5AE8; }
+    .btn-submit-quote:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── 空状态 ── */
+    .empty-state {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        color: var(--text-light);
+        padding: 40px;
+        text-align: center;
+    }
+
+    .empty-state i { font-size: 40px; margin-bottom: 8px; opacity: 0.4; }
+    .empty-state p { font-size: 13px; }
+    .empty-state small { font-size: 11px; }
+
+    /* ── 匿名标识 ── */
+    .anonymous-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        background: #FFF7E6;
+        border: 1px solid #FFD699;
+        border-radius: 20px;
+        font-size: 10px;
+        color: #E6A23C;
+    }
+</style>
+{% endblock %}
+
+{% block page_content %}
+<div class="console-layout">
+
+    <!-- 左侧：会话列表 -->
+    <aside class="console-sidebar">
+        <div class="sidebar-header">
+            <h5>对话消息</h5>
+            <div class="sidebar-tabs">
+                <button class="tab-btn active" id="tab-procurement" onclick="switchTab('procurement')">采购</button>
+                <button class="tab-btn" id="tab-sales" onclick="switchTab('sales')">销售</button>
+            </div>
+        </div>
+        <div class="chat-list" id="chatList">
+            <div class="empty-state">
+                <i class="bi bi-chat-left-dots"></i>
+                <p>暂无会话</p>
+                <small>匹配成功后自动创建</small>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 中间：聊天区 -->
+    <main class="console-main" id="chatMain">
+        {% if active_chat %}
+            <div class="chat-header">
+                <div class="chat-header-icon">
+                    <i class="bi bi-chat-dots"></i>
+                </div>
+                <div>
+                    <div class="chat-header-title">
+                        与 <span id="counterpartyName">{{ counterparty_name }}</span> 的对话
+                        {% if active_chat.is_anonymous %}
+                            <span class="anonymous-badge"><i class="bi bi-eye-slash"></i> 匿名询价</span>
+                        {% endif %}
+                    </div>
+                    <div class="chat-header-sub" id="productNameLabel">
+                        {{ active_chat.product_name or '精密零部件' }}
+                    </div>
+                </div>
+                <div class="chat-header-status">
+                    <span class="status-badge {{ active_chat.status }}" id="chatStatusBadge">
+                        {{ {'active': '询价中', 'quoted': '已报价', 'closed': '已关闭'}.get(active_chat.status, '活跃') }}
+                    </span>
+                </div>
+            </div>
+
+            <div class="messages-area" id="messagesArea">
+                {% for msg in messages %}
+                    {% if msg.message_type == 'system' %}
+                        <div class="msg-system"><span>{{ msg.content }}</span></div>
+                    {% elif msg.is_mine %}
+                        <div class="msg-row mine">
+                            <div class="msg-avatar">我</div>
+                            <div>
+                                <div class="msg-bubble">{{ msg.content }}</div>
+                                <div class="msg-time">{{ msg.created_at.strftime('%H:%M') if msg.created_at else '' }}</div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="msg-row theirs">
+                            <div class="msg-avatar">{{ msg.sender_name[:1] }}</div>
+                            <div>
+                                <div class="msg-bubble">{{ msg.content }}</div>
+                                <div class="msg-time">{{ msg.sender_name }} &middot; {{ msg.created_at.strftime('%H:%M') if msg.created_at else '' }}</div>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            <div class="input-area">
+                <input type="text" id="msgInput" placeholder="输入消息内容..." onkeydown="handleInputKeydown(event)">
+                <button class="btn-quote" onclick="openQuoteModal()">
+                    <i class="bi bi-file-earmark-text"></i> 正式报价单
+                </button>
+                <button class="btn-send" onclick="sendMessage()">
+                    <i class="bi bi-send"></i> 发送
+                </button>
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <i class="bi bi-chat-dots" style="font-size:56px;"></i>
+                <p style="font-size:15px;font-weight:600;">请从左侧选择一条会话</p>
+                <small>选择后将展示与对方的加密对话与 AI 建议</small>
+            </div>
+        {% endif %}
+    </main>
+
+    <!-- 右侧：AI 商机评估面板 -->
+    <aside class="console-insights">
+        <div class="insights-header">
+            <h6>AI 实时分析</h6>
+            <h4>商机洞察</h4>
+        </div>
+        <div class="insights-body">
+            {% if insights %}
+                <div class="insight-card">
+                    <div class="insight-card-label">匹配度</div>
+                    <div class="insight-card-value">
+                        {{ insights.match_score }}%
+                        <i class="bi bi-shield-check icon" style="color:#00B42A;"></i>
+                    </div>
+                    <div class="progress-bar-custom">
+                        <div class="fill" style="width:{{ insights.match_score }}%;"></div>
+                    </div>
+                </div>
+                <div class="insight-card">
+                    <div class="insight-card-label">预计利润率</div>
+                    <div class="insight-card-value">
+                        {{ insights.profit_rate }}%
+                        {% if insights.profit_rate >= 12 %}
+                            <span class="positive">+2.1%</span>
+                        {% else %}
+                            <span class="positive">+0.8%</span>
+                        {% endif %}
+                    </div>
+                    <div class="insight-sub">基于当前需求估算</div>
+                </div>
+                <div class="insight-card">
+                    <div class="insight-card-label">客户风险评估</div>
+                    <div class="insight-card-value" style="font-size:18px;">
+                        {% if insights.risk_level == '低风险' %}
+                            <span class="risk-low">{{ insights.risk_level }}</span>
+                        {% elif insights.risk_level == '高风险' %}
+                            <span class="risk-high">{{ insights.risk_level }}</span>
+                        {% else %}
+                            <span class="risk-mid">{{ insights.risk_level }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="insight-sub">
+                        信用评级：{{ insights.level }}（<strong>{{ insights.credit_score | int }}分</strong>）
+                    </div>
+                </div>
+            {% else %}
+                <div class="empty-state" style="padding:20px;">
+                    <i class="bi bi-graph-up" style="font-size:28px;"></i>
+                    <p style="font-size:12px;">暂无商机评估数据</p>
+                </div>
+            {% endif %}
+        </div>
+        <div class="insight-footer">
+            <button class="btn-report" onclick="viewDetailedReport()">
+                <i class="bi bi-file-earmark-bar-graph"></i> 查看详细分析报告
+            </button>
+        </div>
+    </aside>
+</div>
+
+<!-- 正式报价 Modal -->
+<div class="modal-overlay" id="quoteModal" style="display:none;">
+    <div class="modal-box" role="dialog" aria-modal="true">
+        <div class="modal-header">
+            <div>
+                <div class="modal-header-label">意向报价</div>
+                <h3 id="modalProductName">精密减速机</h3>
+                <div class="buyer-tag" id="modalBuyerTag">买家：匿名上市车企</div>
+            </div>
+            <button onclick="closeQuoteModal()" style="flex:none;padding:6px 10px;border:none;background:transparent;cursor:pointer;">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="form-field">
+                <label>预估单价（元）<span class="required">*</span></label>
+                <input type="number" id="quotePrice" min="0" step="0.01" placeholder="例如 128.50">
+            </div>
+            <div class="form-field">
+                <label>预计交期（天）<span class="required">*</span></label>
+                <input type="number" id="quoteDeliveryDays" min="1" step="1" placeholder="例如 15">
+            </div>
+            <div class="form-field">
+                <label>补充说明（选填）</label>
+                <textarea id="quoteRemarks" rows="3" placeholder="质保、开票、付款方式等"></textarea>
+            </div>
+            <div id="quoteErrorBox" style="display:none;" class="credit-limit-warning"></div>
+            <div class="credit-hint" id="creditHintBox">
+                <i class="bi bi-info-circle"></i>
+                <span>信用分 <span class="score" id="myCreditScore">--</span>
+                &middot; 报价额度 <span id="quoteLimitLabel">加载中...</span></span>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="closeQuoteModal()">取消</button>
+            <button class="btn-submit-quote" id="submitQuoteBtn" onclick="submitFormalQuote()">
+                <i class="bi bi-check-circle"></i> 发送报价
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    'use strict';
+
+    // ── 全局状态 ──
+    var activeChatId = {{ active_chat.id if active_chat else 'null' }};
+    var currentMode = '{{ current_mode or "procurement" }}';
+    var isSubmitting = false;
+
+    // ── Tab 切换 ──
+    function switchTab(mode) {
+        currentMode = mode;
+        var tabs = document.querySelectorAll('.tab-btn');
+        for (var i = 0; i < tabs.length; i++) {
+            tabs[i].classList.remove('active');
+        }
+        var targetTab = document.getElementById('tab-' + mode);
+        if (targetTab) targetTab.classList.add('active');
+        loadChatList();
+    }
+
+    // ── 工具函数 ──
+    function escapeHtml(str) {
+        if (!str) return '';
+        str = String(str);
+        return str.replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;');
+    }
+
+    function formatTime(isoStr) {
+        if (!isoStr) return '';
+        try {
+            var d = new Date(isoStr);
+            if (isNaN(d.getTime())) return '';
+            return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+        } catch (e) { return ''; }
+    }
+
+    // ── 加载会话列表 ──
+    function loadChatList() {
+        fetch('/api/inquiry-chat/list?role=' + encodeURIComponent(currentMode) + '&limit=50', {
+            credentials: 'include'
+        }).then(function(r) { return r.json(); })
+          .then(function(data) {
+              if (data.success && data.chats) {
+                  renderChatList(data.chats);
+              } else {
+                  renderEmptyChatList();
+              }
+          }).catch(function() { renderEmptyChatList(); });
+    }
+
+    function renderChatList(chats) {
+        var container = document.getElementById('chatList');
+        if (!container) return;
+        if (!chats || !chats.length) { renderEmptyChatList(); return; }
+
+        var html = '';
+        for (var i = 0; i < chats.length; i++) {
+            var chat = chats[i];
+            var isActive = activeChatId && activeChatId === chat.id;
+            var avatarClass = currentMode === 'procurement' ? 'buyer-mode' : 'sales-mode';
+            var time = formatTime(chat.latest_message_at);
+            var preview = escapeHtml(chat.latest_message || chat.product_name || '暂无消息');
+
+            html += '<div class="chat-item' + (isActive ? ' active' : '') + '" ' +
+                    'onclick="selectChat(' + chat.id + ')">' +
+                    '<div class="chat-avatar ' + avatarClass + '">' +
+                    escapeHtml(chat.counterparty_name).charAt(0) + '</div>' +
+                    '<div class="chat-info">' +
+                    '<div class="chat-name">' + escapeHtml(chat.counterparty_name) + '</div>' +
+                    '<div class="chat-preview">' + preview + '</div></div>' +
+                    '<div class="chat-meta">' +
+                    '<span class="chat-time">' + time + '</span>' +
+                    (chat.status === 'active' ? '<span class="unread-dot"></span>' : '') +
+                    '</div></div>';
+        }
+        container.innerHTML = html;
+    }
+
+    function renderEmptyChatList() {
+        var label = currentMode === 'procurement' ? '采购' : '销售';
+        var container = document.getElementById('chatList');
+        if (!container) return;
+        container.innerHTML = '<div class="empty-state"><i class="bi bi-chat-left-dots"></i>' +
+            '<p>暂无' + label + '会话</p><small>匹配成功后自动创建</small></div>';
+    }
+
+    // ── 选择会话 ──
+    function selectChat(chatId) {
+        window.location.href = '/inquiry-console?chat_id=' + chatId;
+    }
+
+    // ── 发送消息 ──
+    function sendMessage() {
+        if (!activeChatId) return;
+        var input = document.getElementById('msgInput');
+        if (!input) return;
+        var content = (input.value || '').trim();
+        if (!content) return;
+
+        fetch('/api/inquiry-chat/' + activeChatId + '/message', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: content, message_type: 'text' })
+        }).then(function(r) { return r.json(); })
+          .then(function(data) {
+              if (data.success) {
+                  input.value = '';
+                  appendMessage({
+                      content: content,
+                      sender_name: '我',
+                      is_mine: true,
+                      message_type: 'text',
+                      created_at: new Date().toISOString()
+                  });
+              }
+          }).catch(function(e) { console.error('发送失败', e); });
+    }
+
+    function handleInputKeydown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    }
+
+    function appendMessage(msg) {
+        var area = document.getElementById('messagesArea');
+        if (!area) return;
+        var time = formatTime(msg.created_at);
+        var row = document.createElement('div');
+        row.className = 'msg-row ' + (msg.is_mine ? 'mine' : 'theirs');
+        var avatarChar = msg.is_mine ? '我' : ((msg.sender_name || '?').charAt(0));
+        var nameTime = msg.is_mine ? '' : (escapeHtml(msg.sender_name || '') + ' &middot; ') + time;
+        row.innerHTML = '<div class="msg-avatar">' + avatarChar + '</div>' +
+                        '<div><div class="msg-bubble">' + escapeHtml(msg.content) + '</div>' +
+                        '<div class="msg-time">' + nameTime + '</div></div>';
+        area.appendChild(row);
+        area.scrollTop = area.scrollHeight;
+    }
+
+    // ── 报价 Modal ──
+    function openQuoteModal() {
+        if (!activeChatId) return;
+        var modal = document.getElementById('quoteModal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+        var errBox = document.getElementById('quoteErrorBox');
+        if (errBox) errBox.style.display = 'none';
+        var priceEl = document.getElementById('quotePrice');
+        if (priceEl) priceEl.value = '';
+        var deliveryEl = document.getElementById('quoteDeliveryDays');
+        if (deliveryEl) deliveryEl.value = '15';
+        var remarksEl = document.getElementById('quoteRemarks');
+        if (remarksEl) remarksEl.value = '';
+        loadMyCreditForModal();
+    }
+
+    function closeQuoteModal() {
+        var modal = document.getElementById('quoteModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function loadMyCreditForModal() {
+        fetch('/api/user/me', { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(meData) {
+                if (!meData.id) return;
+                return fetch('/api/credit/score/' + meData.id, { credentials: 'include' });
+            })
+            .then(function(r) { return r ? r.json() : null; })
+            .then(function(scoreData) {
+                if (!scoreData) return;
+                var score = scoreData.credit_score || 0;
+                var limit = scoreData.privileges && scoreData.privileges.daily_quote_limit;
+                var label = (limit === 'unlimited' || score >= 90) ? '报价额度充足' : '今日剩余 ' + (limit || 3) + ' 次';
+                var scoreEl = document.getElementById('myCreditScore');
+                var limitEl = document.getElementById('quoteLimitLabel');
+                if (scoreEl) scoreEl.textContent = Math.round(score);
+                if (limitEl) limitEl.textContent = label;
+            }).catch(function(e) { console.error('加载信用分失败', e); });
+    }
+
+    function submitFormalQuote() {
+        if (isSubmitting) return;
+        var priceEl = document.getElementById('quotePrice');
+        var deliveryEl = document.getElementById('quoteDeliveryDays');
+        var remarksEl = document.getElementById('quoteRemarks');
+        var price = parseFloat(priceEl && priceEl.value);
+        var deliveryDays = parseInt(deliveryEl && deliveryEl.value);
+        var remarks = (remarksEl && remarksEl.value || '').trim();
+
+        var errBox = document.getElementById('quoteErrorBox');
+        if (!price || price <= 0) {
+            if (errBox) { errBox.textContent = '请填写有效的预估单价（元）'; errBox.style.display = 'block'; }
+            return;
+        }
+        if (!deliveryDays || deliveryDays < 1) {
+            if (errBox) { errBox.textContent = '请填写预计交期（天）'; errBox.style.display = 'block'; }
+            return;
+        }
+
+        isSubmitting = true;
+        var btn = document.getElementById('submitQuoteBtn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> 发送中...'; }
+
+        fetch('/api/inquiry-chat/' + activeChatId + '/quote', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                price: price,
+                quantity: 1,
+                unit: '件',
+                delivery_days: deliveryDays,
+                remarks: remarks
+            })
+        }).then(function(r) { return r.json(); })
+          .then(function(data) {
+              if (data.success) {
+                  closeQuoteModal();
+                  showSuccessToast('意向报价已成功发送');
+                  window.location.reload();
+              } else {
+                  var msg = data.error || '报价提交失败';
+                  if (data.credit_limit_reached) {
+                      msg = '今日报价次数已达上限（' + (data.daily_quote_limit || 3) + '次），' +
+                            '提升信用分可解锁更多次数。当前信用分：' +
+                            Math.round(data.credit_score || 0) + '分';
+                  }
+                  if (errBox) { errBox.textContent = msg; errBox.style.display = 'block'; }
+              }
+          }).catch(function() {
+              if (errBox) { errBox.textContent = '网络错误，请稍后重试'; errBox.style.display = 'block'; }
+          }).finally(function() {
+              isSubmitting = false;
+              var btn = document.getElementById('submitQuoteBtn');
+              if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-circle"></i> 发送报价'; }
+          });
+    }
+
+    function showSuccessToast(msg) {
+        var toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;bottom:32px;left:50%;transform:translateX(-50%);' +
+            'background:#1a1a1a;color:#fff;padding:10px 24px;border-radius:24px;' +
+            'font-size:13px;font-weight:500;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,0.2);white-space:nowrap;';
+        toast.textContent = '\u2705 ' + msg;
+        document.body.appendChild(toast);
+        setTimeout(function() { toast.remove(); }, 3200);
+    }
+
+    function viewDetailedReport() {
+        if (!activeChatId) return;
+        alert('\u8be6\u7ec6\u5206\u6790\u62a5\u544a\u529f\u80fd\u5f00\u53d1\u4e2d\uff0c\u656c\u671f\u671f\u5f85\uff01');
+    }
+
+    // ── 初始化 ──
+    document.addEventListener('DOMContentLoaded', function() {
+        loadChatList();
+    });
+})();
+</script>
+{% endblock %}

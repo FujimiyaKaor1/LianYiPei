@@ -1,0 +1,522 @@
+{% extends "layout/base.html" %}
+
+{% block title %}企业定期抽查 - 链易配{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- 页面标题 -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="mb-0"><i class="bi bi-search"></i> 企业定期抽查</h4>
+        <div class="d-flex gap-2">
+            <button class="btn btn-primary" onclick="runCheck()">
+                <i class="bi bi-play-circle"></i> 立即抽查
+            </button>
+            <button class="btn btn-outline-primary" onclick="refreshPage()">
+                <i class="bi bi-arrow-repeat"></i> 刷新
+            </button>
+        </div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <div class="fs-1 fw-bold" id="totalCount">0</div>
+                    <small>企业总数</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <div class="fs-1 fw-bold" id="activeCount">0</div>
+                    <small>正常企业</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <div class="fs-1 fw-bold" id="abnormalCount">0</div>
+                    <small>状态异常</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-secondary text-white">
+                <div class="card-body text-center">
+                    <div class="fs-1 fw-bold" id="dormantCount">0</div>
+                    <small>已休眠企业</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 消息提示 -->
+    <div id="messageBox"></div>
+
+    <div class="row">
+        <!-- 配置面板 -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-gear"></i> 抽查配置
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="enabledSwitch" 
+                                   onchange="updateConfig()">
+                            <label class="form-check-label" for="enabledSwitch">
+                                启用自动抽查
+                            </label>
+                        </div>
+                        <small class="text-muted">启用后将自动定时抽查企业工商状态</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">抽查间隔（小时）</label>
+                        <input type="number" class="form-control" id="intervalHours" 
+                               min="1" max="168" value="24" onchange="updateConfig()">
+                        <small class="text-muted">每次抽查的间隔时间，建议24小时</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">抽查数量</label>
+                        <input type="number" class="form-control" id="sampleSize" 
+                               min="1" max="100" value="10" onchange="updateConfig()">
+                        <small class="text-muted">每次随机抽查的企业数量</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="autoDelistSwitch" 
+                                   onchange="updateConfig()">
+                            <label class="form-check-label" for="autoDelistSwitch">
+                                自动下架异常企业产品
+                            </label>
+                        </div>
+                        <small class="text-muted">检测到企业注销/吊销时自动下架其产品</small>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <small>
+                            <i class="bi bi-info-circle"></i> 
+                            抽查基于工商数据API，随机抽取已审核通过的企业进行检查。
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 抽查历史 -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-clock-history"></i> 抽查历史</span>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="loadHistory()">
+                        <i class="bi bi-arrow-repeat"></i> 刷新
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>抽查时间</th>
+                                    <th>检查数量</th>
+                                    <th>正常</th>
+                                    <th>异常</th>
+                                    <th>已下架</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyTable">
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-4">
+                                        <i class="bi bi-hourglass-split"></i> 加载中...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 异常企业列表 -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <i class="bi bi-exclamation-triangle text-warning"></i> 状态异常企业
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>企业名称</th>
+                                    <th>工商状态</th>
+                                    <th>是否休眠</th>
+                                    <th>更新时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="abnormalTable">
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">
+                                        <i class="bi bi-check-circle text-success"></i> 暂无异常企业
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 抽查详情模态框 -->
+<div class="modal fade" id="detailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-clipboard-data"></i> 抽查详情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detailContent">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+let detailModal;
+
+document.addEventListener('DOMContentLoaded', function() {
+    detailModal = new bootstrap.Modal(document.getElementById('detailModal'));
+    loadStats();
+    loadHistory();
+    loadAbnormalEnterprises();
+    loadConfig();
+});
+
+function loadConfig() {
+    fetch('/admin/api/enterprise-checks/config')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('enabledSwitch').checked = data.enabled !== false;
+            document.getElementById('intervalHours').value = data.check_interval_hours || 24;
+            document.getElementById('sampleSize').value = data.sample_size || 10;
+            document.getElementById('autoDelistSwitch').checked = data.auto_delist_enabled !== false;
+        })
+        .catch(err => console.error('加载配置失败:', err));
+}
+
+function updateConfig() {
+    const config = {
+        enabled: document.getElementById('enabledSwitch').checked,
+        check_interval_hours: parseInt(document.getElementById('intervalHours').value) || 24,
+        sample_size: parseInt(document.getElementById('sampleSize').value) || 10,
+        auto_delist_enabled: document.getElementById('autoDelistSwitch').checked,
+    };
+    
+    fetch('/admin/api/enterprise-checks/config', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(config)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('success', '配置已保存');
+        } else {
+            showMessage('danger', data.error || '保存失败');
+        }
+    })
+    .catch(err => {
+        console.error('保存配置失败:', err);
+        showMessage('danger', '保存失败');
+    });
+}
+
+function loadStats() {
+    fetch('/admin/api/enterprise-checks/stats')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('totalCount').textContent = data.total || 0;
+            document.getElementById('activeCount').textContent = data.active || 0;
+            document.getElementById('abnormalCount').textContent = data.abnormal || 0;
+            document.getElementById('dormantCount').textContent = data.dormant || 0;
+        })
+        .catch(err => console.error('加载统计失败:', err));
+}
+
+function loadHistory() {
+    fetch('/admin/api/enterprise-checks/history?limit=20')
+        .then(r => r.json())
+        .then(data => {
+            renderHistory(data.history || []);
+        })
+        .catch(err => {
+            console.error('加载历史失败:', err);
+            showMessage('danger', '加载历史失败');
+        });
+}
+
+function renderHistory(history) {
+    const tbody = document.getElementById('historyTable');
+    
+    if (history.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center text-muted py-4">
+                    <i class="bi bi-inbox fs-4 d-block mb-2"></i>
+                    暂无抽查记录
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = history.map(item => `
+        <tr>
+            <td>${formatDate(item.check_time)}</td>
+            <td>${item.total_checked}</td>
+            <td><span class="badge bg-success">${item.active_count}</span></td>
+            <td><span class="badge bg-danger">${item.inactive_count}</span></td>
+            <td><span class="badge bg-warning">${item.delisted_count}</span></td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary" onclick="showDetail('${item.check_time}')">
+                    <i class="bi bi-eye"></i> 详情
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function showDetail(checkTime) {
+    fetch('/admin/api/enterprise-checks/history?limit=100')
+        .then(r => r.json())
+        .then(data => {
+            const history = data.history || [];
+            const item = history.find(h => h.check_time === checkTime);
+            if (item) {
+                renderDetailModal(item);
+                detailModal.show();
+            }
+        })
+        .catch(err => {
+            console.error('加载详情失败:', err);
+            showMessage('danger', '加载详情失败');
+        });
+}
+
+function renderDetailModal(item) {
+    const content = document.getElementById('detailContent');
+    
+    content.innerHTML = `
+        <div class="alert alert-info mb-3">
+            <strong>抽查时间：</strong>${item.check_time}<br>
+            <strong>抽查企业数：</strong>${item.total_checked}
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>企业名称</th>
+                        <th>工商状态</th>
+                        <th>处理动作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${(item.results || []).map(r => `
+                        <tr class="${!r.is_active ? 'table-danger' : ''}">
+                            <td>${escapeHtml(r.enterprise_name)}</td>
+                            <td>
+                                ${getStatusBadge(r.status, r.is_active)}
+                            </td>
+                            <td>${getActionText(r.action)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+        
+        ${(item.errors || []).length > 0 ? `
+            <div class="alert alert-warning mt-3">
+                <strong>错误信息：</strong>
+                <ul class="mb-0">
+                    ${item.errors.map(e => `<li>${escapeHtml(e.enterprise_name)}: ${escapeHtml(e.error)}</li>`).join('')}
+                </ul>
+            </div>
+        ` : ''}
+    `;
+}
+
+function getStatusBadge(status, isActive) {
+    if (isActive) {
+        return '<span class="badge bg-success">正常</span>';
+    }
+    const statusMap = {
+        '注销': '<span class="badge bg-danger">注销</span>',
+        '吊销': '<span class="badge bg-danger">吊销</span>',
+        '清算': '<span class="badge bg-warning">清算中</span>',
+    };
+    return statusMap[status] || `<span class="badge bg-secondary">${status || '未知'}</span>`;
+}
+
+function getActionText(action) {
+    const actionMap = {
+        'none': '<span class="text-muted">无</span>',
+        'flagged': '<span class="badge bg-warning">已标记</span>',
+        'delisted': '<span class="badge bg-danger">已下架</span>',
+    };
+    return actionMap[action] || '<span class="text-muted">-</span>';
+}
+
+function loadAbnormalEnterprises() {
+    // 从API获取状态异常的企业（通过统计接口间接获取）
+    fetch('/admin/api/enterprise-checks/stats')
+        .then(r => r.json())
+        .then(data => {
+            if (data.abnormal > 0 || data.dormant > 0) {
+                // 加载异常企业列表
+                fetch('/admin/api/verifications?status=all&page=1&per_page=100')
+                    .then(r => r.json())
+                    .then(verifications => {
+                        const abnormalEnts = (verifications.items || []).filter(
+                            item => ['注销', '吊销', '清算'].includes(item.business_status) || item.is_dormant
+                        );
+                        renderAbnormalTable(abnormalEnts);
+                    })
+                    .catch(() => renderAbnormalTable([]));
+            } else {
+                renderAbnormalTable([]);
+            }
+        })
+        .catch(() => renderAbnormalTable([]));
+}
+
+function renderAbnormalTable(enterprises) {
+    const tbody = document.getElementById('abnormalTable');
+    
+    if (enterprises.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center text-muted py-4">
+                    <i class="bi bi-check-circle text-success"></i> 暂无异常企业
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = enterprises.map(ent => `
+        <tr class="table-danger">
+            <td>${escapeHtml(ent.name)}</td>
+            <td>${getStatusBadge(ent.business_status, ent.business_status === '存续')}</td>
+            <td>${ent.is_dormant ? '<span class="badge bg-secondary">是</span>' : '<span class="badge bg-success">否</span>'}</td>
+            <td>${ent.biz_data_updated_at || '-'}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-success" onclick="restoreEnterprise(${ent.id})">
+                    <i class="bi bi-arrow-counterclockwise"></i> 恢复
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function restoreEnterprise(id) {
+    if (!confirm('确定要恢复该企业的正常状态吗？')) return;
+    
+    fetch(`/admin/api/enterprise-checks/${id}/restore`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({reason: '管理员手动恢复'})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('success', '企业状态已恢复');
+            loadAbnormalEnterprises();
+            loadStats();
+        } else {
+            showMessage('danger', data.message || '操作失败');
+        }
+    })
+    .catch(err => {
+        console.error('恢复失败:', err);
+        showMessage('danger', '操作失败');
+    });
+}
+
+function runCheck() {
+    if (!confirm('确定要立即执行企业抽查吗？这将随机检查一批企业的工商状态。')) return;
+    
+    showMessage('info', '正在执行抽查，请稍候...');
+    
+    fetch('/admin/api/enterprise-checks/run', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showMessage('success', `抽查完成！检查${data.total_checked}家，异常${data.inactive_count}家`);
+            loadHistory();
+            loadStats();
+            loadAbnormalEnterprises();
+        } else {
+            showMessage('danger', data.message || '抽查失败');
+        }
+    })
+    .catch(err => {
+        console.error('抽查失败:', err);
+        showMessage('danger', '抽查失败');
+    });
+}
+
+function refreshPage() {
+    window.location.reload();
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleString('zh-CN');
+}
+
+function showMessage(type, text) {
+    const box = document.getElementById('messageBox');
+    box.innerHTML = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${text}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    setTimeout(() => {
+        const alert = box.querySelector('.alert');
+        if (alert) alert.remove();
+    }, 5000);
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}

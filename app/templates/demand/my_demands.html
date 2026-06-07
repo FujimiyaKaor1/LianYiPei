@@ -1,0 +1,73 @@
+{% extends "layout/base.html" %}
+
+{% block title %}我的供需 - 链易配{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h4 class="mb-0"><i class="bi bi-list-check"></i> 我的供需信息</h4>
+        <a href="{{ url_for('demand.create') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> 发布新供需
+        </a>
+    </div>
+    <div class="card-body">
+        {% if demands %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>类型</th>
+                        <th>产品</th>
+                        <th>数量</th>
+                        <th>状态</th>
+                        <th>发布时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for demand in demands %}
+                    <tr>
+                        <td>
+                            {% if demand.type == 'supply' %}
+                            <span class="badge bg-success">供应</span>
+                            {% else %}
+                            <span class="badge bg-warning text-dark">需求</span>
+                            {% endif %}
+                        </td>
+                        <td><strong>{{ demand.product.name }}</strong></td>
+                        <td>{{ demand.quantity }} {{ demand.unit }}</td>
+                        <td>
+                            {% if demand.status == 'active' %}
+                            <span class="badge bg-primary">进行中</span>
+                            {% else %}
+                            <span class="badge bg-secondary">已关闭</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ demand.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>
+                            {% if demand.status == 'active' %}
+                            <form action="{{ url_for('demand.close', demand_id=demand.id) }}" method="POST" style="display:inline">
+                                <button type="submit" class="btn btn-outline-warning btn-sm">关闭</button>
+                            </form>
+                            {% endif %}
+                            <form action="{{ url_for('demand.delete', demand_id=demand.id) }}" method="POST" style="display:inline">
+                                <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('确定删除？')">删除</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox fs-1 text-muted"></i>
+            <p class="text-muted mt-3">暂无发布的供需信息</p>
+            <a href="{{ url_for('demand.create') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> 发布第一个供需
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

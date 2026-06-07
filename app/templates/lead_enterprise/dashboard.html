@@ -1,0 +1,132 @@
+{% extends "layout/base.html" %}
+
+{% block title %}链主企业控制台{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+  <div class="row">
+    <div class="col-12">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+          <i class="bi bi-building me-2"></i>链主企业控制台
+          <span class="badge bg-primary ms-2">链主企业</span>
+        </h2>
+        <div>
+          <a href="{{ url_for('lead_enterprise.import_suppliers') }}" class="btn btn-primary">
+            <i class="bi bi-upload me-2"></i>导入供应商
+          </a>
+          <a href="{{ url_for('lead_enterprise.display_control_page') }}" class="btn btn-info">
+            <i class="bi bi-eye me-2"></i>展示控制
+          </a>
+          <a href="{{ url_for('quality_labels.inspection_page') }}" class="btn btn-success">
+            <i class="bi bi-clipboard-check me-2"></i>验厂管理
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 贡献度统计 -->
+  <div class="row mb-4">
+    <div class="col-md-4">
+      <div class="card text-white bg-primary">
+        <div class="card-body">
+          <h5 class="card-title">
+            <i class="bi bi-currency-dollar me-2"></i>带动交易额
+          </h5>
+          <h2 class="mb-0">{{ "%.2f"|format(contribution.total_transaction_amount / 10000) }} 万元</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card text-white bg-success">
+        <div class="card-body">
+          <h5 class="card-title">
+            <i class="bi bi-clipboard-check me-2"></i>验厂企业数量
+          </h5>
+          <h2 class="mb-0">{{ contribution.inspection_count }} 家</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card text-white bg-info">
+        <div class="card-body">
+          <h5 class="card-title">
+            <i class="bi bi-people me-2"></i>管理供应商数量
+          </h5>
+          <h2 class="mb-0">{{ contribution.managed_supplier_count }} 家</h2>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 供应商展示控制列表 -->
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="mb-0">
+            <i class="bi bi-list-ul me-2"></i>供应商展示控制
+          </h5>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>供应商名称</th>
+                  <th>展示模式</th>
+                  <th>授权状态</th>
+                  <th>授权时间</th>
+                  <th>更新时间</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for control in display_controls %}
+                <tr>
+                  <td>{{ control.supplier_name }}</td>
+                  <td>
+                    {% if control.display_mode == 'public' %}
+                      <span class="badge bg-success">公开展示</span>
+                    {% elif control.display_mode == 'lead_only' %}
+                      <span class="badge bg-warning">仅链主可见</span>
+                    {% elif control.display_mode == 'hidden' %}
+                      <span class="badge bg-danger">完全隐藏</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if control.authorized %}
+                      <span class="badge bg-success">已授权</span>
+                    {% else %}
+                      <span class="badge bg-secondary">未授权</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ control.authorized_at or '-' }}</td>
+                  <td>{{ control.updated_at }}</td>
+                  <td>
+                    <a href="{{ url_for('lead_enterprise.display_control_page') }}" 
+                       class="btn btn-sm btn-primary">
+                      <i class="bi bi-pencil"></i> 管理
+                    </a>
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="6" class="text-center text-muted">
+                    暂无供应商记录
+                    <a href="{{ url_for('lead_enterprise.import_suppliers') }}" class="ms-2">
+                      立即导入
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

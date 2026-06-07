@@ -1,0 +1,317 @@
+{% extends "layout/base.html" %}
+
+{% block title %}预警处置 - {{ alert.product_name }} - 链易配{% endblock %}
+
+{% block extra_css %}
+<style>
+.status-badge-pending    { background: #6c757d; color: #fff; }
+.status-badge-processing { background: #0d6efd; color: #fff; }
+.status-badge-completed  { background: #198754; color: #fff; }
+.status-badge-rejected   { background: #dc3545; color: #fff; }
+
+.level-badge-red    { background: #dc3545; color: #fff; }
+.level-badge-yellow { background: #ffc107; color: #333; }
+.level-badge-blue   { background: #0d6efd; color: #fff; }
+
+.timeline-item { border-left: 3px solid #dee2e6; padding-left: 16px; margin-bottom: 20px; position: relative; }
+.timeline-item::before {
+    content: '';
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: #0d6efd;
+    position: absolute;
+    left: -7px; top: 4px;
+}
+.timeline-item.completed::before { background: #198754; }
+.timeline-item.rejected::before  { background: #dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 mb-3">
+    <a href="/dashboard/alert-center" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> 返回预警中心
+    </a>
+    <h4 class="mb-0">预警处置详情</h4>
+</div>
+
+<div class="row g-4">
+    {# ── 左栏：预警信息 + 工作流操作 ── #}
+    <div class="col-lg-7">
+
+        {# 预警信息卡片 #}
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center
+                {% if alert.level == 'red' %}bg-danger text-white
+                {% elif alert.level == 'yellow' %}bg-warning text-dark
+                {% else %}bg-primary text-white{% endif %}">
+                <span>
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                    {% if alert.level == 'red' %}红色预警（严重）
+                    {% elif alert.level == 'yellow' %}黄色预警（警告）
+                    {% else %}蓝色预警（提示）{% endif %}
+                </span>
+                <span class="badge bg-white
+                    {% if alert.level == 'red' %}text-danger
+                    {% elif alert.level == 'yellow' %}text-dark
+                    {% else %}text-primary{% endif %}">
+                    {% if alert.alert_type == 'capacity_risk' %}产能风险
+                    {% elif alert.alert_type == 'supply_chain_break' %}供应链断链
+                    {% elif alert.alert_type == 'business_risk' %}经营风险
+                    {% elif alert.alert_type == 'credit_anomaly' %}信用异常
+                    {% else %}{{ alert.dimension }}{% endif %}
+                </span>
+            </div>
+            <div class="card-body">
+                <h5 class="fw-bold">{{ alert.product_name }}</h5>
+                <p class="text-muted">{{ alert.message }}</p>
+                {% if alert.suggestion %}
+                <div class="alert alert-success py-2 mb-0">
+                    <i class="bi bi-lightbulb me-1"></i> <strong>建议措施：</strong>{{ alert.suggestion }}
+                </div>
+                {% endif %}
+                <div class="text-muted small mt-2">
+                    <i class="bi bi-clock me-1"></i> 预警时间：{{ alert.created_at.strftime('%Y-%m-%d %H:%M') }}
+                </div>
+            </div>
+        </div>
+
+        {# 工作流操作卡片 #}
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-light">
+                <strong>处置操作</strong>
+                <span class="badge ms-2 status-badge-{{ workflow.status }}">
+                    {% if workflow.status == 'pending' %}待处理
+                    {% elif workflow.status == 'processing' %}处理中
+                    {% elif workflow.status == 'completed' %}已完成
+                    {% else %}已退回{% endif %}
+                </span>
+            </div>
+            <div class="card-body">
+
+                {# 派单信息 #}
+                <div class="mb-3 p-3 bg-light rounded">
+                    <div class="row g-2 small text-muted">
+                        <div class="col-6">
+                            <i class="bi bi-person-fill me-1"></i>
+                            <strong>处理人：</strong>
+                            {{ workflow.assignee.name if workflow.assignee else '未指定' }}
+                        </div>
+                        <div class="col-6">
+                            <i class="bi bi-person-check me-1"></i>
+                            <strong>派单人：</strong>
+                            {{ workflow.assigner.name if workflow.assigner else '-' }}
+                        </div>
+                        <div class="col-6">
+                            <i class="bi bi-calendar me-1"></i>
+                            <strong>派单时间：</strong>
+                            {{ workflow.assigned_at.strftime('%Y-%m-%d %H:%M') if workflow.assigned_at else '-' }}
+                        </div>
+                        <div class="col-6">
+                            <i class="bi bi-check2-circle me-1"></i>
+                            <strong>完成时间：</strong>
+                            {{ workflow.completed_at.strftime('%Y-%m-%d %H:%M') if workflow.completed_at else '-' }}
+                        </div>
+                    </div>
+                </div>
+
+                {# 开始处理按钮（pending 状态，处理人可见） #}
+                {% if workflow.status == 'pending' and current_user.id == workflow.assigned_to %}
+                <div class="mb-3">
+                    <button class="btn btn-primary" onclick="startProcessing({{ workflow.id }})">
+                        <i class="bi bi-play-fill me-1"></i> 开始处理
+                    </button>
+                </div>
+                {% endif %}
+
+                {# 处理记录填写（processing 状态，处理人可见） #}
+                {% if workflow.status in ('processing', 'pending') and current_user.id == workflow.assigned_to %}
+                <div id="submitForm">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">处理说明 <span class="text-danger">*</span></label>
+                        <textarea id="handlingNotes" class="form-control" rows="4"
+                                  placeholder="请详细描述处理措施和结果...">{{ workflow.handling_notes or '' }}</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">证据文件 URL（每行一个）</label>
+                        <textarea id="evidenceUrls" class="form-control" rows="3"
+                                  placeholder="https://example.com/evidence1.pdf&#10;https://example.com/evidence2.jpg">{% if workflow.evidence_urls %}{{ workflow.evidence_urls | join('\n') }}{% endif %}</textarea>
+                        <div class="form-text">支持填写文件链接，如企业回访记录、政策文件等</div>
+                    </div>
+                    <button class="btn btn-success" onclick="submitResult({{ workflow.id }})">
+                        <i class="bi bi-send me-1"></i> 提交处理结果
+                    </button>
+                </div>
+                {% endif %}
+
+                {# 已提交的处理记录（completed 状态） #}
+                {% if workflow.status in ('completed', 'rejected') and workflow.handling_notes %}
+                <div class="mb-3">
+                    <label class="form-label fw-semibold text-muted">处理说明</label>
+                    <div class="p-3 bg-light rounded">{{ workflow.handling_notes }}</div>
+                </div>
+                {% if workflow.evidence_urls %}
+                <div class="mb-3">
+                    <label class="form-label fw-semibold text-muted">证据文件</label>
+                    <ul class="list-unstyled mb-0">
+                        {% for url in workflow.evidence_urls %}
+                        <li><a href="{{ url }}" target="_blank" class="text-primary small">
+                            <i class="bi bi-file-earmark me-1"></i>{{ url }}
+                        </a></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                {% endif %}
+
+                {# 审核区域（completed 状态，admin 可见） #}
+                {% if workflow.status == 'completed' and current_user.role == 'admin' and not workflow.review_result %}
+                <hr>
+                <div id="reviewForm">
+                    <h6 class="fw-semibold mb-3">审核处理结果</h6>
+                    <div class="mb-3">
+                        <label class="form-label">审核意见（可选）</label>
+                        <textarea id="reviewNotes" class="form-control" rows="3"
+                                  placeholder="填写审核意见..."></textarea>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-success" onclick="reviewWorkflow({{ workflow.id }}, true)">
+                            <i class="bi bi-check-circle me-1"></i> 审核通过，关闭预警
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="reviewWorkflow({{ workflow.id }}, false)">
+                            <i class="bi bi-x-circle me-1"></i> 审核不通过，退回重处理
+                        </button>
+                    </div>
+                </div>
+                {% endif %}
+
+                {# 审核结果展示 #}
+                {% if workflow.review_result %}
+                <hr>
+                <div class="p-3 rounded {% if workflow.review_result == 'approved' %}bg-success bg-opacity-10{% else %}bg-danger bg-opacity-10{% endif %}">
+                    <div class="fw-semibold mb-1">
+                        {% if workflow.review_result == 'approved' %}
+                        <i class="bi bi-check-circle-fill text-success me-1"></i> 审核通过
+                        {% else %}
+                        <i class="bi bi-x-circle-fill text-danger me-1"></i> 审核不通过
+                        {% endif %}
+                    </div>
+                    {% if workflow.reviewer %}
+                    <div class="small text-muted">审核人：{{ workflow.reviewer.name }}</div>
+                    {% endif %}
+                    {% if workflow.review_notes %}
+                    <div class="small mt-1">{{ workflow.review_notes }}</div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+
+    {# ── 右栏：处置历史时间轴 ── #}
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-light">
+                <strong>处置历史</strong>
+                <span class="badge bg-secondary ms-2">{{ all_workflows | length }} 条记录</span>
+            </div>
+            <div class="card-body">
+                {% if all_workflows %}
+                {% for wf in all_workflows %}
+                <div class="timeline-item {{ wf.status }}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <span class="badge status-badge-{{ wf.status }} me-1">
+                                {% if wf.status == 'pending' %}待处理
+                                {% elif wf.status == 'processing' %}处理中
+                                {% elif wf.status == 'completed' %}已完成
+                                {% else %}已退回{% endif %}
+                            </span>
+                            {% if wf.assignee %}
+                            <span class="small text-muted">{{ wf.assignee.name }}</span>
+                            {% endif %}
+                        </div>
+                        <span class="small text-muted">
+                            {{ wf.assigned_at.strftime('%m-%d %H:%M') if wf.assigned_at else '-' }}
+                        </span>
+                    </div>
+                    {% if wf.handling_notes %}
+                    <div class="small text-muted mt-1">{{ wf.handling_notes[:80] }}{% if wf.handling_notes|length > 80 %}...{% endif %}</div>
+                    {% endif %}
+                    {% if wf.review_result %}
+                    <div class="small mt-1">
+                        {% if wf.review_result == 'approved' %}
+                        <span class="text-success"><i class="bi bi-check-circle me-1"></i>审核通过</span>
+                        {% else %}
+                        <span class="text-danger"><i class="bi bi-x-circle me-1"></i>审核不通过</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if wf.id != workflow.id %}
+                    <div class="mt-1">
+                        <a href="/dashboard/alert-workflow/{{ wf.id }}" class="small text-primary">查看详情</a>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="text-center text-muted py-3">暂无处置记录</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function startProcessing(workflowId) {
+    if (!confirm('确认开始处理此预警任务？')) return;
+    fetch(`/api/alert-workflows/${workflowId}/start`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) location.reload();
+            else alert('操作失败：' + (data.error || '未知错误'));
+        });
+}
+
+function submitResult(workflowId) {
+    const notes = document.getElementById('handlingNotes').value.trim();
+    if (!notes) { alert('请填写处理说明'); return; }
+
+    const urlsRaw = document.getElementById('evidenceUrls').value.trim();
+    const evidenceUrls = urlsRaw ? urlsRaw.split('\n').map(s => s.trim()).filter(Boolean) : [];
+
+    fetch(`/api/alert-workflows/${workflowId}/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handling_notes: notes, evidence_urls: evidenceUrls }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) { alert('处理结果已提交，等待审核'); location.reload(); }
+        else alert('提交失败：' + (data.error || '未知错误'));
+    });
+}
+
+function reviewWorkflow(workflowId, approved) {
+    const action = approved ? '通过' : '不通过';
+    if (!confirm(`确认审核${action}？`)) return;
+
+    const notes = document.getElementById('reviewNotes') ?
+        document.getElementById('reviewNotes').value.trim() : '';
+
+    fetch(`/api/alert-workflows/${workflowId}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approved, review_notes: notes }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) { alert(`审核${action}成功`); location.reload(); }
+        else alert('审核失败：' + (data.error || '未知错误'));
+    });
+}
+</script>
+{% endblock %}

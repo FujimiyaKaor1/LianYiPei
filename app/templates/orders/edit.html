@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}编辑订单 - {{ order.order_no }} - 链易配{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h4>编辑订单 - {{ order.order_no }}</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('orders.edit', order_id=order.id) }}">
+                        <div class="mb-3">
+                            <label for="product_name" class="form-label">产品名称 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="product_name" name="product_name" value="{{ order.product_name }}" required>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="quantity" class="form-label">数量 <span class="text-danger">*</span></label>
+                                    <input type="number" class="form-control" id="quantity" name="quantity" value="{{ order.quantity }}" min="1" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="unit" class="form-label">单位 <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="unit" name="unit" required>
+                                        <option value="">请选择</option>
+                                        <option value="件" {% if order.unit == '件' %}selected{% endif %}>件</option>
+                                        <option value="个" {% if order.unit == '个' %}selected{% endif %}>个</option>
+                                        <option value="台" {% if order.unit == '台' %}selected{% endif %}>台</option>
+                                        <option value="套" {% if order.unit == '套' %}selected{% endif %}>套</option>
+                                        <option value="吨" {% if order.unit == '吨' %}selected{% endif %}>吨</option>
+                                        <option value="千克" {% if order.unit == '千克' %}selected{% endif %}>千克</option>
+                                        <option value="米" {% if order.unit == '米' %}selected{% endif %}>米</option>
+                                        <option value="平方米" {% if order.unit == '平方米' %}selected{% endif %}>平方米</option>
+                                        <option value="立方米" {% if order.unit == '立方米' %}selected{% endif %}>立方米</option>
+                                        <option value="箱" {% if order.unit == '箱' %}selected{% endif %}>箱</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="customer_name" class="form-label">客户名称 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="customer_name" name="customer_name" value="{{ order.customer_name }}" required>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="order_date" class="form-label">订单日期 <span class="text-danger">*</span></label>
+                                    <input type="date" class="form-control" id="order_date" name="order_date" value="{{ order.order_date.strftime('%Y-%m-%d') if order.order_date else '' }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="delivery_date" class="form-label">预计交货日期</label>
+                                    <input type="date" class="form-control" id="delivery_date" name="delivery_date" value="{{ order.delivery_date.strftime('%Y-%m-%d') if order.delivery_date else '' }}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">备注</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3">{{ order.notes or '' }}</textarea>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('orders.detail', order_id=order.id) }}" class="btn btn-secondary">取消</a>
+                            <button type="submit" class="btn btn-primary">保存修改</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

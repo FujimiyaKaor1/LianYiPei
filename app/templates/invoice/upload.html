@@ -1,0 +1,226 @@
+{% extends "layout/base.html" %}
+
+{% block title %}发票上传验证{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-file-earmark-text"></i> 发票上传验证
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form id="invoiceUploadForm" enctype="multipart/form-data">
+                        <!-- 发票文件 -->
+                        <div class="mb-3">
+                            <label for="invoiceFile" class="form-label">发票文件 <span class="text-danger">*</span></label>
+                            <input type="file" class="form-control" id="invoiceFile" name="file" 
+                                   accept=".pdf,.jpg,.jpeg,.png" required>
+                            <div class="form-text">支持PDF、JPG、PNG格式，最大16MB</div>
+                        </div>
+
+                        <!-- 发票号码 -->
+                        <div class="mb-3">
+                            <label for="invoiceNo" class="form-label">发票号码 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="invoiceNo" name="invoice_no" 
+                                   placeholder="请输入发票号码" required>
+                        </div>
+
+                        <!-- 发票代码 -->
+                        <div class="mb-3">
+                            <label for="invoiceCode" class="form-label">发票代码</label>
+                            <input type="text" class="form-control" id="invoiceCode" name="invoice_code" 
+                                   placeholder="请输入发票代码">
+                        </div>
+
+                        <!-- 开票日期 -->
+                        <div class="mb-3">
+                            <label for="invoiceDate" class="form-label">开票日期 <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="invoiceDate" name="invoice_date" required>
+                        </div>
+
+                        <!-- 发票金额 -->
+                        <div class="mb-3">
+                            <label for="invoiceAmount" class="form-label">发票金额（元） <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="invoiceAmount" name="invoice_amount" 
+                                   step="0.01" min="0" placeholder="请输入发票金额" required>
+                        </div>
+
+                        <!-- 卖方企业 -->
+                        <div class="mb-3">
+                            <label for="sellerId" class="form-label">卖方企业ID <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="sellerId" name="seller_id" 
+                                   placeholder="请输入卖方企业ID" required>
+                        </div>
+
+                        <!-- 撮合码（可选） -->
+                        <div class="mb-3">
+                            <label for="collaborationCode" class="form-label">撮合码（可选）</label>
+                            <input type="text" class="form-control" id="collaborationCode" name="collaboration_code" 
+                                   placeholder="如有撮合码请输入">
+                        </div>
+
+                        <!-- 交付日期（可选） -->
+                        <div class="mb-3">
+                            <label for="deliveryDate" class="form-label">交付日期（可选）</label>
+                            <input type="date" class="form-control" id="deliveryDate" name="delivery_date">
+                        </div>
+
+                        <!-- 质量评分 -->
+                        <div class="mb-3">
+                            <label for="qualityRating" class="form-label">质量评分</label>
+                            <select class="form-select" id="qualityRating" name="quality_rating">
+                                <option value="5" selected>5星 - 非常满意</option>
+                                <option value="4">4星 - 满意</option>
+                                <option value="3">3星 - 一般</option>
+                                <option value="2">2星 - 不满意</option>
+                                <option value="1">1星 - 非常不满意</option>
+                            </select>
+                        </div>
+
+                        <!-- 提交按钮 -->
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                <i class="bi bi-cloud-upload"></i> 上传并验证
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- 进度提示 -->
+                    <div id="uploadProgress" class="mt-3" style="display: none;">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" style="width: 100%">
+                                正在验证发票...
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 结果提示 -->
+                    <div id="resultAlert" class="mt-3" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- 验证说明 -->
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h5 class="card-title">验证说明</h5>
+                    <ul class="mb-0">
+                        <li>发票将通过税务API进行真伪验证</li>
+                        <li>验证通过后，履约数据将自动记录</li>
+                        <li>卖方企业信用分将获得相应提升</li>
+                        <li>如验证失败超过3次，将触发人工审核</li>
+                        <li>验证时间通常在5秒内完成</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('invoiceUploadForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const submitBtn = document.getElementById('submitBtn');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const resultAlert = document.getElementById('resultAlert');
+    
+    // 禁用提交按钮
+    submitBtn.disabled = true;
+    uploadProgress.style.display = 'block';
+    resultAlert.style.display = 'none';
+    
+    try {
+        // 构建FormData
+        const formData = new FormData(this);
+        
+        // 发送请求
+        const response = await fetch('/api/invoice/upload', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        // 隐藏进度条
+        uploadProgress.style.display = 'none';
+        
+        // 显示结果
+        if (result.success) {
+            resultAlert.className = 'alert alert-success';
+            resultAlert.innerHTML = `
+                <h5 class="alert-heading"><i class="bi bi-check-circle"></i> 验证成功！</h5>
+                <p>${result.message}</p>
+                <hr>
+                <p class="mb-0">
+                    <strong>发票号码：</strong>${result.invoice_info.invoice_no}<br>
+                    <strong>发票金额：</strong>¥${result.invoice_info.amount}<br>
+                    <strong>开票日期：</strong>${result.invoice_info.date}<br>
+                    ${result.invoice_info.buyer ? '<strong>买方：</strong>' + result.invoice_info.buyer + '<br>' : ''}
+                    ${result.invoice_info.seller ? '<strong>卖方：</strong>' + result.invoice_info.seller + '<br>' : ''}
+                </p>
+            `;
+            
+            // 清空表单
+            this.reset();
+        } else {
+            // 检查是否需要人工审核
+            if (result.manual_review_required) {
+                resultAlert.className = 'alert alert-warning';
+                resultAlert.innerHTML = `
+                    <h5 class="alert-heading"><i class="bi bi-exclamation-triangle"></i> 需要人工审核</h5>
+                    <p>该发票验证失败次数过多（超过3次），已自动提交人工审核。</p>
+                    <p class="mb-0"><strong>失败原因：</strong>${result.error}</p>
+                    <hr>
+                    <p class="mb-0 text-muted">
+                        <small>工作人员将在1-3个工作日内完成审核，请耐心等待。</small>
+                    </p>
+                `;
+            } else {
+                resultAlert.className = 'alert alert-danger';
+                resultAlert.innerHTML = `
+                    <h5 class="alert-heading"><i class="bi bi-x-circle"></i> 验证失败</h5>
+                    <p>${result.error}</p>
+                    <p class="mb-0 text-muted">
+                        <small>请检查发票信息是否正确，或稍后重试。如多次失败将自动提交人工审核。</small>
+                    </p>
+                `;
+            }
+        }
+        
+        resultAlert.style.display = 'block';
+        
+        // 滚动到结果区域
+        resultAlert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+    } catch (error) {
+        uploadProgress.style.display = 'none';
+        resultAlert.className = 'alert alert-danger';
+        resultAlert.innerHTML = `
+            <h5 class="alert-heading"><i class="bi bi-exclamation-triangle"></i> 上传失败</h5>
+            <p>网络错误或服务器异常，请稍后重试</p>
+            <p class="mb-0 text-muted"><small>错误详情: ${error.message}</small></p>
+        `;
+        resultAlert.style.display = 'block';
+    } finally {
+        submitBtn.disabled = false;
+    }
+});
+
+// 文件大小验证
+document.getElementById('invoiceFile').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const maxSize = 16 * 1024 * 1024; // 16MB
+        if (file.size > maxSize) {
+            alert(`文件大小超过16MB限制！当前文件: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
+            this.value = '';
+        }
+    }
+});
+</script>
+{% endblock %}

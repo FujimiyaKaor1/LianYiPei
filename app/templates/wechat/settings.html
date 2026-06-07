@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}微信推送设置 - 链易配{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="bi bi-wechat"></i> 微信推送设置</h4>
+                </div>
+                <div class="card-body">
+                    <!-- 绑定状态 -->
+                    <div class="alert alert-info" id="bindStatus">
+                        {% if current_user.wechat_bound %}
+                        <i class="bi bi-check-circle-fill text-success"></i> 
+                        已绑定微信账号
+                        {% if current_user.wechat_bound_at %}
+                        （绑定时间：{{ current_user.wechat_bound_at.strftime('%Y-%m-%d %H:%M') }}）
+                        {% endif %}
+                        {% else %}
+                        <i class="bi bi-exclamation-circle-fill text-warning"></i> 
+                        未绑定微信账号
+                        {% endif %}
+                    </div>
+
+                    <!-- 绑定/解绑按钮 -->
+                    <div class="mb-4">
+                        <h5>账号绑定</h5>
+                        {% if current_user.wechat_bound %}
+                        <button class="btn btn-danger" id="unbindBtn">
+                            <i class="bi bi-x-circle"></i> 解绑微信账号
+                        </button>
+                        {% else %}
+                        <div class="alert alert-warning">
+                            <p><strong>如何绑定微信账号：</strong></p>
+                            <ol>
+                                <li><strong>企业微信：</strong>请联系管理员在企业微信后台配置应用，并扫描二维码绑定</li>
+                                <li><strong>微信服务号：</strong>关注"链易配"服务号，发送"绑定"并按提示操作</li>
+                            </ol>
+                            <p class="mb-0">绑定后，您将收到重要消息的微信推送通知。</p>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <hr>
+
+                    <!-- 推送偏好设置 -->
+                    <div class="mb-4">
+                        <h5>推送偏好</h5>
+                        <p class="text-muted">选择您希望接收的推送类型</p>
+                        
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="pushPreference" 
+                                   id="preferenceAll" value="all"
+                                   {% if not current_user.wechat_push_preference or current_user.wechat_push_preference == 'all' %}checked{% endif %}>
+                            <label class="form-check-label" for="preferenceAll">
+                                <strong>全部推送</strong>
+                                <br>
+                                <small class="text-muted">接收所有类型的消息推送（新报价、预警、信用分变化等）</small>
+                            </label>
+                        </div>
+
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="radio" name="pushPreference" 
+                                   id="preferenceUrgent" value="urgent_only"
+                                   {% if current_user.wechat_push_preference == 'urgent_only' %}checked{% endif %}>
+                            <label class="form-check-label" for="preferenceUrgent">
+                                <strong>仅紧急消息</strong>
+                                <br>
+                                <small class="text-muted">仅接收红色预警和重要通知</small>
+                            </label>
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="radio" name="pushPreference" 
+                                   id="preferenceOff" value="off"
+                                   {% if current_user.wechat_push_preference == 'off' %}checked{% endif %}>
+                            <label class="form-check-label" for="preferenceOff">
+                                <strong>关闭推送</strong>
+                                <br>
+                                <small class="text-muted">不接收任何微信推送（仍可在消息中心查看）</small>
+                            </label>
+                        </div>
+
+                        <button class="btn btn-primary" id="savePreferenceBtn">
+                            <i class="bi bi-save"></i> 保存设置
+                        </button>
+                    </div>
+
+                    <hr>
+
+                    <!-- 推送规则说明 -->
+                    <div class="mb-4">
+                        <h5>推送规则</h5>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>消息类型</th>
+                                    <th>推送条件</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="badge bg-danger">红色预警</span></td>
+                                    <td>立即推送（紧急消息）</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge bg-primary">新报价</span></td>
+                                    <td>收到新报价时推送</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge bg-warning">信用分变化</span></td>
+                                    <td>信用分变化±10分时推送</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge bg-info">询价消息</span></td>
+                                    <td>收到新询价时推送</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge bg-secondary">系统通知</span></td>
+                                    <td>重要系统通知推送</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <hr>
+
+                    <!-- 测试推送 -->
+                    {% if current_user.wechat_bound %}
+                    <div>
+                        <h5>测试推送</h5>
+                        <p class="text-muted">发送一条测试消息到您的微信</p>
+                        <button class="btn btn-outline-primary" id="testPushBtn">
+                            <i class="bi bi-send"></i> 发送测试消息
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 返回按钮 -->
+            <div class="mt-3">
+                <a href="{{ url_for('messages.index') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> 返回消息中心
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 解绑微信账号
+    const unbindBtn = document.getElementById('unbindBtn');
+    if (unbindBtn) {
+        unbindBtn.addEventListener('click', function() {
+            if (confirm('确定要解绑微信账号吗？解绑后将无法接收微信推送。')) {
+                fetch('/api/wechat/unbind', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('解绑成功');
+                        location.reload();
+                    } else {
+                        alert('解绑失败：' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('操作失败，请稍后重试');
+                });
+            }
+        });
+    }
+
+    // 保存推送偏好
+    const savePreferenceBtn = document.getElementById('savePreferenceBtn');
+    if (savePreferenceBtn) {
+        savePreferenceBtn.addEventListener('click', function() {
+            const preference = document.querySelector('input[name="pushPreference"]:checked').value;
+            
+            fetch('/api/wechat/preference', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ preference: preference })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('推送偏好已保存');
+                } else {
+                    alert('保存失败：' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('操作失败，请稍后重试');
+            });
+        });
+    }
+
+    // 测试推送
+    const testPushBtn = document.getElementById('testPushBtn');
+    if (testPushBtn) {
+        testPushBtn.addEventListener('click', function() {
+            testPushBtn.disabled = true;
+            testPushBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 发送中...';
+            
+            fetch('/api/wechat/test-push', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('测试消息已发送，请检查您的微信');
+                } else {
+                    alert('发送失败：' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('操作失败，请稍后重试');
+            })
+            .finally(() => {
+                testPushBtn.disabled = false;
+                testPushBtn.innerHTML = '<i class="bi bi-send"></i> 发送测试消息';
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

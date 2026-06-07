@@ -1,0 +1,213 @@
+{% extends "layout/base.html" %}
+
+{% block title %}预警规则配置 - 链易配{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="bi bi-sliders"></i> 预警规则配置</h4>
+    <a href="/dashboard/alerts" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-bell"></i> 查看预警列表
+    </a>
+  </div>
+
+  <!-- 阈值配置卡片 -->
+  <div class="row g-3 mb-4">
+    <!-- 产能风险 -->
+    <div class="col-md-6">
+      <div class="card border-warning">
+        <div class="card-header bg-warning text-dark">
+          <i class="bi bi-speedometer2"></i> 产能风险阈值
+        </div>
+        <div class="card-body">
+          <p class="text-muted small">当企业产能利用率低于此值时触发预警</p>
+          <div class="input-group">
+            <input type="number" id="capacity_utilization_low" class="form-control"
+              min="0" max="1" step="0.05"
+              value="{{ thresholds.get('capacity_utilization_low', 0.30) }}"
+              placeholder="0.30">
+            <span class="input-group-text">（0~1）</span>
+            <button class="btn btn-warning" onclick="saveThreshold('capacity_utilization_low')">保存</button>
+          </div>
+          <div class="form-text">默认值：0.30（即30%）</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 供应链断链 -->
+    <div class="col-md-6">
+      <div class="card border-danger">
+        <div class="card-header bg-danger text-white">
+          <i class="bi bi-link-45deg"></i> 供应链断链阈值
+        </div>
+        <div class="card-body">
+          <p class="text-muted small">当某产品供应商数量少于此值时触发预警</p>
+          <div class="input-group">
+            <input type="number" id="supplier_count_min" class="form-control"
+              min="1" max="20" step="1"
+              value="{{ thresholds.get('supplier_count_min', 3) }}"
+              placeholder="3">
+            <span class="input-group-text">家</span>
+            <button class="btn btn-danger" onclick="saveThreshold('supplier_count_min')">保存</button>
+          </div>
+          <div class="form-text">默认值：3（家供应商）</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 企业经营风险 -->
+    <div class="col-md-6">
+      <div class="card border-secondary">
+        <div class="card-header bg-secondary text-white">
+          <i class="bi bi-building-exclamation"></i> 企业经营风险阈值
+        </div>
+        <div class="card-body">
+          <p class="text-muted small">当企业信用分低于此值时触发经营风险预警</p>
+          <div class="input-group">
+            <input type="number" id="business_risk_credit_min" class="form-control"
+              min="0" max="100" step="1"
+              value="{{ thresholds.get('business_risk_credit_min', 50) }}"
+              placeholder="50">
+            <span class="input-group-text">分</span>
+            <button class="btn btn-secondary" onclick="saveThreshold('business_risk_credit_min')">保存</button>
+          </div>
+          <div class="form-text">默认值：50分</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 信用分异常 -->
+    <div class="col-md-6">
+      <div class="card border-info">
+        <div class="card-header bg-info text-white">
+          <i class="bi bi-graph-down-arrow"></i> 信用分异常阈值
+        </div>
+        <div class="card-body">
+          <p class="text-muted small">当企业信用分7天内下降超过此值时触发异常预警</p>
+          <div class="input-group">
+            <input type="number" id="credit_drop_7days" class="form-control"
+              min="1" max="50" step="1"
+              value="{{ thresholds.get('credit_drop_7days', 15) }}"
+              placeholder="15">
+            <span class="input-group-text">分</span>
+            <button class="btn btn-info" onclick="saveThreshold('credit_drop_7days')">保存</button>
+          </div>
+          <div class="form-text">默认值：15分（7天内）</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 预警等级阈值 -->
+    <div class="col-md-6">
+      <div class="card border-danger">
+        <div class="card-header bg-danger text-white">
+          <i class="bi bi-exclamation-triangle"></i> 红色预警严重程度阈值
+        </div>
+        <div class="card-body">
+          <p class="text-muted small">严重程度达到此值时升级为红色预警（0~1）</p>
+          <div class="input-group">
+            <input type="number" id="red_threshold" class="form-control"
+              min="0" max="1" step="0.05"
+              value="{{ thresholds.get('red_threshold', 0.70) }}"
+              placeholder="0.70">
+            <span class="input-group-text">（0~1）</span>
+            <button class="btn btn-danger" onclick="saveThreshold('red_threshold')">保存</button>
+          </div>
+          <div class="form-text">默认值：0.70</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card border-warning">
+        <div class="card-header bg-warning text-dark">
+          <i class="bi bi-exclamation-circle"></i> 黄色预警严重程度阈值
+        </div>
+        <div class="card-body">
+          <p class="text-muted small">严重程度达到此值时升级为黄色预警（0~1）</p>
+          <div class="input-group">
+            <input type="number" id="yellow_threshold" class="form-control"
+              min="0" max="1" step="0.05"
+              value="{{ thresholds.get('yellow_threshold', 0.40) }}"
+              placeholder="0.40">
+            <span class="input-group-text">（0~1）</span>
+            <button class="btn btn-warning" onclick="saveThreshold('yellow_threshold')">保存</button>
+          </div>
+          <div class="form-text">默认值：0.40（低于此值为蓝色预警）</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 规则变更历史 -->
+  <div class="card">
+    <div class="card-header">
+      <i class="bi bi-clock-history"></i> 规则变更历史
+    </div>
+    <div class="card-body p-0">
+      {% if change_logs %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>变更时间</th>
+              <th>规则维度</th>
+              <th>新阈值</th>
+              <th>操作人</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in change_logs %}
+            <tr>
+              <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+              <td><code>{{ log.operation_target }}</code></td>
+              <td>{{ log.operation_detail }}</td>
+              <td>{{ log.user.name if log.user else '系统' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center py-4 text-muted">暂无变更记录</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div id="toast-container" class="position-fixed bottom-0 end-0 p-3" style="z-index:9999"></div>
+
+<script>
+function saveThreshold(dimension) {
+  const val = document.getElementById(dimension).value;
+  if (val === '' || isNaN(parseFloat(val))) {
+    showToast('请输入有效数值', 'danger');
+    return;
+  }
+  fetch('/admin/api/config/alert-thresholds', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({dimension: dimension, threshold_value: parseFloat(val)})
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      showToast('阈值已保存，规则立即生效', 'success');
+    } else {
+      showToast(data.error || '保存失败', 'danger');
+    }
+  })
+  .catch(() => showToast('网络错误', 'danger'));
+}
+
+function showToast(msg, type) {
+  const id = 'toast_' + Date.now();
+  const html = `<div id="${id}" class="toast align-items-center text-bg-${type} border-0 show" role="alert">
+    <div class="d-flex"><div class="toast-body">${msg}</div>
+    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div></div>`;
+  document.getElementById('toast-container').insertAdjacentHTML('beforeend', html);
+  setTimeout(() => document.getElementById(id)?.remove(), 3000);
+}
+</script>
+{% endblock %}

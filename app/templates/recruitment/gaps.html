@@ -1,0 +1,574 @@
+{% extends "layout/base.html" %}
+
+{% block title %}产业链缺口分析 - 链易配{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+
+  <!-- 页面标题 -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h4 class="mb-1"><i class="bi bi-diagram-3 me-2 text-primary"></i>产业链缺口分析</h4>
+      <p class="text-muted small mb-0">基于图谱数据识别供应链薄弱环节，智能生成招商建议</p>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sm" onclick="loadGaps()">
+        <i class="bi bi-arrow-clockwise me-1"></i>刷新分析
+      </button>
+      <button class="btn btn-primary btn-sm" onclick="showTasksModal()">
+        <i class="bi bi-list-task me-1"></i>招商任务列表
+      </button>
+    </div>
+  </div>
+
+  <!-- 统计卡片 -->
+  <div class="row g-3 mb-4" id="statsRow">
+    <div class="col-md-3">
+      <div class="card text-center border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="text-muted small mb-1">缺口产品总数</div>
+          <div class="fs-2 fw-bold text-danger" id="totalGaps">--</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="text-muted small mb-1">紧急缺口</div>
+          <div class="fs-2 fw-bold text-warning" id="urgentGaps">--</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="text-muted small mb-1">影响企业总数</div>
+          <div class="fs-2 fw-bold text-info" id="affectedEnterprises">--</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="text-muted small mb-1">供应商不足产品</div>
+          <div class="fs-2 fw-bold text-primary" id="shortageGaps">--</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <!-- 左侧：缺口产品列表 -->
+    <div class="col-lg-7">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+          <span class="fw-semibold"><i class="bi bi-exclamation-triangle me-1 text-warning"></i>缺口产品列表</span>
+          <div class="d-flex gap-2">
+            <select class="form-select form-select-sm" id="filterType" onchange="filterGaps()" style="width:120px;">
+              <option value="">全部类型</option>
+              <option value="supplier_shortage">供应商不足</option>
+              <option value="localization_shortage">本地化不足</option>
+              <option value="unmatched">历史未匹配</option>
+              <option value="graph_gap">图谱缺口</option>
+            </select>
+            <select class="form-select form-select-sm" id="filterUrgency" onchange="filterGaps()" style="width:100px;">
+              <option value="">全部紧迫度</option>
+              <option value="紧急">紧急</option>
+              <option value="较高">较高</option>
+              <option value="一般">一般</option>
+            </select>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div id="gapsList">
+            <div class="text-center text-muted py-5">
+              <div class="spinner-border spinner-border-sm me-2"></div>加载中...
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右侧：图谱可视化 + 潜在企业 -->
+    <div class="col-lg-5">
+      <!-- 产业链图谱（高亮缺口节点） -->
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header bg-white border-bottom fw-semibold">
+          <i class="bi bi-share me-1 text-primary"></i>产业链图谱（缺口高亮）
+        </div>
+        <div class="card-body p-2">
+          <div id="gapChart" style="height:280px;"></div>
+        </div>
+      </div>
+
+      <!-- 潜在招商企业 -->
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white border-bottom fw-semibold">
+          <i class="bi bi-building me-1 text-success"></i>潜在招商企业
+          <span class="text-muted small ms-2" id="recommendTitle">（点击缺口产品查看推荐）</span>
+        </div>
+        <div class="card-body p-0">
+          <div id="enterpriseList">
+            <div class="text-center text-muted py-4 small">请在左侧点击缺口产品查看推荐企业</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 招商任务列表 Modal -->
+<div class="modal fade" id="tasksModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-list-task me-2"></i>招商任务列表</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div id="tasksList">
+          <div class="text-center text-muted py-4">加载中...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 创建招商任务 Modal -->
+<div class="modal fade" id="createTaskModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>创建招商任务</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="createTaskForm">
+          <input type="hidden" id="taskProduct" name="target_product">
+          <div class="mb-3">
+            <label class="form-label">任务名称</label>
+            <input type="text" class="form-control" id="taskName" name="task_name" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">目标产品</label>
+            <input type="text" class="form-control" id="taskProductDisplay" readonly>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">目标企业名称（可选）</label>
+            <input type="text" class="form-control" id="taskEnterpriseName" name="target_enterprise_name">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">目标企业地区（可选）</label>
+            <input type="text" class="form-control" id="taskEnterpriseLocation" name="target_enterprise_location">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">优先级</label>
+            <select class="form-select" id="taskPriority" name="priority">
+              <option value="high">高优先级</option>
+              <option value="normal" selected>普通</option>
+              <option value="low">低优先级</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">截止日期（可选）</label>
+            <input type="date" class="form-control" id="taskDeadline" name="deadline">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">备注</label>
+            <textarea class="form-control" id="taskNotes" name="progress_notes" rows="2"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" onclick="submitCreateTask()">
+          <i class="bi bi-check-lg me-1"></i>创建任务
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let allGaps = [];
+let selectedGap = null;
+
+const URGENCY_COLORS = { '紧急': 'danger', '较高': 'warning', '一般': 'secondary' };
+const GAP_TYPE_ICONS = {
+  'supplier_shortage': 'bi-people',
+  'localization_shortage': 'bi-geo-alt',
+  'unmatched': 'bi-x-circle',
+  'graph_gap': 'bi-diagram-3',
+};
+
+async function loadGaps() {
+  document.getElementById('gapsList').innerHTML =
+    '<div class="text-center text-muted py-5"><div class="spinner-border spinner-border-sm me-2"></div>分析中...</div>';
+
+  try {
+    const res = await fetch('/api/recruitment/gaps');
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || '加载失败');
+
+    allGaps = data.gaps || [];
+    updateStats(allGaps);
+    renderGapsList(allGaps);
+    renderGapChart(allGaps);
+  } catch (e) {
+    document.getElementById('gapsList').innerHTML =
+      `<div class="text-center text-danger py-4"><i class="bi bi-exclamation-circle me-1"></i>${e.message}</div>`;
+  }
+}
+
+function updateStats(gaps) {
+  document.getElementById('totalGaps').textContent = gaps.length;
+  document.getElementById('urgentGaps').textContent = gaps.filter(g => g.urgency_label === '紧急').length;
+  document.getElementById('affectedEnterprises').textContent =
+    gaps.reduce((s, g) => s + (g.affected_enterprise_count || 0), 0);
+  document.getElementById('shortageGaps').textContent =
+    gaps.filter(g => g.gap_type === 'supplier_shortage').length;
+}
+
+function filterGaps() {
+  const type = document.getElementById('filterType').value;
+  const urgency = document.getElementById('filterUrgency').value;
+  let filtered = allGaps;
+  if (type) filtered = filtered.filter(g => g.gap_type === type);
+  if (urgency) filtered = filtered.filter(g => g.urgency_label === urgency);
+  renderGapsList(filtered);
+}
+
+function renderGapsList(gaps) {
+  if (!gaps.length) {
+    document.getElementById('gapsList').innerHTML =
+      '<div class="text-center text-muted py-5"><i class="bi bi-check-circle text-success fs-3 d-block mb-2"></i>暂无产业链缺口</div>';
+    return;
+  }
+
+  const html = gaps.map((gap, idx) => {
+    const urgencyColor = URGENCY_COLORS[gap.urgency_label] || 'secondary';
+    const icon = GAP_TYPE_ICONS[gap.gap_type] || 'bi-question-circle';
+    const suggestion = gap.suggestion || {};
+    return `
+    <div class="gap-item border-bottom px-3 py-3 cursor-pointer hover-bg"
+         onclick="selectGap(${idx})" id="gap-item-${idx}"
+         style="cursor:pointer; transition:background .15s;">
+      <div class="d-flex justify-content-between align-items-start">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi ${icon} text-primary fs-5"></i>
+          <div>
+            <div class="fw-semibold">${gap.product_name}</div>
+            <div class="text-muted small">${gap.gap_type_label}</div>
+          </div>
+        </div>
+        <span class="badge bg-${urgencyColor}">${gap.urgency_label}</span>
+      </div>
+      <div class="row g-2 mt-2 small text-muted">
+        <div class="col-4">
+          <i class="bi bi-people me-1"></i>供应商: <strong class="${gap.supplier_count < 3 ? 'text-danger' : ''}">${gap.supplier_count}家</strong>
+        </div>
+        <div class="col-4">
+          <i class="bi bi-geo-alt me-1"></i>本地化: <strong class="${gap.local_ratio < 0.3 ? 'text-warning' : ''}">${gap.local_ratio_pct}</strong>
+        </div>
+        <div class="col-4">
+          <i class="bi bi-building me-1"></i>影响: <strong>${gap.affected_enterprise_count}家</strong>
+        </div>
+      </div>
+      ${suggestion.description ? `
+      <div class="mt-2 p-2 bg-light rounded small text-muted">
+        <i class="bi bi-lightbulb me-1 text-warning"></i>${suggestion.description}
+      </div>` : ''}
+      <div class="mt-2 d-flex gap-2">
+        <button class="btn btn-outline-primary btn-sm" onclick="event.stopPropagation(); loadRecommendations(${idx})">
+          <i class="bi bi-search me-1"></i>查看推荐企业
+        </button>
+        <button class="btn btn-success btn-sm" onclick="event.stopPropagation(); openCreateTask('${gap.product_name}', '${suggestion.priority || 'normal'}')">
+          <i class="bi bi-plus me-1"></i>转为招商任务
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('gapsList').innerHTML = html;
+}
+
+function selectGap(idx) {
+  // 高亮选中行
+  document.querySelectorAll('.gap-item').forEach(el => el.style.background = '');
+  const el = document.getElementById(`gap-item-${idx}`);
+  if (el) el.style.background = '#f0f7ff';
+  selectedGap = allGaps[idx];
+  loadRecommendations(idx);
+}
+
+async function loadRecommendations(idx) {
+  const gap = allGaps[idx];
+  if (!gap) return;
+
+  document.getElementById('recommendTitle').textContent = `（${gap.product_name}）`;
+  document.getElementById('enterpriseList').innerHTML =
+    '<div class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm me-2"></div>推荐中...</div>';
+
+  try {
+    const res = await fetch('/api/recruitment/recommend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        product_name: gap.product_name,
+        gap_type: gap.gap_type,
+        supplier_count: gap.supplier_count,
+        local_ratio: gap.local_ratio,
+        enterprise_type: (gap.suggestion || {}).enterprise_type || '制造企业',
+      }),
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || '推荐失败');
+    renderEnterpriseList(data.enterprises || [], gap.product_name);
+  } catch (e) {
+    document.getElementById('enterpriseList').innerHTML =
+      `<div class="text-center text-danger py-3 small">${e.message}</div>`;
+  }
+}
+
+function renderEnterpriseList(enterprises, productName) {
+  if (!enterprises.length) {
+    document.getElementById('enterpriseList').innerHTML =
+      '<div class="text-center text-muted py-4 small">暂无推荐企业</div>';
+    return;
+  }
+
+  const MATCH_COLORS = { '高度匹配': 'success', '较好匹配': 'primary', '一般匹配': 'secondary' };
+
+  const html = enterprises.map(ent => {
+    const matchColor = MATCH_COLORS[ent.match_level] || 'secondary';
+    const sourceLabel = ent.source === 'internal' ? '<span class="badge bg-info ms-1">平台内</span>' : '';
+    return `
+    <div class="border-bottom px-3 py-2">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="fw-semibold small">${ent.name}${sourceLabel}</div>
+          <div class="text-muted" style="font-size:.75rem;">${ent.city} · 注册资本${ent.registered_capital}万元</div>
+        </div>
+        <span class="badge bg-${matchColor}">${ent.match_level}</span>
+      </div>
+      <div class="d-flex gap-3 mt-1" style="font-size:.75rem; color:#888;">
+        <span><i class="bi bi-award me-1"></i>专利${ent.patent_count}项</span>
+        <span><i class="bi bi-star me-1"></i>信用${ent.credit_score}</span>
+        ${ent.is_green_factory ? '<span class="text-success"><i class="bi bi-leaf me-1"></i>绿色工厂</span>' : ''}
+      </div>
+      <div class="mt-1" style="font-size:.75rem; color:#666;">${ent.business_scope || ''}</div>
+      <div class="mt-1">
+        <button class="btn btn-outline-success btn-sm py-0 px-2" style="font-size:.75rem;"
+                onclick="openCreateTask('${productName}', 'normal', '${ent.name}', '${ent.city}')">
+          <i class="bi bi-plus me-1"></i>创建招商任务
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('enterpriseList').innerHTML = html;
+}
+
+function renderGapChart(gaps) {
+  const chartEl = document.getElementById('gapChart');
+  if (!chartEl || !window.echarts) return;
+
+  const chart = echarts.init(chartEl);
+
+  if (!gaps.length) {
+    chart.setOption({
+      graphic: [{
+        type: 'text',
+        left: 'center', top: 'middle',
+        style: { text: '暂无缺口数据', fill: '#999', fontSize: 14 },
+      }],
+    });
+    return;
+  }
+
+  // 构建图谱节点：缺口节点用红色高亮
+  const gapNames = new Set(gaps.map(g => g.product_name));
+  const nodes = gaps.slice(0, 20).map(g => ({
+    name: g.product_name,
+    symbolSize: 20 + g.urgency_score * 30,
+    itemStyle: {
+      color: g.urgency_label === '紧急' ? '#ef4444' :
+             g.urgency_label === '较高' ? '#f59e0b' : '#6b7280',
+    },
+    label: { show: true, fontSize: 10 },
+  }));
+
+  // 简单的力导向图展示缺口节点
+  chart.setOption({
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'item',
+      formatter: (params) => {
+        if (params.dataType !== 'node') return '';
+        const g = gaps.find(x => x.product_name === params.name);
+        if (!g) return params.name;
+        return `<b>${g.product_name}</b><br/>
+                类型: ${g.gap_type_label}<br/>
+                供应商: ${g.supplier_count}家<br/>
+                紧迫度: ${g.urgency_label}`;
+      },
+    },
+    legend: {
+      data: ['紧急缺口', '较高缺口', '一般缺口'],
+      bottom: 0, textStyle: { fontSize: 10 },
+    },
+    series: [{
+      type: 'graph',
+      layout: 'force',
+      roam: true,
+      data: nodes,
+      links: [],
+      force: { repulsion: 120, edgeLength: 60 },
+      label: { show: true, color: '#333', fontSize: 10 },
+      emphasis: { focus: 'self' },
+    }],
+  });
+
+  window.addEventListener('resize', () => { try { chart.resize(); } catch (e) {} });
+}
+
+function openCreateTask(productName, priority, enterpriseName, location) {
+  document.getElementById('taskProduct').value = productName;
+  document.getElementById('taskProductDisplay').value = productName;
+  document.getElementById('taskName').value = `招商任务-${productName}`;
+  document.getElementById('taskPriority').value = priority || 'normal';
+  document.getElementById('taskEnterpriseName').value = enterpriseName || '';
+  document.getElementById('taskEnterpriseLocation').value = location || '';
+  document.getElementById('taskNotes').value = '';
+  new bootstrap.Modal(document.getElementById('createTaskModal')).show();
+}
+
+async function submitCreateTask() {
+  const form = document.getElementById('createTaskForm');
+  const payload = {
+    task_name: document.getElementById('taskName').value,
+    target_product: document.getElementById('taskProduct').value,
+    target_enterprise_name: document.getElementById('taskEnterpriseName').value,
+    target_enterprise_location: document.getElementById('taskEnterpriseLocation').value,
+    priority: document.getElementById('taskPriority').value,
+    deadline: document.getElementById('taskDeadline').value || null,
+    progress_notes: document.getElementById('taskNotes').value,
+  };
+
+  if (!payload.target_product) {
+    alert('请填写目标产品');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/recruitment/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data.success) {
+      bootstrap.Modal.getInstance(document.getElementById('createTaskModal')).hide();
+      showToast('招商任务已创建', 'success');
+    } else {
+      alert(data.error || '创建失败');
+    }
+  } catch (e) {
+    alert('网络错误: ' + e.message);
+  }
+}
+
+async function showTasksModal() {
+  new bootstrap.Modal(document.getElementById('tasksModal')).show();
+  document.getElementById('tasksList').innerHTML =
+    '<div class="text-center text-muted py-4">加载中...</div>';
+
+  try {
+    const res = await fetch('/api/recruitment/tasks');
+    const data = await res.json();
+    renderTasksList(data.tasks || []);
+  } catch (e) {
+    document.getElementById('tasksList').innerHTML =
+      `<div class="text-center text-danger py-4">${e.message}</div>`;
+  }
+}
+
+function renderTasksList(tasks) {
+  if (!tasks.length) {
+    document.getElementById('tasksList').innerHTML =
+      '<div class="text-center text-muted py-5">暂无招商任务</div>';
+    return;
+  }
+
+  const STATUS_LABELS = {
+    pending: '待跟进', contacted: '已联系',
+    negotiating: '洽谈中', signed: '已签约', failed: '已终止',
+  };
+  const STATUS_COLORS = {
+    pending: 'secondary', contacted: 'info',
+    negotiating: 'primary', signed: 'success', failed: 'danger',
+  };
+  const PRIORITY_LABELS = { high: '高', normal: '普通', low: '低' };
+
+  const html = `
+  <table class="table table-hover mb-0">
+    <thead class="table-light">
+      <tr>
+        <th>任务名称</th>
+        <th>目标产品</th>
+        <th>优先级</th>
+        <th>状态</th>
+        <th>创建时间</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${tasks.map(t => `
+      <tr>
+        <td class="small">${t.task_name}</td>
+        <td class="small">${t.target_product || '-'}</td>
+        <td><span class="badge bg-${t.priority === 'high' ? 'danger' : 'secondary'}">${PRIORITY_LABELS[t.priority] || t.priority}</span></td>
+        <td><span class="badge bg-${STATUS_COLORS[t.status] || 'secondary'}">${STATUS_LABELS[t.status] || t.status}</span></td>
+        <td class="small text-muted">${(t.created_at || '').slice(0, 10)}</td>
+        <td>
+          <select class="form-select form-select-sm" style="width:100px;"
+                  onchange="updateTaskStatus(${t.id}, this.value)">
+            ${Object.entries(STATUS_LABELS).map(([v, l]) =>
+              `<option value="${v}" ${t.status === v ? 'selected' : ''}>${l}</option>`
+            ).join('')}
+          </select>
+        </td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+
+  document.getElementById('tasksList').innerHTML = html;
+}
+
+async function updateTaskStatus(taskId, status) {
+  try {
+    const res = await fetch(`/api/recruitment/tasks/${taskId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    const data = await res.json();
+    if (data.success) showToast('状态已更新', 'success');
+  } catch (e) {
+    showToast('更新失败: ' + e.message, 'danger');
+  }
+}
+
+function showToast(msg, type) {
+  const toast = document.createElement('div');
+  toast.className = `alert alert-${type} position-fixed bottom-0 end-0 m-3`;
+  toast.style.zIndex = 9999;
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// 初始化
+loadGaps();
+</script>
+{% endblock %}

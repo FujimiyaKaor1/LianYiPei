@@ -1,0 +1,180 @@
+{% extends "layout/base.html" %}
+
+{% block title %}预警统计分析 - 链易配{% endblock %}
+
+{% block extra_css %}
+<style>
+.stat-card { border-radius: 12px; padding: 20px; text-align: center; }
+.stat-card .num { font-size: 2rem; font-weight: 700; }
+.stat-card .label { font-size: 0.85rem; opacity: .8; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-bar-chart-fill text-primary me-2"></i>预警统计分析</h4>
+    <a href="/dashboard/alert-center" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> 返回预警中心
+    </a>
+</div>
+
+{# ── 总览卡片 ── #}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card bg-primary text-white shadow-sm">
+            <div class="num">{{ stats.total }}</div>
+            <div class="label">工作流总数</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card bg-success text-white shadow-sm">
+            <div class="num">{{ stats.completed }}</div>
+            <div class="label">已完成处置</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card bg-warning text-dark shadow-sm">
+            <div class="num">{{ stats.resolution_rate }}%</div>
+            <div class="label">处置率</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card bg-danger text-white shadow-sm">
+            <div class="num">{{ stats.overdue_count }}</div>
+            <div class="label">超时未处理</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    {# ── 各等级响应时间 ── #}
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-light fw-semibold">各等级平均响应时间</div>
+            <div class="card-body">
+                {% set level_info = [
+                    ('red',    '红色预警', 'danger'),
+                    ('yellow', '黄色预警', 'warning'),
+                    ('blue',   '蓝色预警', 'primary'),
+                ] %}
+                {% for level, label, color in level_info %}
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span class="badge bg-{{ color }} {% if color == 'warning' %}text-dark{% endif %}">{{ label }}</span>
+                    <span class="fw-bold">
+                        {% set hours = stats.level_response_hours.get(level) %}
+                        {% if hours is not none %}{{ hours }} 小时{% else %}<span class="text-muted small">暂无数据</span>{% endif %}
+                    </span>
+                </div>
+                {% endfor %}
+
+                <hr>
+                <div class="text-muted small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    响应时间 = 派单时间到完成时间的平均值
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ── 状态分布 ── #}
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-light fw-semibold">工作流状态分布</div>
+            <div class="card-body">
+                {% set status_info = [
+                    ('pending',    '待处理',  'secondary'),
+                    ('processing', '处理中',  'primary'),
+                    ('completed',  '已完成',  'success'),
+                    ('rejected',   '已退回',  'danger'),
+                ] %}
+                {% for status, label, color in status_info %}
+                {% set count = stats.by_status.get(status, 0) %}
+                {% set pct = (count / stats.total * 100) | int if stats.total else 0 %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span class="badge bg-{{ color }}">{{ label }}</span>
+                        <span>{{ count }} 条 ({{ pct }}%)</span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-{{ color }}" style="width: {{ pct }}%"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    {# ── 超时预警提示 ── #}
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-light fw-semibold">处置质量指标</div>
+            <div class="card-body">
+                <div class="text-center mb-3">
+                    <div style="font-size: 3rem; font-weight: 700;
+                        color: {% if stats.resolution_rate >= 80 %}#198754{% elif stats.resolution_rate >= 50 %}#ffc107{% else %}#dc3545{% endif %}">
+                        {{ stats.resolution_rate }}%
+                    </div>
+                    <div class="text-muted small">总体处置率</div>
+                </div>
+                <hr>
+                {% if stats.overdue_count > 0 %}
+                <div class="alert alert-warning py-2 mb-2">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    <strong>{{ stats.overdue_count }}</strong> 条工作流超过3天未处理
+                </div>
+                {% else %}
+                <div class="alert alert-success py-2 mb-2">
+                    <i class="bi bi-check-circle me-1"></i> 无超时未处理工作流
+                </div>
+                {% endif %}
+                <div class="text-muted small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    超时标准：派单后3天内未完成处置
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── 近30天处置趋势 ── #}
+<div class="card border-0 shadow-sm mt-4">
+    <div class="card-header bg-light fw-semibold">近30天处置趋势</div>
+    <div class="card-body">
+        {% if stats.daily_trend %}
+        <div id="trendChart" style="height: 260px;"></div>
+        {% else %}
+        <div class="text-center text-muted py-4">
+            <i class="bi bi-bar-chart fs-1"></i>
+            <p class="mt-2">暂无处置数据</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if stats.daily_trend %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script>
+const trendData = {{ stats.daily_trend | tojson }};
+const chart = echarts.init(document.getElementById('trendChart'));
+chart.setOption({
+    tooltip: { trigger: 'axis' },
+    xAxis: {
+        type: 'category',
+        data: trendData.map(d => d.date),
+        axisLabel: { rotate: 30, fontSize: 11 },
+    },
+    yAxis: { type: 'value', name: '处置数量', minInterval: 1 },
+    series: [{
+        name: '处置数量',
+        type: 'bar',
+        data: trendData.map(d => d.count),
+        itemStyle: { color: '#0d6efd', borderRadius: [4, 4, 0, 0] },
+    }],
+    grid: { left: 50, right: 20, top: 20, bottom: 60 },
+});
+window.addEventListener('resize', () => chart.resize());
+</script>
+{% endif %}
+{% endblock %}

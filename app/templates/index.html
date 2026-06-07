@@ -1,0 +1,75 @@
+{% extends "layout/base.html" %}
+
+{% block title %}首页 - 链易配{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='frontend/assets/style.css') }}" />
+<style>
+  /* React 单页仪表盘：隐藏原先 Bootstrap 顶栏与页脚 */
+  .navbar { display: none !important; }
+  .le-topbar { display: none !important; }
+  .le-tabs-wrap { display: none !important; }
+  footer { display: none !important; }
+  main.container { margin: 0 !important; padding: 0 !important; max-width: none !important; }
+  body { overflow: hidden !important; }
+  #root { height: 100vh; overflow: hidden; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="root"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  window.__INITIAL_DATA__ = {
+    enterprise_count: {{ enterprise_count }},
+    supply_count: {{ supply_count }},
+    demand_count: {{ demand_count }},
+    product_count: {{ product_count }},
+    transaction_count: {{ transaction_count }},
+    alert_count: {{ alert_count }},
+    recent_supplies: [
+      {% for supply in recent_supplies %}
+        {
+          product_name: {{ (supply.product.name if supply.product else '') | tojson }},
+          enterprise_name: {{ (supply.enterprise.name if supply.enterprise else '') | tojson }},
+          quantity: {{ supply.quantity }},
+          unit: {{ (supply.unit if supply.unit else '') | tojson }},
+          created_at: {{ (supply.created_at.strftime('%Y-%m-%d %H:%M:%S') if supply.created_at else '') | tojson }}
+        }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ],
+    recent_demands: [
+      {% for demand in recent_demands %}
+        {
+          product_name: {{ (demand.product.name if demand.product else '') | tojson }},
+          enterprise_name: {{ (demand.enterprise.name if demand.enterprise else '') | tojson }},
+          quantity: {{ demand.quantity }},
+          unit: {{ (demand.unit if demand.unit else '') | tojson }},
+          created_at: {{ (demand.created_at.strftime('%Y-%m-%d %H:%M:%S') if demand.created_at else '') | tojson }}
+        }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ],
+    recent_alerts: [
+      {% for alert in recent_alerts %}
+        {
+          id: {{ (alert.id if alert.id else '') | tojson }},
+          level: {{ (alert.level if alert.level else 'red') | tojson }},
+          product_name: {{ (alert.product_name if alert.product_name else '') | tojson }},
+          message: {{ (alert.message if alert.message else '') | tojson }}
+        }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ],
+    user_name: {{ (current_user.name if current_user.is_authenticated else '用户') | tojson }}
+  };
+
+  window.__ROUTES__ = {
+    home: {{ url_for('main.index') | tojson }},
+    match: {{ url_for('match.index') | tojson }},
+    info: {{ '/dashboard/stats' | tojson }},
+    graph: {{ '/dashboard/graph' | tojson }}
+  };
+</script>
+<script type="module" src="{{ url_for('static', filename='frontend/assets/main.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}订单管理 - 链易配{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h2>订单管理</h2>
+            <p class="text-muted">管理您的订单，自动同步产能数据</p>
+        </div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">{{ stats.total }}</h5>
+                    <p class="card-text text-muted">总订单</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center border-warning">
+                <div class="card-body">
+                    <h5 class="card-title text-warning">{{ stats.pending }}</h5>
+                    <p class="card-text text-muted">待处理</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center border-info">
+                <div class="card-body">
+                    <h5 class="card-title text-info">{{ stats.in_progress }}</h5>
+                    <p class="card-text text-muted">进行中</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center border-success">
+                <div class="card-body">
+                    <h5 class="card-title text-success">{{ stats.completed }}</h5>
+                    <p class="card-text text-muted">已完成</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center border-secondary">
+                <div class="card-body">
+                    <h5 class="card-title text-secondary">{{ stats.cancelled }}</h5>
+                    <p class="card-text text-muted">已取消</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">{{ current_user.current_orders or 0 }}</h5>
+                    <p class="card-text">当前订单</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作栏 -->
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <a href="{{ url_for('orders.create') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> 创建订单
+            </a>
+            <a href="{{ url_for('orders.export', status=current_status) }}" class="btn btn-success">
+                <i class="bi bi-download"></i> 导出Excel
+            </a>
+        </div>
+        <div class="col-md-6">
+            <form method="GET" class="d-flex justify-content-end">
+                <select name="status" class="form-select me-2" style="width: 200px;" onchange="this.form.submit()">
+                    <option value="">全部状态</option>
+                    <option value="pending" {% if current_status == 'pending' %}selected{% endif %}>待处理</option>
+                    <option value="in_progress" {% if current_status == 'in_progress' %}selected{% endif %}>进行中</option>
+                    <option value="completed" {% if current_status == 'completed' %}selected{% endif %}>已完成</option>
+                    <option value="cancelled" {% if current_status == 'cancelled' %}selected{% endif %}>已取消</option>
+                </select>
+            </form>
+        </div>
+    </div>
+
+    <!-- 订单列表 -->
+    <div class="card">
+        <div class="card-body">
+            {% if orders %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>订单编号</th>
+                            <th>产品名称</th>
+                            <th>数量</th>
+                            <th>客户名称</th>
+                            <th>订单日期</th>
+                            <th>预计交货</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr>
+                            <td><a href="{{ url_for('orders.detail', order_id=order.id) }}">{{ order.order_no }}</a></td>
+                            <td>{{ order.product_name }}</td>
+                            <td>{{ order.quantity }} {{ order.unit }}</td>
+                            <td>{{ order.customer_name }}</td>
+                            <td>{{ order.order_date.strftime('%Y-%m-%d') if order.order_date else '-' }}</td>
+                            <td>{{ order.delivery_date.strftime('%Y-%m-%d') if order.delivery_date else '-' }}</td>
+                            <td>
+                                {% if order.status == 'pending' %}
+                                <span class="badge bg-warning">待处理</span>
+                                {% elif order.status == 'in_progress' %}
+                                <span class="badge bg-info">进行中</span>
+                                {% elif order.status == 'completed' %}
+                                <span class="badge bg-success">已完成</span>
+                                {% elif order.status == 'cancelled' %}
+                                <span class="badge bg-secondary">已取消</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('orders.detail', order_id=order.id) }}" class="btn btn-outline-primary">查看</a>
+                                    <a href="{{ url_for('orders.edit', order_id=order.id) }}" class="btn btn-outline-secondary">编辑</a>
+                                    {% if order.status == 'pending' %}
+                                    <button class="btn btn-outline-info" onclick="updateStatus({{ order.id }}, 'in_progress')">开始</button>
+                                    {% elif order.status == 'in_progress' %}
+                                    <button class="btn btn-outline-success" onclick="updateStatus({{ order.id }}, 'completed')">完成</button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 分页 -->
+            {% if pagination.pages > 1 %}
+            <nav>
+                <ul class="pagination justify-content-center">
+                    {% if pagination.page > 1 %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('orders.index', page=pagination.page-1, status=current_status) }}">上一页</a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for p in range(1, pagination.pages + 1) %}
+                    <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                        <a class="page-link" href="{{ url_for('orders.index', page=p, status=current_status) }}">{{ p }}</a>
+                    </li>
+                    {% endfor %}
+                    
+                    {% if pagination.page < pagination.pages %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('orders.index', page=pagination.page+1, status=current_status) }}">下一页</a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
+                <p class="text-muted mt-3">暂无订单</p>
+                <a href="{{ url_for('orders.create') }}" class="btn btn-primary">创建第一个订单</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function updateStatus(orderId, status) {
+    if (!confirm('确认更新订单状态吗？')) {
+        return;
+    }
+    
+    let actualDeliveryDate = null;
+    if (status === 'completed') {
+        actualDeliveryDate = new Date().toISOString().split('T')[0];
+    }
+    
+    fetch(`/orders/${orderId}/update-status`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            status: status,
+            actual_delivery_date: actualDeliveryDate
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('状态更新成功');
+            location.reload();
+        } else {
+            alert('更新失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('更新失败: ' + error);
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,192 @@
+{% extends "layout/base.html" %}
+
+{% block title %}履约数据看板{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-bar-chart-line me-2"></i>履约数据看板</h4>
+    <button class="btn btn-outline-primary btn-sm" onclick="downloadReport()">
+      <i class="bi bi-download me-1"></i>下载PDF报告
+    </button>
+  </div>
+
+  <!-- 顶部指标卡 -->
+  <div class="row g-3 mb-4" id="statsCards">
+    <div class="col-md-3">
+      <div class="card text-center h-100">
+        <div class="card-body">
+          <div class="text-muted small mb-1">当前信用分</div>
+          <div class="display-6 fw-bold text-primary" id="currentScore">--</div>
+          <div class="text-muted small" id="scoreLevel">--</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center h-100">
+        <div class="card-body">
+          <div class="text-muted small mb-1">按时交付率</div>
+          <div class="display-6 fw-bold text-success" id="ownRate">--</div>
+          <div class="text-muted small">行业均值 <span id="industryRate">--</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center h-100">
+        <div class="card-body">
+          <div class="text-muted small mb-1">履约总次数</div>
+          <div class="display-6 fw-bold text-info" id="totalCount">--</div>
+          <div class="text-muted small">近12个月</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center h-100">
+        <div class="card-body">
+          <div class="text-muted small mb-1">按时履约次数</div>
+          <div class="display-6 fw-bold text-warning" id="onTimeCount">--</div>
+          <div class="text-muted small">近12个月</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <!-- 信用分趋势折线图 -->
+    <div class="col-md-8">
+      <div class="card h-100">
+        <div class="card-header bg-white fw-semibold">
+          <i class="bi bi-graph-up me-1"></i>近12个月信用分趋势
+        </div>
+        <div class="card-body">
+          <div id="trendChart" style="height:280px;"></div>
+        </div>
+      </div>
+    </div>
+    <!-- 信用分构成维度 -->
+    <div class="col-md-4">
+      <div class="card h-100">
+        <div class="card-header bg-white fw-semibold">
+          <i class="bi bi-pie-chart me-1"></i>信用分构成维度
+        </div>
+        <div class="card-body">
+          <div id="dimChart" style="height:280px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 最近10条变动记录 -->
+  <div class="card">
+    <div class="card-header bg-white fw-semibold">
+      <i class="bi bi-clock-history me-1"></i>最近信用分变动记录
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0" id="historyTable">
+        <thead class="table-light">
+          <tr>
+            <th>时间</th>
+            <th>变动类型</th>
+            <th>变动值</th>
+            <th>变动前</th>
+            <th>变动后</th>
+            <th>原因</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody">
+          <tr><td colspan="6" class="text-center text-muted py-3">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<script>
+const TYPE_LABELS = {
+  fulfillment_on_time: '按时履约',
+  fulfillment_late: '逾期履约',
+  data_auth: '数据授权',
+  data_update: '数据更新',
+  report_verified: '被举报核实',
+  report_false: '举报不实',
+  activity_inquiry: '发布询价',
+  activity_quote: '提交报价',
+  batch_recalculate: '系统重算',
+  consecutive_bonus: '连续履约奖励',
+};
+
+async function loadDashboard() {
+  const res = await fetch('/fulfillment/api/dashboard-data');
+  const data = await res.json();
+  if (!data.success) return;
+
+  // 顶部指标
+  const score = data.current_score;
+  document.getElementById('currentScore').textContent = score.toFixed(1);
+  document.getElementById('scoreLevel').textContent =
+    score >= 90 ? '优秀' : score >= 75 ? '良好' : score >= 60 ? '一般' : '较差';
+  document.getElementById('ownRate').textContent = data.delivery_stats.own_rate + '%';
+  document.getElementById('industryRate').textContent = data.delivery_stats.industry_rate + '%';
+  document.getElementById('totalCount').textContent = data.delivery_stats.total_count;
+  document.getElementById('onTimeCount').textContent = data.delivery_stats.on_time_count;
+
+  // 趋势折线图
+  const trendChart = echarts.init(document.getElementById('trendChart'));
+  trendChart.setOption({
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: data.trend.map(t => t.month) },
+    yAxis: { type: 'value', min: 0, max: 100, name: '信用分' },
+    series: [{
+      name: '信用分', type: 'line', smooth: true,
+      data: data.trend.map(t => t.score),
+      areaStyle: { opacity: 0.1 },
+      lineStyle: { color: '#2A6DFF' },
+      itemStyle: { color: '#2A6DFF' },
+    }],
+  });
+
+  // 维度饼图
+  const dims = data.dimensions;
+  const dimData = Object.entries(dims)
+    .filter(([, v]) => v !== 0)
+    .map(([k, v]) => ({ name: k, value: Math.abs(v).toFixed(1) }));
+  const dimChart = echarts.init(document.getElementById('dimChart'));
+  dimChart.setOption({
+    tooltip: { trigger: 'item', formatter: '{b}: {c}分 ({d}%)' },
+    legend: { orient: 'vertical', left: 'left', textStyle: { fontSize: 12 } },
+    series: [{
+      type: 'pie', radius: ['40%', '70%'],
+      data: dimData,
+      label: { show: false },
+    }],
+  });
+
+  // 历史记录表格
+  const tbody = document.getElementById('historyBody');
+  if (!data.history.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">暂无记录</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.history.map(r => {
+    const badge = r.change_value >= 0
+      ? `<span class="badge bg-success">+${r.change_value.toFixed(1)}</span>`
+      : `<span class="badge bg-danger">${r.change_value.toFixed(1)}</span>`;
+    return `<tr>
+      <td class="text-muted small">${r.created_at}</td>
+      <td>${TYPE_LABELS[r.change_type] || r.change_type}</td>
+      <td>${badge}</td>
+      <td>${r.old_score.toFixed(1)}</td>
+      <td>${r.new_score.toFixed(1)}</td>
+      <td class="text-muted small">${r.reason || '-'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function downloadReport() {
+  window.print();
+}
+
+loadDashboard();
+</script>
+{% endblock %}

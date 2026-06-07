@@ -1,0 +1,6 @@
+{#-
+  兼容历史模板中的 {% extends "base.html" %}（消息中心、数据授权、订单、微信设置等）。
+  实际布局、Bootstrap 5、顶栏与 footer 均与 layout/base.html 一致，避免重复维护。
+  「返回系统首页」按钮在 layout/base.html 中统一渲染。
+-#}
+{% extends "layout/base.html" %}

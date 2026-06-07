@@ -1,0 +1,223 @@
+{% extends "layout/base.html" %}
+
+{% block title %}签署电子合同{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-10 offset-md-1">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-pen"></i> 签署电子合同
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- 合同状态 -->
+                    <div class="alert alert-info mb-4">
+                        <h5>合同ID: {{ contract_id }}</h5>
+                        <p class="mb-0">
+                            当前状态: 
+                            {% if contract.status == 'pending' %}
+                                <span class="badge bg-warning">待签署</span>
+                            {% elif contract.status == 'signed' %}
+                                <span class="badge bg-success">已签署</span>
+                            {% elif contract.status == 'fulfilled' %}
+                                <span class="badge bg-primary">已履约</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ contract.status }}</span>
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    <!-- 合同预览区域 -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">合同预览</h5>
+                        </div>
+                        <div class="card-body" style="min-height: 400px; background-color: #f8f9fa;">
+                            <div class="text-center p-5">
+                                <i class="bi bi-file-earmark-text" style="font-size: 4rem; color: #6c757d;"></i>
+                                <p class="mt-3 text-muted">合同内容预览</p>
+                                <p class="text-muted">合同ID: {{ contract_id }}</p>
+                                <a href="{{ url_for('contract.download_contract', contract_id=contract_id) }}" 
+                                   class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-download"></i> 下载合同PDF
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if contract.status == 'pending' %}
+                    <!-- 签署表单 -->
+                    <form method="POST" action="{{ url_for('contract.sign_page', contract_id=contract_id) }}" id="signForm">
+                        <div class="mb-4">
+                            <h5>签署方式</h5>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="signature_type" 
+                                       id="digitalSign" value="digital" checked>
+                                <label class="form-check-label" for="digitalSign">
+                                    数字签名（推荐）
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="signature_type" 
+                                       id="handwrittenSign" value="handwritten">
+                                <label class="form-check-label" for="handwrittenSign">
+                                    手写签名
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 签名区域 -->
+                        <div class="mb-4" id="signatureArea">
+                            <h5>签名</h5>
+                            <div class="border rounded p-3" style="background-color: #fff;">
+                                <canvas id="signatureCanvas" width="600" height="200" 
+                                        style="border: 1px dashed #ccc; cursor: crosshair; width: 100%;"></canvas>
+                                <div class="mt-2">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" id="clearBtn">
+                                        <i class="bi bi-eraser"></i> 清除
+                                    </button>
+                                </div>
+                            </div>
+                            <input type="hidden" name="signature_image" id="signatureImage">
+                            <input type="hidden" name="timestamp" id="timestamp">
+                        </div>
+
+                        <!-- 确认条款 -->
+                        <div class="mb-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="agreeTerms" required>
+                                <label class="form-check-label" for="agreeTerms">
+                                    我已阅读并同意合同条款，确认签署此合同
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 提交按钮 -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('contract.list_contracts') }}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> 返回
+                            </a>
+                            <button type="submit" class="btn btn-success" id="submitBtn">
+                                <i class="bi bi-pen"></i> 确认签署
+                            </button>
+                        </div>
+                    </form>
+                    {% else %}
+                    <!-- 已签署状态 -->
+                    <div class="alert alert-success">
+                        <h5><i class="bi bi-check-circle"></i> 合同已签署</h5>
+                        <p class="mb-0">此合同已完成签署流程</p>
+                    </div>
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('contract.view_contract', contract_id=contract_id) }}" class="btn btn-primary">
+                            <i class="bi bi-eye"></i> 查看合同详情
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 签名画布功能
+const canvas = document.getElementById('signatureCanvas');
+const ctx = canvas.getContext('2d');
+let isDrawing = false;
+let lastX = 0;
+let lastY = 0;
+
+// 设置画布实际尺寸
+canvas.width = 600;
+canvas.height = 200;
+
+canvas.addEventListener('mousedown', startDrawing);
+canvas.addEventListener('mousemove', draw);
+canvas.addEventListener('mouseup', stopDrawing);
+canvas.addEventListener('mouseout', stopDrawing);
+
+// 触摸事件支持
+canvas.addEventListener('touchstart', handleTouchStart);
+canvas.addEventListener('touchmove', handleTouchMove);
+canvas.addEventListener('touchend', stopDrawing);
+
+function startDrawing(e) {
+    isDrawing = true;
+    const rect = canvas.getBoundingClientRect();
+    lastX = e.clientX - rect.left;
+    lastY = e.clientY - rect.top;
+}
+
+function draw(e) {
+    if (!isDrawing) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(x, y);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    
+    lastX = x;
+    lastY = y;
+}
+
+function stopDrawing() {
+    isDrawing = false;
+}
+
+function handleTouchStart(e) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    lastX = touch.clientX - rect.left;
+    lastY = touch.clientY - rect.top;
+    isDrawing = true;
+}
+
+function handleTouchMove(e) {
+    e.preventDefault();
+    if (!isDrawing) return;
+    
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(x, y);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    
+    lastX = x;
+    lastY = y;
+}
+
+// 清除按钮
+document.getElementById('clearBtn').addEventListener('click', function() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+});
+
+// 表单提交
+document.getElementById('signForm').addEventListener('submit', function(e) {
+    // 保存签名图片
+    const signatureData = canvas.toDataURL('image/png');
+    document.getElementById('signatureImage').value = signatureData;
+    
+    // 保存时间戳
+    document.getElementById('timestamp').value = new Date().toISOString();
+});
+</script>
+{% endblock %}

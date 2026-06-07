@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}订单详情 - {{ order.order_no }} - 链易配{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4>订单详情</h4>
+                    <div>
+                        <a href="{{ url_for('orders.edit', order_id=order.id) }}" class="btn btn-sm btn-primary">编辑</a>
+                        <button class="btn btn-sm btn-danger" onclick="deleteOrder({{ order.id }})">删除</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <strong>订单编号:</strong>
+                            <p>{{ order.order_no }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>状态:</strong>
+                            <p>
+                                {% if order.status == 'pending' %}
+                                <span class="badge bg-warning">待处理</span>
+                                {% elif order.status == 'in_progress' %}
+                                <span class="badge bg-info">进行中</span>
+                                {% elif order.status == 'completed' %}
+                                <span class="badge bg-success">已完成</span>
+                                {% elif order.status == 'cancelled' %}
+                                <span class="badge bg-secondary">已取消</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <strong>产品名称:</strong>
+                            <p>{{ order.product_name }}</p>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <strong>数量:</strong>
+                            <p>{{ order.quantity }} {{ order.unit }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>客户名称:</strong>
+                            <p>{{ order.customer_name }}</p>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <strong>订单日期:</strong>
+                            <p>{{ order.order_date.strftime('%Y-%m-%d') if order.order_date else '-' }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>预计交货日期:</strong>
+                            <p>{{ order.delivery_date.strftime('%Y-%m-%d') if order.delivery_date else '-' }}</p>
+                        </div>
+                    </div>
+
+                    {% if order.actual_delivery_date %}
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <strong>实际交货日期:</strong>
+                            <p>{{ order.actual_delivery_date.strftime('%Y-%m-%d') }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>是否按时交货:</strong>
+                            <p>
+                                {% if order.delivery_date and order.actual_delivery_date <= order.delivery_date %}
+                                <span class="badge bg-success">是</span>
+                                {% else %}
+                                <span class="badge bg-warning">否</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if order.notes %}
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <strong>备注:</strong>
+                            <p>{{ order.notes }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <hr>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <strong>创建时间:</strong>
+                            <p>{{ order.created_at.strftime('%Y-%m-%d %H:%M:%S') if order.created_at else '-' }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>更新时间:</strong>
+                            <p>{{ order.updated_at.strftime('%Y-%m-%d %H:%M:%S') if order.updated_at else '-' }}</p>
+                        </div>
+                    </div>
+
+                    <!-- 状态操作按钮 -->
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{{ url_for('orders.index') }}" class="btn btn-secondary">返回列表</a>
+                        <div>
+                            {% if order.status == 'pending' %}
+                            <button class="btn btn-info" onclick="updateStatus({{ order.id }}, 'in_progress')">开始处理</button>
+                            <button class="btn btn-secondary" onclick="updateStatus({{ order.id }}, 'cancelled')">取消订单</button>
+                            {% elif order.status == 'in_progress' %}
+                            <button class="btn btn-success" onclick="updateStatus({{ order.id }}, 'completed')">标记完成</button>
+                            <button class="btn btn-secondary" onclick="updateStatus({{ order.id }}, 'cancelled')">取消订单</button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateStatus(orderId, status) {
+    let confirmMsg = '确认更新订单状态吗？';
+    if (status === 'cancelled') {
+        confirmMsg = '确认取消订单吗？此操作不可撤销。';
+    }
+    
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+    
+    let actualDeliveryDate = null;
+    if (status === 'completed') {
+        actualDeliveryDate = new Date().toISOString().split('T')[0];
+    }
+    
+    fetch(`/orders/${orderId}/update-status`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            status: status,
+            actual_delivery_date: actualDeliveryDate
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('状态更新成功');
+            location.reload();
+        } else {
+            alert('更新失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('更新失败: ' + error);
+    });
+}
+
+function deleteOrder(orderId) {
+    if (!confirm('确认删除此订单吗？此操作不可撤销。')) {
+        return;
+    }
+    
+    fetch(`/orders/${orderId}/delete`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('订单删除成功');
+            window.location.href = '/orders';
+        } else {
+            alert('删除失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('删除失败: ' + error);
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,147 @@
+{% extends "layout/base.html" %}
+
+{% block title %}供应商展示控制{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h4 class="mb-0">
+            <i class="bi bi-eye me-2"></i>供应商展示控制
+          </h4>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>说明：</strong>
+            <ul class="mb-0">
+              <li><strong>公开展示：</strong>所有用户都可以看到该供应商</li>
+              <li><strong>仅链主可见：</strong>只有您可以看到该供应商</li>
+              <li><strong>完全隐藏：</strong>该供应商不会出现在任何匹配结果中</li>
+              <li><strong>注意：</strong>需要供应商授权后才能应用非公开模式</li>
+            </ul>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>供应商名称</th>
+                  <th>当前展示模式</th>
+                  <th>授权状态</th>
+                  <th>授权时间</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for control in display_controls %}
+                <tr>
+                  <td>{{ control.supplier_name }}</td>
+                  <td>
+                    {% if control.display_mode == 'public' %}
+                      <span class="badge bg-success">公开展示</span>
+                    {% elif control.display_mode == 'lead_only' %}
+                      <span class="badge bg-warning">仅链主可见</span>
+                    {% elif control.display_mode == 'hidden' %}
+                      <span class="badge bg-danger">完全隐藏</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if control.authorized %}
+                      <span class="badge bg-success">
+                        <i class="bi bi-check-circle"></i> 已授权
+                      </span>
+                    {% else %}
+                      <span class="badge bg-secondary">
+                        <i class="bi bi-x-circle"></i> 未授权
+                      </span>
+                    {% endif %}
+                  </td>
+                  <td>{{ control.authorized_at or '-' }}</td>
+                  <td>
+                    <div class="btn-group" role="group">
+                      <button class="btn btn-sm btn-success" 
+                              onclick="setDisplayMode({{ control.supplier_id }}, 'public')"
+                              {% if not control.authorized and control.display_mode != 'public' %}disabled{% endif %}>
+                        公开
+                      </button>
+                      <button class="btn btn-sm btn-warning" 
+                              onclick="setDisplayMode({{ control.supplier_id }}, 'lead_only')"
+                              {% if not control.authorized %}disabled{% endif %}>
+                        仅我可见
+                      </button>
+                      <button class="btn btn-sm btn-danger" 
+                              onclick="setDisplayMode({{ control.supplier_id }}, 'hidden')"
+                              {% if not control.authorized %}disabled{% endif %}>
+                        隐藏
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="5" class="text-center text-muted">
+                    暂无供应商记录
+                    <a href="{{ url_for('lead_enterprise.import_suppliers') }}" class="ms-2">
+                      立即导入
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-3">
+            <a href="{{ url_for('lead_enterprise.dashboard') }}" class="btn btn-secondary">
+              <i class="bi bi-arrow-left me-2"></i>返回控制台
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function setDisplayMode(supplierId, mode) {
+  if (!confirm(`确定要将展示模式设置为"${getModeText(mode)}"吗？`)) {
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/lead-enterprise/api/suppliers/${supplierId}/display-control`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        display_mode: mode
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      alert('设置成功');
+      window.location.reload();
+    } else {
+      alert('设置失败：' + result.message);
+    }
+  } catch (error) {
+    alert('设置失败：' + error.message);
+  }
+}
+
+function getModeText(mode) {
+  const modeMap = {
+    'public': '公开展示',
+    'lead_only': '仅链主可见',
+    'hidden': '完全隐藏'
+  };
+  return modeMap[mode] || mode;
+}
+</script>
+{% endblock %}

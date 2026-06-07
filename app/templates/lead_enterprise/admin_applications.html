@@ -1,0 +1,215 @@
+{% extends "layout/base.html" %}
+
+{% block title %}链主入驻申请审核{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+  <div class="row">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h4 class="mb-0">
+            <i class="bi bi-clipboard-check me-2"></i>链主入驻申请审核
+          </h4>
+        </div>
+        <div class="card-body">
+          <!-- 状态筛选 -->
+          <ul class="nav nav-tabs mb-3">
+            <li class="nav-item">
+              <a class="nav-link {% if current_status == 'pending' %}active{% endif %}" 
+                 href="?status=pending">
+                待审核
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if current_status == 'approved' %}active{% endif %}" 
+                 href="?status=approved">
+                已通过
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link {% if current_status == 'rejected' %}active{% endif %}" 
+                 href="?status=rejected">
+                已拒绝
+              </a>
+            </li>
+          </ul>
+
+          <!-- 申请列表 -->
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>企业名称</th>
+                  <th>供应商数量</th>
+                  <th>年采购额（万元）</th>
+                  <th>申请时间</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for app in applications %}
+                <tr>
+                  <td>{{ app.enterprise_name }}</td>
+                  <td>{{ app.supplier_count }}</td>
+                  <td>{{ "%.2f"|format(app.annual_procurement) }}</td>
+                  <td>{{ app.submitted_at }}</td>
+                  <td>
+                    {% if app.status == 'pending' %}
+                      <span class="badge bg-warning">待审核</span>
+                    {% elif app.status == 'approved' %}
+                      <span class="badge bg-success">已通过</span>
+                    {% elif app.status == 'rejected' %}
+                      <span class="badge bg-danger">已拒绝</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <button class="btn btn-sm btn-info" 
+                            onclick="viewApplication({{ app.id }}, {{ app|tojson }})">
+                      <i class="bi bi-eye"></i> 查看
+                    </button>
+                    {% if app.status == 'pending' %}
+                      <button class="btn btn-sm btn-success" 
+                              onclick="reviewApplication({{ app.id }}, true)">
+                        <i class="bi bi-check-circle"></i> 通过
+                      </button>
+                      <button class="btn btn-sm btn-danger" 
+                              onclick="reviewApplication({{ app.id }}, false)">
+                        <i class="bi bi-x-circle"></i> 拒绝
+                      </button>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% else %}
+                <tr>
+                  <td colspan="6" class="text-center text-muted">暂无申请记录</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 查看详情模态框 -->
+<div class="modal fade" id="viewModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">申请详情</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="viewModalBody">
+        <!-- 动态填充 -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 审核模态框 -->
+<div class="modal fade" id="reviewModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="reviewModalTitle">审核申请</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="reviewApplicationId">
+        <input type="hidden" id="reviewApproved">
+        
+        <div class="mb-3">
+          <label for="reviewNotes" class="form-label">审核意见</label>
+          <textarea class="form-control" id="reviewNotes" rows="4" 
+                    placeholder="请填写审核意见"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" onclick="submitReview()">确认</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function viewApplication(id, app) {
+  const modalBody = document.getElementById('viewModalBody');
+  modalBody.innerHTML = `
+    <div class="row">
+      <div class="col-md-6">
+        <p><strong>企业名称：</strong>${app.enterprise_name}</p>
+        <p><strong>供应商数量：</strong>${app.supplier_count}</p>
+        <p><strong>年采购额：</strong>${app.annual_procurement} 万元</p>
+      </div>
+      <div class="col-md-6">
+        <p><strong>申请时间：</strong>${app.submitted_at}</p>
+        <p><strong>状态：</strong>${app.status}</p>
+        ${app.reviewed_at ? `<p><strong>审核时间：</strong>${app.reviewed_at}</p>` : ''}
+      </div>
+    </div>
+    <hr>
+    <div class="mb-3">
+      <strong>申请说明：</strong>
+      <p>${app.description || '无'}</p>
+    </div>
+    ${app.review_notes ? `
+      <div class="mb-3">
+        <strong>审核意见：</strong>
+        <p>${app.review_notes}</p>
+      </div>
+    ` : ''}
+  `;
+  
+  const modal = new bootstrap.Modal(document.getElementById('viewModal'));
+  modal.show();
+}
+
+function reviewApplication(id, approved) {
+  document.getElementById('reviewApplicationId').value = id;
+  document.getElementById('reviewApproved').value = approved;
+  document.getElementById('reviewModalTitle').textContent = approved ? '通过申请' : '拒绝申请';
+  document.getElementById('reviewNotes').value = '';
+  
+  const modal = new bootstrap.Modal(document.getElementById('reviewModal'));
+  modal.show();
+}
+
+async function submitReview() {
+  const id = document.getElementById('reviewApplicationId').value;
+  const approved = document.getElementById('reviewApproved').value === 'true';
+  const notes = document.getElementById('reviewNotes').value;
+  
+  try {
+    const response = await fetch(`/lead-enterprise/api/admin/applications/${id}/review`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        approved: approved,
+        review_notes: notes
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      alert('审核完成');
+      window.location.reload();
+    } else {
+      alert('审核失败：' + result.message);
+    }
+  } catch (error) {
+    alert('审核失败：' + error.message);
+  }
+}
+</script>
+{% endblock %}

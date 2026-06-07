@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}链易配 - 产业链供需智能匹配平台{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='frontend/assets/main.css') }}" />
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.0/dist/echarts.min.js"></script>
+    <style>
+        html, body, #root { height: 100%; margin: 0; padding: 0; }
+        body { overflow: hidden; }
+    </style>
+    <script>
+        window.__INITIAL_DATA__ = {{ initial_data | tojson }};
+        window.__FLASK_FLASH_MESSAGES__ = {{ get_flashed_messages(with_categories=true) | tojson | safe }};
+    </script>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="module" src="{{ url_for('static', filename='frontend/assets/main.js') }}"></script>
+</body>
+</html>

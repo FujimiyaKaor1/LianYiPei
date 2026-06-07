@@ -1,0 +1,79 @@
+{% extends "layout/base.html" %}
+
+{% block title %}链主验厂管理 - 链易配{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:720px;">
+  <div class="d-flex align-items-center mb-4">
+    <a href="{{ url_for('quality_labels.manage') }}" class="btn btn-outline-secondary btn-sm me-3">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <h4 class="mb-0"><i class="bi bi-clipboard-check me-2 text-primary"></i>链主验厂管理</h4>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header"><h6 class="mb-0">颁发验厂标签</h6></div>
+    <div class="card-body">
+      <div class="mb-3">
+        <label class="form-label fw-semibold">选择供应商 <span class="text-danger">*</span></label>
+        <select class="form-select" id="enterpriseId">
+          <option value="">请选择供应商</option>
+          {% for ent in enterprises %}
+          <option value="{{ ent.id }}">{{ ent.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">标签名称</label>
+        <input type="text" class="form-control" id="labelName" value="链主验厂通过" placeholder="如：链主验厂通过">
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">证书/报告编号</label>
+        <input type="text" class="form-control" id="certificateNo" placeholder="可选">
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">有效期（天）</label>
+        <input type="number" class="form-control" id="validDays" value="365" min="1" max="3650">
+        <div class="form-text">默认1年（365天）</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">验厂备注</label>
+        <textarea class="form-control" id="inspectionNotes" rows="2" placeholder="验厂结论、注意事项等（可选）"></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="grantInspection()">
+        <i class="bi bi-clipboard-check me-1"></i>颁发验厂标签
+      </button>
+    </div>
+  </div>
+
+  <div id="resultMsg"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function grantInspection() {
+  const enterpriseId = document.getElementById('enterpriseId').value;
+  if (!enterpriseId) { alert('请选择供应商'); return; }
+  const payload = {
+    enterprise_id: parseInt(enterpriseId),
+    label_name: document.getElementById('labelName').value || '链主验厂通过',
+    certificate_no: document.getElementById('certificateNo').value,
+    valid_days: parseInt(document.getElementById('validDays').value) || 365,
+    inspection_notes: document.getElementById('inspectionNotes').value,
+  };
+  const res = await fetch('/quality-labels/api/grant-inspection', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  const el = document.getElementById('resultMsg');
+  if (data.success) {
+    el.innerHTML = '<div class="alert alert-success">验厂标签颁发成功！</div>';
+  } else {
+    el.innerHTML = `<div class="alert alert-danger">${data.message || '颁发失败'}</div>`;
+  }
+}
+</script>
+{% endblock %}

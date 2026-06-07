@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}数据授权管理 - 链易配{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="bi bi-shield-lock"></i> 数据授权管理
+                </h2>
+                <a href="{{ url_for('dashboard.main') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> 返回
+                </a>
+            </div>
+
+            <!-- 说明卡片 -->
+            <div class="alert alert-info mb-4">
+                <h5><i class="bi bi-info-circle"></i> 数据授权说明</h5>
+                <p class="mb-2">授权平台接入您的用电量和开票数据，可以：</p>
+                <ul class="mb-2">
+                    <li><strong>首次授权奖励：</strong>每种数据类型首次授权可获得 <span class="badge bg-success">+10 信用分</span></li>
+                    <li><strong>提升匹配权重：</strong>数据越完整，匹配推荐越精准</li>
+                    <li><strong>增强可信度：</strong>真实数据让合作伙伴更信任您</li>
+                </ul>
+                <p class="mb-0 text-muted small">
+                    <i class="bi bi-shield-check"></i> 您的数据安全受到严格保护，仅用于平台内部分析，不会泄露给第三方。您可以随时撤销授权。
+                </p>
+            </div>
+
+            <!-- 可授权的数据类型 -->
+            <div class="row mb-4">
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="bi bi-lightning-charge text-warning"></i> 用电量数据
+                            </h5>
+                            <p class="card-text text-muted">
+                                授权接入最近12个月的用电量数据，帮助平台评估您的生产活跃度和产能状况。
+                            </p>
+                            <div id="power-auth-status">
+                                <button class="btn btn-primary" onclick="authorizeData('power_consumption')">
+                                    <i class="bi bi-plus-circle"></i> 立即授权
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="bi bi-receipt text-success"></i> 开票数据
+                            </h5>
+                            <p class="card-text text-muted">
+                                授权接入最近12个月的开票数据，帮助平台评估您的交易规模和经营状况。
+                            </p>
+                            <div id="invoice-auth-status">
+                                <button class="btn btn-primary" onclick="authorizeData('invoice_data')">
+                                    <i class="bi bi-plus-circle"></i> 立即授权
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 授权记录列表 -->
+            <div class="card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-list-check"></i> 授权记录</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>数据类型</th>
+                                    <th>授权状态</th>
+                                    <th>授权时间</th>
+                                    <th>最后同步时间</th>
+                                    <th>同步状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="auth-list">
+                                {% if authorizations %}
+                                    {% for auth in authorizations %}
+                                    <tr data-auth-id="{{ auth.id }}" data-data-type="{{ auth.data_type }}">
+                                        <td>
+                                            {% if auth.data_type == 'power_consumption' %}
+                                                <i class="bi bi-lightning-charge text-warning"></i> {{ auth.data_type_name }}
+                                            {% elif auth.data_type == 'invoice_data' %}
+                                                <i class="bi bi-receipt text-success"></i> {{ auth.data_type_name }}
+                                            {% else %}
+                                                {{ auth.data_type_name }}
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if auth.authorized %}
+                                                <span class="badge bg-success">已授权</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">已撤销</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ auth.authorized_at or '-' }}</td>
+                                        <td>{{ auth.last_sync_at or '未同步' }}</td>
+                                        <td>
+                                            {% if auth.sync_status == 'success' %}
+                                                <span class="badge bg-success">{{ auth.sync_status_name }}</span>
+                                            {% elif auth.sync_status == 'failed' %}
+                                                <span class="badge bg-danger" title="{{ auth.error_message }}">{{ auth.sync_status_name }}</span>
+                                            {% elif auth.sync_status == 'pending' %}
+                                                <span class="badge bg-warning">{{ auth.sync_status_name }}</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">{{ auth.sync_status_name }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if auth.authorized %}
+                                                <button class="btn btn-sm btn-danger" onclick="revokeAuthorization({{ auth.id }})">
+                                                    <i class="bi bi-x-circle"></i> 撤销授权
+                                                </button>
+                                            {% else %}
+                                                <button class="btn btn-sm btn-primary" onclick="authorizeData('{{ auth.data_type }}')">
+                                                    <i class="bi bi-arrow-clockwise"></i> 重新授权
+                                                </button>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted">暂无授权记录</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 授权数据
+function authorizeData(dataType) {
+    if (!confirm(`确认授权 ${getDataTypeName(dataType)} 吗？\n\n首次授权将获得 +10 信用分奖励。`)) {
+        return;
+    }
+
+    fetch('/data-authorization/api/data-authorization', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            data_type: dataType
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            let message = data.message;
+            if (data.credit_bonus > 0) {
+                message += `\n\n恭喜！您的信用分从 ${data.old_score.toFixed(1)} 提升至 ${data.new_score.toFixed(1)} (+${data.credit_bonus})`;
+            }
+            alert(message);
+            location.reload();
+        } else {
+            alert('授权失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('授权失败，请稍后重试');
+    });
+}
+
+// 撤销授权
+function revokeAuthorization(authId) {
+    if (!confirm('确认撤销授权吗？\n\n撤销后将停止数据同步，但历史数据会保留，已获得的信用分不会扣除。')) {
+        return;
+    }
+
+    fetch(`/data-authorization/api/data-authorization/${authId}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('撤销失败：' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('撤销失败，请稍后重试');
+    });
+}
+
+// 获取数据类型中文名称
+function getDataTypeName(dataType) {
+    const names = {
+        'power_consumption': '用电量数据',
+        'invoice_data': '开票数据'
+    };
+    return names[dataType] || dataType;
+}
+
+// 页面加载时更新按钮状态
+document.addEventListener('DOMContentLoaded', function() {
+    // 检查已授权的数据类型
+    const authRows = document.querySelectorAll('#auth-list tr[data-auth-id]');
+    authRows.forEach(row => {
+        const dataType = row.getAttribute('data-data-type');
+        const isAuthorized = row.querySelector('.badge.bg-success') !== null;
+        
+        if (isAuthorized) {
+            // 更新对应卡片的按钮状态
+            const statusDiv = document.getElementById(
+                dataType === 'power_consumption' ? 'power-auth-status' : 'invoice-auth-status'
+            );
+            if (statusDiv) {
+                statusDiv.innerHTML = `
+                    <span class="badge bg-success mb-2">
+                        <i class="bi bi-check-circle"></i> 已授权
+                    </span>
+                    <p class="text-muted small mb-0">数据正在定期同步中</p>
+                `;
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

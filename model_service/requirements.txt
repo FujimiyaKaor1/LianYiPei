@@ -1,0 +1,8 @@
+flask>=2.3
+torch
+transformers>=4.41
+accelerate
+sentencepiece
+protobuf
+huggingface-hub
+python-dotenv

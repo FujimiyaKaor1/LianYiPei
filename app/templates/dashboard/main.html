@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>链易配 - 产业链协同平台</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        :root {
+            --primary: #2A6DFF;
+            --primary-light: #E8F3FF;
+            --success: #00B42A;
+            --bg: #F5F7FA;
+            --card: #FFFFFF;
+            --text: #303133;
+            --text-secondary: #606266;
+            --text-light: #909399;
+            --border: #E4E7ED;
+            --shadow: 0 2px 12px rgba(0,0,0,0.06);
+            --shadow-hover: 0 4px 20px rgba(0,0,0,0.1);
+            --radius: 16px;
+            --radius-sm: 12px;
+            --radius-lg: 20px;
+            --transition: 0.2s ease;
+            --sidebar-width: 260px;
+            --ai-panel-width: 320px;
+            --header-height: 60px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-width: 1200px;
+            min-height: 100vh;
+            overflow-x: auto;
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* ===== 顶部导航栏 ===== */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 1000;
+            box-shadow: var(--shadow);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-left: 16px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary), #5B8FFF);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+        }
+
+        .logo-text {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .logo-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-left: 8px;
+            padding-left: 12px;
+            border-left: 1px solid var(--border);
+        }
+
+        .header-center {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+        }
+
+        .search-box {
+            width: 400px;
+            height: 40px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.04);
+            transition: var(--transition);
+        }
+
+        .search-box:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(42, 109, 255, 0.1);
+        }
+
+        .search-box i {
+            color: var(--text-light);
+            font-size: 14px;
+        }
+
+        .search-box input {
+            flex: 1;
+            border: none;
+            outline: none;
+            padding: 0 12px;
+            font-size: 14px;
+            color: var(--text);
+            background: transparent;
+        }
+
+        .search-box input::placeholder {
+            color: var(--text-light);
+        }
+
+        .search-clear {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--border);
+            border: none;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            font-size: 10px;
+            transition: var(--transition);
+        }
+
+        .search-box input:not(:placeholder-shown) + .search-clear {
+            display: flex;
+        }
+
+        .search-clear:hover {
+            background: var(--text-light);
+            color: white;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding-right: 16px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), #5B8FFF);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+        }
+
+        .user-avatar:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(42, 109, 255, 0.3);
+        }
+
+        .user-avatar::after {
+            content: '';
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 10px;
+            height: 10px;
+            background: var(--success);
+            border-radius: 50%;
+            border: 2px solid white;
+        }
+
+        .settings-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--bg);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            font-size: 16px;
+            transition: var(--transition);
+        }
+
+        .settings-btn:hover {
+            background: var(--primary-light);
+            color: var(--primary);
+        }
+
+        /* ===== 主内容区域 ===== */
+        .main-wrapper {
+            display: flex;
+            margin-top: var(--header-height);
+            min-height: calc(100vh - var(--header-height));
+        }
+
+        /* ===== 左侧菜单栏 ===== */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--card);
+            border-right: 1px solid var(--border);
+            position: fixed;
+            top: var(--header-height);
+            left: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        .nav-menu {
+            flex: 1;
+            padding: 24px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 24px;
+            border-radius: var(--radius);
+            text-decoration: none;
+            color: var(--text);
+            font-size: 15px;
+            font-weight: 500;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+
+        .nav-item i {
+            width: 20px;
+            text-align: center;
+            font-size: 16px;
+        }
+
+        .nav-item:hover {
+            background: #F0F2F5;
+        }
+
+        .nav-item.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(42, 109, 255, 0.3);
+        }
+
+        .nav-item.active i {
+            color: white;
+        }
+
+        .sidebar-footer {
+            padding: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .quick-entry {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 20px;
+            background: #F0F2F5;
+            border-radius: var(--radius-sm);
+            text-decoration: none;
+            color: var(--text);
+            font-size: 14px;
+            font-weight: 500;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+
+        .quick-entry:hover {
+            background: var(--primary-light);
+            color: var(--primary);
+        }
+
+        .quick-entry i {
+            color: var(--primary);
+            font-size: 18px;
+        }
+
+        /* ===== 中间主内容区 ===== */
+        .main-content {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            margin-right: var(--ai-panel-width);
+            padding: 24px;
+            min-width: 0;
+        }
+
+        /* ===== 指标卡片区域 ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 120px;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .stat-icon.blue { background: var(--primary-light); color: var(--primary); }
+        .stat-icon.green { background: #E8FFEA; color: var(--success); }
+        .stat-icon.orange { background: #FFF7E8; color: #FF7D00; }
+        .stat-icon.purple { background: #F2E8FF; color: #7B61FF; }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text);
+            text-align: center;
+        }
+
+        .stat-footer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .stat-change {
+            font-size: 12px;
+            color: var(--success);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .stat-change i {
+            font-size: 10px;
+        }
+
+        /* ===== 知识图谱区域 ===== */
+        .graph-section {
+            background: var(--card);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .section-header {
+            height: 48px;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .section-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .section-btn {
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .section-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .graph-container {
+            height: 450px;
+            padding: 16px;
+        }
+
+        #knowledge-graph {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* ===== 右侧AI助手区域 ===== */
+        .ai-panel {
+            width: var(--ai-panel-width);
+            background: var(--card);
+            border-left: 1px solid var(--border);
+            position: fixed;
+            top: var(--header-height);
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        .ai-header {
+            padding: 16px 12px;
+            border-bottom: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .ai-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .ai-title i {
+            color: var(--primary);
+        }
+
+        .ai-chat {
+            flex: 1;
+            padding: 16px 12px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .chat-message {
+            max-width: 90%;
+            padding: 12px;
+            border-radius: var(--radius);
+            font-size: 14px;
+            line-height: 1.5;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .chat-message.ai {
+            background: var(--primary-light);
+            color: var(--text);
+            align-self: flex-start;
+            border-radius: var(--radius) var(--radius) var(--radius) 4px;
+        }
+
+        .chat-message.user {
+            background: var(--primary);
+            color: white;
+            align-self: flex-end;
+            border-radius: var(--radius) var(--radius) 4px var(--radius);
+        }
+
+        .ai-suggestions {
+            padding: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .suggestion-card {
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+
+        .suggestion-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .suggestion-title i {
+            color: var(--primary);
+        }
+
+        .suggestion-item {
+            padding: 8px 12px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: var(--card);
+            border-radius: 8px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .suggestion-item:hover {
+            background: var(--primary-light);
+            color: var(--primary);
+        }
+
+        .suggestion-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .suggestion-item i {
+            color: var(--primary);
+            font-size: 10px;
+        }
+
+        .ai-input-area {
+            padding: 12px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .ai-input {
+            flex: 1;
+            height: 40px;
+            padding: 0 16px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 14px;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .ai-input:focus {
+            border-color: var(--primary);
+        }
+
+        .ai-input::placeholder {
+            color: var(--text-light);
+        }
+
+        .ai-send-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            transition: var(--transition);
+        }
+
+        .ai-send-btn:hover {
+            background: #1E5AE8;
+            transform: scale(1.05);
+        }
+
+        /* ===== 图例 ===== */
+        .graph-legend {
+            display: flex;
+            gap: 16px;
+            padding: 12px 20px;
+            border-top: 1px solid var(--border);
+            background: var(--bg);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .legend-dot.product { background: var(--primary); }
+        .legend-dot.enterprise { background: var(--success); }
+
+        /* ===== 滚动条样式 ===== */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-light);
+        }
+
+        /* ===== 响应式 ===== */
+        @media (max-width: 1400px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 1200px) {
+            body {
+                overflow-x: scroll;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 顶部导航栏 -->
+        <header class="header">
+            <div class="header-left">
+                <a href="#" class="logo">
+                    <div class="logo-icon">
+                        <i class="fas fa-link"></i>
+                    </div>
+                    <span class="logo-text">链易配</span>
+                </a>
+                <span class="logo-subtitle">产业链协同平台</span>
+            </div>
+
+            <div class="header-center">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="搜索企业/产品" id="searchInput">
+                    <button class="search-clear" id="searchClear">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="header-right">
+                <button class="settings-btn" title="设置">
+                    <i class="fas fa-cog"></i>
+                </button>
+                <div class="user-avatar" title="用户中心">
+                    <i class="fas fa-user"></i>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主内容区域 -->
+        <div class="main-wrapper">
+            <!-- 左侧菜单栏 -->
+            <aside class="sidebar">
+                <nav class="nav-menu">
+                    <a href="#" class="nav-item active" data-page="home">
+                        <i class="fas fa-home"></i>
+                        <span>首页</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="match">
+                        <i class="fas fa-handshake"></i>
+                        <span>企业匹配</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="smart">
+                        <i class="fas fa-magic"></i>
+                        <span>智能匹配</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="graph">
+                        <i class="fas fa-project-diagram"></i>
+                        <span>供应链图谱</span>
+                    </a>
+                    <a href="#" class="nav-item" data-page="ai">
+                        <i class="fas fa-robot"></i>
+                        <span>AI对话助手</span>
+                    </a>
+                </nav>
+
+                <div class="sidebar-footer">
+                    <a href="#" class="quick-entry">
+                        <i class="fas fa-sitemap"></i>
+                        <span>12条产业链图谱</span>
+                    </a>
+                </div>
+            </aside>
+
+            <!-- 中间主内容区 -->
+            <main class="main-content">
+                <!-- 指标卡片区域 -->
+                <section class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">入驻企业总数</span>
+                            <div class="stat-icon blue">
+                                <i class="fas fa-building"></i>
+                            </div>
+                        </div>
+                        <div class="stat-value">69</div>
+                        <div class="stat-footer">
+                            <span class="stat-change">
+                                <i class="fas fa-arrow-up"></i>
+                                本周环比 +12%
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">供应信息总数</span>
+                            <div class="stat-icon green">
+                                <i class="fas fa-box"></i>
+                            </div>
+                        </div>
+                        <div class="stat-value">20</div>
+                        <div class="stat-footer">
+                            <span class="stat-change">
+                                <i class="fas fa-arrow-up"></i>
+                                本周环比 +5%
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">需求信息总数</span>
+                            <div class="stat-icon orange">
+                                <i class="fas fa-clipboard-list"></i>
+                            </div>
+                        </div>
+                        <div class="stat-value">16</div>
+                        <div class="stat-footer">
+                            <span class="stat-change">
+                                <i class="fas fa-arrow-up"></i>
+                                本周环比 +3%
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">产品种类</span>
+                            <div class="stat-icon purple">
+                                <i class="fas fa-cubes"></i>
+                            </div>
+                        </div>
+                        <div class="stat-value">40</div>
+                        <div class="stat-footer">
+                            <span class="stat-change">
+                                <i class="fas fa-arrow-up"></i>
+                                本周环比 +2%
+                            </span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 知识图谱区域 -->
+                <section class="graph-section">
+                    <div class="section-header">
+                        <h2 class="section-title">产业链图谱（12条产业链）</h2>
+                        <div class="section-actions">
+                            <button class="section-btn">
+                                <i class="fas fa-expand"></i>
+                                全屏
+                            </button>
+                            <button class="section-btn">
+                                <i class="fas fa-download"></i>
+                                导出
+                            </button>
+                        </div>
+                    </div>
+                    <div class="graph-container">
+                        <div id="knowledge-graph"></div>
+                    </div>
+                    <div class="graph-legend">
+                        <div class="legend-item">
+                            <span class="legend-dot product"></span>
+                            <span>产品节点</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot enterprise"></span>
+                            <span>企业节点</span>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <!-- 右侧AI助手区域 -->
+            <aside class="ai-panel">
+                <div class="ai-header">
+                    <h3 class="ai-title">
+                        <i class="fas fa-robot"></i>
+                        AI智能助手
+                    </h3>
+                </div>
+
+                <div class="ai-chat" id="aiChat">
+                    <div class="chat-message ai">
+                        你好，我是链易配AI智能助手。
+                    </div>
+                    <div class="chat-message ai">
+                        你可以问我：企业数量、供需分析、预警信息，或描述你的需求偏好。
+                    </div>
+                </div>
+
+                <div class="ai-suggestions">
+                    <div class="suggestion-card">
+                        <div class="suggestion-title">
+                            <i class="fas fa-lightbulb"></i>
+                            匹配建议
+                        </div>
+                        <div class="suggestion-item" data-query="光刻机">
+                            <i class="fas fa-circle"></i>
+                            光刻机 - 成都精密机械制造有限公司，供应69
+                        </div>
+                        <div class="suggestion-item" data-query="高端传感器">
+                            <i class="fas fa-circle"></i>
+                            高端传感器 - 绵阳电子科技有限公司，供应45
+                        </div>
+                        <div class="suggestion-item" data-query="精密轴承">
+                            <i class="fas fa-circle"></i>
+                            精密轴承 - 德阳重型装备集团，供应32
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ai-input-area">
+                    <input type="text" class="ai-input" placeholder="请输入您的问题..." id="aiInput">
+                    <button class="ai-send-btn" id="aiSendBtn">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <script>
+        // ===== 初始化ECharts知识图谱 =====
+        function initKnowledgeGraph() {
+            const chartDom = document.getElementById('knowledge-graph');
+            const myChart = echarts.init(chartDom);
+
+            const graphData = {
+                nodes: [
+                    { name: '光刻机', category: 0, symbolSize: 50, value: '光刻机' },
+                    { name: '高端传感器', category: 0, symbolSize: 45, value: '高端传感器' },
+                    { name: '精密轴承', category: 0, symbolSize: 40, value: '精密轴承' },
+                    { name: '芯片', category: 0, symbolSize: 55, value: '芯片' },
+                    { name: '数控机床', category: 0, symbolSize: 42, value: '数控机床' },
+                    { name: '工业机器人', category: 0, symbolSize: 48, value: '工业机器人' },
+                    { name: '成都精密机械制造有限公司', category: 1, symbolSize: 35 },
+                    { name: '绵阳电子科技有限公司', category: 1, symbolSize: 32 },
+                    { name: '德阳重型装备集团', category: 1, symbolSize: 38 },
+                    { name: '宜宾半导体研究院', category: 1, symbolSize: 30 },
+                    { name: '泸州智能装备公司', category: 1, symbolSize: 28 },
+                    { name: '自贡精密仪器厂', category: 1, symbolSize: 26 },
+                ],
+                links: [
+                    { source: '成都精密机械制造有限公司', target: '光刻机' },
+                    { source: '成都精密机械制造有限公司', target: '数控机床' },
+                    { source: '绵阳电子科技有限公司', target: '高端传感器' },
+                    { source: '绵阳电子科技有限公司', target: '芯片' },
+                    { source: '德阳重型装备集团', target: '精密轴承' },
+                    { source: '德阳重型装备集团', target: '工业机器人' },
+                    { source: '宜宾半导体研究院', target: '芯片' },
+                    { source: '宜宾半导体研究院', target: '光刻机' },
+                    { source: '泸州智能装备公司', target: '工业机器人' },
+                    { source: '泸州智能装备公司', target: '数控机床' },
+                    { source: '自贡精密仪器厂', target: '高端传感器' },
+                    { source: '自贡精密仪器厂', target: '精密轴承' },
+                ],
+                categories: [
+                    { name: '产品' },
+                    { name: '企业' }
+                ]
+            };
+
+            const option = {
+                tooltip: {
+                    trigger: 'item',
+                    formatter: function(params) {
+                        if (params.dataType === 'node') {
+                            const category = params.data.category === 0 ? '产品' : '企业';
+                            return `<strong>${params.data.name}</strong><br/>类型: ${category}`;
+                        }
+                        return '';
+                    },
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    borderColor: '#E4E7ED',
+                    borderWidth: 1,
+                    padding: [8, 12],
+                    textStyle: {
+                        color: '#303133',
+                        fontSize: 13
+                    }
+                },
+                legend: {
+                    show: false
+                },
+                series: [{
+                    type: 'graph',
+                    layout: 'force',
+                    data: graphData.nodes.map(node => ({
+                        ...node,
+                        label: {
+                            show: true,
+                            position: 'bottom',
+                            fontSize: 11,
+                            color: '#606266'
+                        }
+                    })),
+                    links: graphData.links,
+                    categories: graphData.categories,
+                    roam: true,
+                    draggable: true,
+                    force: {
+                        repulsion: 300,
+                        edgeLength: [80, 150],
+                        gravity: 0.1
+                    },
+                    emphasis: {
+                        focus: 'adjacency',
+                        lineStyle: {
+                            width: 3
+                        }
+                    },
+                    lineStyle: {
+                        color: '#E4E7ED',
+                        width: 2,
+                        curveness: 0.1
+                    },
+                    itemStyle: {
+                        borderColor: '#fff',
+                        borderWidth: 2,
+                        shadowBlur: 10,
+                        shadowColor: 'rgba(0, 0, 0, 0.1)'
+                    },
+                    label: {
+                        show: true,
+                        position: 'bottom',
+                        distance: 5,
+                        fontSize: 11,
+                        color: '#606266'
+                    }
+                }],
+                color: ['#2A6DFF', '#00B42A']
+            };
+
+            myChart.setOption(option);
+
+            window.addEventListener('resize', function() {
+                myChart.resize();
+            });
+        }
+
+        // ===== AI助手交互 =====
+        function initAIAssistant() {
+            const aiInput = document.getElementById('aiInput');
+            const aiSendBtn = document.getElementById('aiSendBtn');
+            const aiChat = document.getElementById('aiChat');
+            const suggestionItems = document.querySelectorAll('.suggestion-item');
+
+            function sendMessage(message) {
+                if (!message.trim()) return;
+
+                const userMsg = document.createElement('div');
+                userMsg.className = 'chat-message user';
+                userMsg.textContent = message;
+                aiChat.appendChild(userMsg);
+
+                setTimeout(() => {
+                    const aiMsg = document.createElement('div');
+                    aiMsg.className = 'chat-message ai';
+                    aiMsg.textContent = '当前入驻企业69家，供应信息20条，需求信息16条。';
+                    aiChat.appendChild(aiMsg);
+                    aiChat.scrollTop = aiChat.scrollHeight;
+                }, 500);
+
+                aiInput.value = '';
+                aiChat.scrollTop = aiChat.scrollHeight;
+            }
+
+            aiSendBtn.addEventListener('click', () => sendMessage(aiInput.value));
+
+            aiInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendMessage(aiInput.value);
+                }
+            });
+
+            suggestionItems.forEach(item => {
+                item.addEventListener('click', () => {
+                    const query = item.dataset.query;
+                    aiInput.value = query;
+                    sendMessage(query);
+                });
+            });
+        }
+
+        // ===== 搜索框交互 =====
+        function initSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const searchClear = document.getElementById('searchClear');
+
+            searchClear.addEventListener('click', () => {
+                searchInput.value = '';
+                searchInput.focus();
+            });
+        }
+
+        // ===== 导航菜单交互 =====
+        function initNavigation() {
+            const navItems = document.querySelectorAll('.nav-item');
+
+            navItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    navItems.forEach(nav => nav.classList.remove('active'));
+                    item.classList.add('active');
+                });
+            });
+        }
+
+        // ===== 初始化 =====
+        document.addEventListener('DOMContentLoaded', () => {
+            initKnowledgeGraph();
+            initAIAssistant();
+            initSearch();
+            initNavigation();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,94 @@
+{% extends "layout/base.html" %}
+
+{% block title %}批量导入供应商{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-md-8 offset-md-2">
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h4 class="mb-0">
+            <i class="bi bi-upload me-2"></i>批量导入供应商
+          </h4>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            请输入供应商企业ID，每行一个。导入后可以在展示控制页面管理这些供应商。
+          </div>
+
+          <form id="importForm">
+            <div class="mb-3">
+              <label for="supplierIds" class="form-label">供应商ID列表 <span class="text-danger">*</span></label>
+              <textarea class="form-control" id="supplierIds" rows="10" 
+                        placeholder="请输入供应商ID，每行一个&#10;例如：&#10;1&#10;2&#10;3" required></textarea>
+              <small class="form-text text-muted">每行输入一个企业ID</small>
+            </div>
+
+            <div class="d-grid gap-2">
+              <button type="submit" class="btn btn-primary" id="submitBtn">
+                <i class="bi bi-upload me-2"></i>开始导入
+              </button>
+              <a href="{{ url_for('lead_enterprise.dashboard') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left me-2"></i>返回
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('importForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>导入中...';
+  
+  const idsText = document.getElementById('supplierIds').value;
+  const supplierIds = idsText.split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .map(line => parseInt(line))
+    .filter(id => !isNaN(id));
+  
+  if (supplierIds.length === 0) {
+    alert('请输入有效的供应商ID');
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="bi bi-upload me-2"></i>开始导入';
+    return;
+  }
+  
+  try {
+    const response = await fetch('/lead-enterprise/suppliers/import', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        supplier_ids: supplierIds
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      alert(`导入成功！共导入 ${result.imported_count} 家供应商`);
+      window.location.href = '/lead-enterprise/dashboard';
+    } else {
+      alert('导入失败：' + result.message);
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="bi bi-upload me-2"></i>开始导入';
+    }
+  } catch (error) {
+    alert('导入失败：' + error.message);
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="bi bi-upload me-2"></i>开始导入';
+  }
+});
+</script>
+{% endblock %}

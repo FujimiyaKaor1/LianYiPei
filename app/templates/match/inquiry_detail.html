@@ -1,0 +1,279 @@
+{% extends "layout/base.html" %}
+
+{% block title %}询价单详情 - 链易配{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex align-items-center mb-3">
+    <a href="javascript:history.back()" class="btn btn-outline-secondary btn-sm me-3">
+      <i class="bi bi-arrow-left"></i> 返回
+    </a>
+    <h5 class="mb-0"><i class="bi bi-file-text me-2"></i>询价单详情</h5>
+  </div>
+
+  <!-- 询价单基本信息 -->
+  <div class="card mb-4">
+    <div class="card-header bg-white fw-semibold">
+      <i class="bi bi-info-circle me-1"></i>询价信息
+    </div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div class="text-muted small">产品名称</div>
+          <div class="fw-semibold fs-5">{{ inquiry.product_name or '未指定' }}</div>
+        </div>
+        <div class="col-md-4">
+          <div class="text-muted small">询价方</div>
+          <div>{{ inquiry.buyer.name if inquiry.buyer else '未知' }}</div>
+        </div>
+        <div class="col-md-4">
+          <div class="text-muted small">供应方</div>
+          <div>{{ inquiry.seller.name if inquiry.seller else '未知' }}</div>
+        </div>
+        <div class="col-md-8">
+          <div class="text-muted small">询价内容</div>
+          <div>{{ inquiry.content or '—' }}</div>
+        </div>
+        <div class="col-md-4">
+          <div class="text-muted small">状态</div>
+          <span class="badge {% if inquiry.status == 'open' %}bg-secondary{% elif inquiry.status == 'sent' %}bg-primary{% else %}bg-success{% endif %}">
+            {{ {'open': '待处理', 'sent': '已发送', 'agreement_signed': '已签约'}.get(inquiry.status, inquiry.status) }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- 价格指数面板 -->
+    <div class="col-md-5">
+      <div class="card h-100" id="priceIndexCard">
+        <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-graph-up-arrow me-1 text-primary"></i>市场价格指数</span>
+          <span class="badge bg-light text-secondary" id="priceDataSource">加载中...</span>
+        </div>
+        <div class="card-body" id="priceIndexBody">
+          <div class="text-center py-4 text-muted">
+            <div class="spinner-border spinner-border-sm me-2"></div>正在获取价格数据...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 报价列表 -->
+    <div class="col-md-7">
+      <div class="card h-100">
+        <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-list-ul me-1"></i>收到的报价</span>
+          <span class="badge bg-primary" id="quoteCount">0</span>
+        </div>
+        <div class="card-body p-0">
+          <div id="quoteList">
+            <div class="text-center py-4 text-muted">
+              <div class="spinner-border spinner-border-sm me-2"></div>加载报价中...
+            </div>
+          </div>
+        </div>
+
+        <!-- 提交报价表单（供应方可见） -->
+        {% if current_user.id == inquiry.seller_id %}
+        <div class="card-footer bg-light">
+          <div class="fw-semibold mb-2 small">提交报价</div>
+          <form id="quoteForm" class="row g-2">
+            <div class="col-6">
+              <input type="number" class="form-control form-control-sm" id="quotePrice"
+                     placeholder="报价金额 (元)" step="0.01" min="0.01" required>
+            </div>
+            <div class="col-3">
+              <input type="number" class="form-control form-control-sm" id="quoteQty"
+                     placeholder="数量">
+            </div>
+            <div class="col-3">
+              <input type="text" class="form-control form-control-sm" id="quoteUnit"
+                     placeholder="单位">
+            </div>
+            <div class="col-4">
+              <input type="number" class="form-control form-control-sm" id="quoteDelivery"
+                     placeholder="交货天数">
+            </div>
+            <div class="col-8">
+              <input type="text" class="form-control form-control-sm" id="quoteRemarks"
+                     placeholder="备注（可选）">
+            </div>
+            <div class="col-12">
+              <button type="submit" class="btn btn-primary btn-sm w-100">
+                <i class="bi bi-send me-1"></i>提交报价
+              </button>
+            </div>
+          </form>
+          <div id="quoteMsg" class="mt-2 small"></div>
+          <div class="text-muted small mt-1">
+            今日剩余报价次数：<span id="remainingQuotes" class="fw-semibold text-primary">--</span>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const INQUIRY_ID = {{ inquiry.id }};
+const PRODUCT_NAME = {{ inquiry.product_name | tojson }};
+
+// 加载价格指数
+async function loadPriceIndex() {
+  if (!PRODUCT_NAME) {
+    document.getElementById('priceIndexBody').innerHTML =
+      '<p class="text-muted text-center py-3">未指定产品名称</p>';
+    return;
+  }
+  try {
+    const res = await fetch(`/api/price-index/${encodeURIComponent(PRODUCT_NAME)}`);
+    const data = await res.json();
+    renderPriceIndex(data);
+  } catch (e) {
+    document.getElementById('priceIndexBody').innerHTML =
+      '<p class="text-danger text-center py-3">价格数据加载失败</p>';
+  }
+}
+
+function renderPriceIndex(data) {
+  const sourceEl = document.getElementById('priceDataSource');
+  const bodyEl = document.getElementById('priceIndexBody');
+
+  if (data.message || data.median_price === null) {
+    sourceEl.textContent = '数据不足';
+    sourceEl.className = 'badge bg-warning text-dark';
+    bodyEl.innerHTML = `
+      <div class="text-center py-4">
+        <i class="bi bi-exclamation-circle text-warning fs-3 d-block mb-2"></i>
+        <div class="text-muted">${data.message || '数据不足，暂无价格指数'}</div>
+        <div class="text-muted small mt-1">当前样本数：${data.sample_count || 0} 条（需至少3条）</div>
+      </div>`;
+    return;
+  }
+
+  const isCold = data.is_cold_start;
+  sourceEl.textContent = isCold ? '参考价格' : '实时报价';
+  sourceEl.className = isCold ? 'badge bg-warning text-dark' : 'badge bg-success';
+
+  const fmt = v => v != null ? '¥' + Number(v).toLocaleString('zh-CN', {minimumFractionDigits: 2}) : '—';
+  const stdRange = (data.median_price != null && data.std_dev != null)
+    ? `${fmt(data.median_price - data.std_dev)} ~ ${fmt(data.median_price + data.std_dev)}`
+    : '—';
+
+  bodyEl.innerHTML = `
+    <div class="text-center mb-3">
+      <div class="text-muted small">价格中位数</div>
+      <div class="display-6 fw-bold text-primary">${fmt(data.median_price)}</div>
+      ${isCold ? '<div class="badge bg-warning text-dark mt-1">参考价格（非实时报价）</div>' : ''}
+    </div>
+    <div class="row g-2 text-center mb-3">
+      <div class="col-6">
+        <div class="text-muted small">均价</div>
+        <div class="fw-semibold">${fmt(data.mean_price)}</div>
+      </div>
+      <div class="col-6">
+        <div class="text-muted small">标准差</div>
+        <div class="fw-semibold">${data.std_dev != null ? '±' + fmt(data.std_dev) : '—'}</div>
+      </div>
+      <div class="col-6">
+        <div class="text-muted small">最低价</div>
+        <div class="fw-semibold text-success">${fmt(data.min_price)}</div>
+      </div>
+      <div class="col-6">
+        <div class="text-muted small">最高价</div>
+        <div class="fw-semibold text-danger">${fmt(data.max_price)}</div>
+      </div>
+    </div>
+    <hr class="my-2">
+    <div class="row g-1 text-muted small">
+      <div class="col-6">样本数量：<strong>${data.sample_count || 0}</strong> 条</div>
+      <div class="col-6">数据来源：${data.data_source || '—'}</div>
+      ${data.last_updated ? `<div class="col-12">更新时间：${new Date(data.last_updated).toLocaleString('zh-CN')}</div>` : ''}
+    </div>
+    ${data.note ? `<div class="alert alert-warning py-1 px-2 mt-2 small mb-0">${data.note}</div>` : ''}`;
+}
+
+// 加载报价列表
+async function loadQuotes() {
+  try {
+    const res = await fetch(`/api/quotes/inquiry/${INQUIRY_ID}`);
+    const data = await res.json();
+    renderQuotes(data.quotes || []);
+  } catch (e) {
+    document.getElementById('quoteList').innerHTML =
+      '<p class="text-danger text-center py-3">报价加载失败</p>';
+  }
+}
+
+function renderQuotes(quotes) {
+  document.getElementById('quoteCount').textContent = quotes.length;
+  if (!quotes.length) {
+    document.getElementById('quoteList').innerHTML =
+      '<p class="text-muted text-center py-4">暂无报价</p>';
+    return;
+  }
+  const rows = quotes.map(q => `
+    <div class="d-flex justify-content-between align-items-start px-3 py-2 border-bottom">
+      <div>
+        <div class="fw-semibold">${q.supplier_name}</div>
+        <div class="text-muted small">
+          ${q.quantity ? q.quantity + (q.unit || '') + ' · ' : ''}
+          ${q.delivery_days ? q.delivery_days + '天交货 · ' : ''}
+          ${q.remarks || ''}
+        </div>
+      </div>
+      <div class="text-end">
+        <div class="fw-bold text-primary fs-5">¥${Number(q.price).toLocaleString('zh-CN', {minimumFractionDigits: 2})}</div>
+        <div class="text-muted small">${q.created_at ? new Date(q.created_at).toLocaleDateString('zh-CN') : ''}</div>
+      </div>
+    </div>`).join('');
+  document.getElementById('quoteList').innerHTML = rows;
+}
+
+// 提交报价
+const quoteForm = document.getElementById('quoteForm');
+if (quoteForm) {
+  quoteForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    const msgEl = document.getElementById('quoteMsg');
+    msgEl.innerHTML = '';
+    const payload = {
+      inquiry_id: INQUIRY_ID,
+      product_name: PRODUCT_NAME,
+      price: parseFloat(document.getElementById('quotePrice').value),
+      quantity: parseInt(document.getElementById('quoteQty').value) || 0,
+      unit: document.getElementById('quoteUnit').value,
+      delivery_days: parseInt(document.getElementById('quoteDelivery').value) || 0,
+      remarks: document.getElementById('quoteRemarks').value,
+    };
+    try {
+      const res = await fetch('/api/quotes', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success) {
+        msgEl.innerHTML = '<span class="text-success"><i class="bi bi-check-circle me-1"></i>报价提交成功</span>';
+        document.getElementById('remainingQuotes').textContent = data.remaining_quotes_today;
+        quoteForm.reset();
+        loadQuotes();
+        loadPriceIndex();  // 刷新价格指数
+      } else {
+        msgEl.innerHTML = `<span class="text-danger">${data.error || '提交失败'}</span>`;
+      }
+    } catch (e) {
+      msgEl.innerHTML = '<span class="text-danger">网络错误，请重试</span>';
+    }
+  });
+}
+
+loadPriceIndex();
+loadQuotes();
+</script>
+{% endblock %}

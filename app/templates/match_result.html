@@ -1,0 +1,111 @@
+{% extends "layout/base.html" %}
+{% block title %}匹配结果 - 链易配{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="h4 mb-1 fw-bold" style="color:#0f172a">匹配结果</h2>
+    <p class="text-muted small mb-0">当前登录企业：<strong class="text-success">{{ buyer.name }}</strong></p>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('match.index') }}">返回智能匹配</a>
+</div>
+
+<div class="row g-3">
+  {% for s in suppliers %}
+  <div class="col-md-6 col-xl-4">
+    <div class="card h-100 shadow-sm border-0" style="border-radius:16px;border:1px solid #e8f5f0!important;">
+      <div class="card-body d-flex flex-column">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div>
+            <h3 class="h6 fw-bold mb-1" style="color:#0f172a">{{ s.name }}</h3>
+            <p class="small text-muted mb-2">{{ s.address or '地址未填写' }}</p>
+          </div>
+          <span class="badge rounded-pill" style="background:rgba(58,201,160,.15);color:#14785A;">候选</span>
+        </div>
+        <div class="small text-muted mb-3">
+          {% if s.contact %}联系人 {{ s.contact }}{% endif %}
+          {% if s.phone %} · {{ s.phone }}{% endif %}
+        </div>
+        <!-- 产能信号 需求: 17.1-17.5, 17.7 -->
+        {% set sig = s._capacity_signal %}
+        {% if sig %}
+        <div class="d-flex align-items-center gap-2 mb-3">
+          <span class="badge bg-{{ sig.color }} bg-opacity-15 text-{{ sig.color }} border border-{{ sig.color }} border-opacity-25 px-2 py-1 rounded-pill small fw-semibold">
+            <i class="bi {{ sig.icon }} me-1"></i>{{ sig.label }}
+          </span>
+          {% if sig.authorized and sig.utilization_rate is not none %}
+          <span class="text-muted small">{{ (sig.utilization_rate * 100) | round(0) | int }}% 负荷</span>
+          {% endif %}
+          <span class="text-muted small">· {{ sig.bargaining_hint }}</span>
+        </div>
+        {% endif %}
+        <div class="mt-auto d-flex gap-2 flex-wrap">
+          <button type="button"
+            class="btn btn-sm flex-grow-1"
+            style="background:#3AC9A0;border-color:#3AC9A0;color:#fff;font-weight:600;border-radius:10px;"
+            data-bs-toggle="modal"
+            data-bs-target="#mapDistanceModal"
+            data-supplier-id="{{ s.id }}"
+            data-supplier-name="{{ s.name | e }}">
+            <i class="bi bi-map"></i> 查看地理距离
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="col-12">
+    <div class="alert alert-light border">暂无其他企业数据。请先注册更多企业或前往 <a href="{{ url_for('match.index') }}">智能匹配</a>。</div>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- 地图弹窗：内嵌全屏地图页 -->
+<div class="modal fade" id="mapDistanceModal" tabindex="-1" aria-labelledby="mapDistanceModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-fullscreen-lg-down">
+    <div class="modal-content" style="border-radius:16px;overflow:hidden;">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold" id="mapDistanceModalLabel" style="color:#0f172a">地理距离</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body p-0 pt-2">
+        <iframe id="mapDistanceFrame" title="地图" class="w-100 border-0"
+          style="min-height:min(75vh,720px);height:75vh;background:#f8fafc;"></iframe>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">关闭</button>
+        <a id="mapOpenNewTab" href="#" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">新标签打开</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var modal = document.getElementById('mapDistanceModal');
+  var frame = document.getElementById('mapDistanceFrame');
+  var linkNew = document.getElementById('mapOpenNewTab');
+  if (!modal || !frame) return;
+
+  modal.addEventListener('show.bs.modal', function (event) {
+    var btn = event.relatedTarget;
+    if (!btn || !btn.getAttribute) return;
+    var sid = btn.getAttribute('data-supplier-id');
+    var sname = btn.getAttribute('data-supplier-name') || '';
+    var label = document.getElementById('mapDistanceModalLabel');
+    if (label) label.textContent = '地理距离 · ' + sname;
+
+    var base = '{{ url_for("main.map_view_page") }}';
+    var url = base + '?supplier_id=' + encodeURIComponent(sid) + '&buyer_id={{ buyer.id }}';
+    frame.src = url;
+    if (linkNew) linkNew.href = url;
+  });
+
+  modal.addEventListener('hidden.bs.modal', function () {
+    frame.src = 'about:blank';
+  });
+})();
+</script>
+{% endblock %}

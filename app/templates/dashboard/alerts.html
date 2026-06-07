@@ -1,0 +1,101 @@
+{% extends "layout/base.html" %}
+
+{% block title %}预警列表 - 链易配{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-danger text-white">
+        <h4 class="mb-0"><i class="bi bi-bell"></i> 供应链预警列表</h4>
+    </div>
+    <div class="card-body">
+        {% if alerts %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>产品</th>
+                        <th>预警等级</th>
+                        <th>风险维度</th>
+                        <th>预警信息</th>
+                        <th>时间</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in alerts %}
+                    <tr class="
+                        {% if alert.level == 'red' %}table-danger
+                        {% elif alert.level == 'orange' %}table-warning
+                        {% else %}table-light{% endif %}">
+                        <td><strong>{{ alert.product_name }}</strong></td>
+                        <td>
+                            <span class="badge 
+                                {% if alert.level == 'red' %}bg-danger
+                                {% elif alert.level == 'orange' %}bg-warning text-dark
+                                {% else %}bg-secondary{% endif %}">
+                                {% if alert.level == 'red' %}红色预警
+                                {% elif alert.level == 'orange' %}橙色预警
+                                {% else %}黄色预警{% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark">
+                                {% if alert.dimension == 'import' %}国际进口依赖
+                                {% elif alert.dimension == 'interprovincial' %}省外采购依赖
+                                {% else %}本地供应短缺{% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            {{ alert.message }}
+                            {% if alert.suggestion %}
+                            <div class="mt-1 text-success small"><i class="bi bi-lightbulb"></i> 补链建议：{{ alert.suggestion }}</div>
+                            {% endif %}
+                        </td>
+                        <td>{{ alert.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="mt-4">
+            <h6><i class="bi bi-info-circle"></i> 预警等级说明</h6>
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>等级</th>
+                        <th>风险维度</th>
+                        <th>触发条件</th>
+                        <th>政策对应</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="table-danger">
+                        <td><span class="badge bg-danger">红色预警</span></td>
+                        <td>国际进口依赖</td>
+                        <td>进口来源国单一且占比>60%</td>
+                        <td>"卡脖子"风险，国际供应链断供</td>
+                    </tr>
+                    <tr class="table-warning">
+                        <td><span class="badge bg-warning text-dark">橙色预警</span></td>
+                        <td>省外采购依赖</td>
+                        <td>省外采购占比>70%</td>
+                        <td>跨省供应链韧性不足</td>
+                    </tr>
+                    <tr>
+                        <td><span class="badge bg-secondary">黄色预警</span></td>
+                        <td>本地供应短缺</td>
+                        <td>本地供应商数量<3家</td>
+                        <td>本地配套能力薄弱</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-check-circle fs-1 text-success"></i>
+            <p class="text-muted mt-3">暂无预警信息</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,105 @@
+{% extends "layout/base.html" %}
+
+{% block title %}企业注册 - 链易配{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="bi bi-building-add"></i> 企业注册</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">企业名称 *</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="address" class="form-label">企业地址</label>
+                        <input type="text" class="form-control" id="address" name="address" placeholder="如：四川省成都市高新区...">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="province" class="form-label">省份</label>
+                                <input type="text" class="form-control" id="province" name="province">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="city" class="form-label">城市</label>
+                                <input type="text" class="form-control" id="city" name="city">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="business_scope" class="form-label">经营范围</label>
+                        <textarea class="form-control" id="business_scope" name="business_scope" rows="2" placeholder="主营业务简述"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="industry_code" class="form-label">行业代码</label>
+                                <input type="text" class="form-control" id="industry_code" name="industry_code" placeholder="国标行业编码等">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="registered_capital" class="form-label">注册资金（万元）</label>
+                                <input type="text" class="form-control" id="registered_capital" name="registered_capital" inputmode="decimal">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="longitude" class="form-label">经度</label>
+                                <input type="number" step="0.0001" class="form-control" id="longitude" name="longitude" placeholder="104.0657">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="latitude" class="form-label">纬度</label>
+                                <input type="number" step="0.0001" class="form-control" id="latitude" name="latitude" placeholder="30.6595">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="contact" class="form-label">联系人</label>
+                                <input type="text" class="form-control" id="contact" name="contact">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="phone" class="form-label">联系电话</label>
+                                <input type="text" class="form-control" id="phone" name="phone">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">密码 *</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password2" class="form-label">确认密码 *</label>
+                        <input type="password" class="form-control" id="password2" name="password2" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-check-lg"></i> 注册
+                    </button>
+                    <div class="alert alert-info mt-3 mb-0">
+                        <small><i class="bi bi-info-circle"></i> 注册后需等待管理员审核，审核通过后方可登录使用。</small>
+                    </div>
+                </form>
+                <hr>
+                <p class="text-center mb-0">
+                    已有账号？<a href="{{ url_for('auth.login') }}">立即登录</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

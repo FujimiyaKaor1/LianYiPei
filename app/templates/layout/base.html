@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}链易配 - 产业链供需智能匹配平台{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_css %}{% endblock %}
+    {# 页面级 <head> 脚本（如高德安全密钥须在 maps.js 之前注入） #}
+    {% block head_scripts %}{% endblock %}
+</head>
+<body>
+    {# 当前路由：用于顶栏高亮与二级 Tabs #}
+    {% set path = request.path %}
+    {% set active_top = 'match' %}
+    {% if path == '/' %}
+        {% set active_top = 'home' %}
+    {% elif path.startswith('/match') or path.startswith('/clip-match') %}
+        {% set active_top = 'match' %}
+    {% elif path.startswith('/demand') %}
+        {% set active_top = 'demand' %}
+    {% elif path.startswith('/dashboard') %}
+        {% set active_top = 'graph' %}
+    {% endif %}
+
+    <nav class="le-topbar">
+        <div class="container le-topbar-inner">
+            <a class="le-logo" href="{{ url_for('main.index') }}">
+                <i class="bi bi-link-45deg"></i> 链易配
+            </a>
+            {# React SPA 主入口：从 Jinja 子页一键回到首页壳 #}
+            <a
+                class="btn btn-success btn-sm shadow-sm ms-1 flex-shrink-0"
+                href="{{ url_for('main.index') }}"
+                style="white-space: nowrap;"
+                title="返回 React 单页应用主入口"
+            >
+                <i class="bi bi-house-heart-fill"></i> 返回系统首页
+            </a>
+
+            <div class="le-topnav" role="navigation" aria-label="主菜单">
+                <a href="{{ url_for('main.index') }}" class="le-nav-link {% if active_top == 'home' %}is-active{% endif %}">首页</a>
+                {% if current_user.is_authenticated and current_user.role == 'enterprise' %}
+                <a href="{{ url_for('match.index') }}" class="le-nav-link {% if active_top == 'match' %}is-active{% endif %}">智能匹配</a>
+                {% endif %}
+                <a href="{{ url_for('demand.list_demands') }}" class="le-nav-link {% if active_top == 'demand' %}is-active{% endif %}">供需信息</a>
+                {% if current_user.is_authenticated and current_user.role == 'admin' %}
+                <a href="/dashboard/graph" class="le-nav-link {% if active_top == 'graph' %}is-active{% endif %}">图谱</a>
+                {% endif %}
+            </div>
+
+            <div class="le-topbar-right">
+                <form class="le-search" method="get" action="{{ url_for('demand.list_demands') }}">
+                    <input name="q" class="le-search-input" placeholder="搜索企业/产品..." />
+                    <button type="submit" class="le-search-btn" aria-label="搜索">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </form>
+
+                <a class="le-ai-btn" href="{{ url_for('main.index') }}" aria-label="AI智能助手">
+                    <i class="bi bi-stars"></i> AI智能助手
+                </a>
+
+                {% if current_user.is_authenticated %}
+                <div class="dropdown le-user">
+                    <button class="le-avatar dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        {{ current_user.name[:1] }}
+                    </button>
+                    <ul class="dropdown-menu le-avatar-menu">
+                        {% if current_user.role == 'enterprise' %}
+                        <li><a class="dropdown-item" href="{{ url_for('enterprise.profile') }}">企业中心</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('enterprise.products') }}">产品管理</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('demand.my_demands') }}">我的供需</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('demand.create') }}">发布供需</a></li>
+                        {% elif current_user.role == 'admin' %}
+                        <li><a class="dropdown-item" href="/dashboard/stats">政府大屏</a></li>
+                        <li><a class="dropdown-item" href="/dashboard/graph">产业链图谱</a></li>
+                        {% endif %}
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">退出登录</a></li>
+                    </ul>
+                </div>
+                {% else %}
+                <div class="le-auth-links">
+                    <a class="le-auth-link" href="{{ url_for('main.index', login='1') }}">登录</a>
+                    <a class="le-auth-link" href="{{ url_for('auth.register') }}">注册</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    {# 二级 Tabs：非首页页面才展示 #}
+    {% if path != '/' %}
+    <div class="container le-tabs-wrap">
+        <div class="le-tabs" role="tablist" aria-label="二级导航">
+            {% if active_top == 'match' and current_user.is_authenticated and current_user.role == 'enterprise' %}
+                <a class="le-tab {% if path.startswith('/match') %}is-active{% endif %}" href="{{ url_for('match.index') }}">智能匹配</a>
+                <a class="le-tab {% if path.startswith('/clip-match') %}is-active{% endif %}" href="{{ url_for('main.clip_match_page') }}">图文匹配</a>
+            {% elif active_top == 'demand' %}
+                <a class="le-tab {% if path.startswith('/demand') %}is-active{% endif %}" href="{{ url_for('demand.list_demands') }}">供需信息</a>
+                {% if current_user.is_authenticated and current_user.role == 'enterprise' %}
+                <a class="le-tab {% if path.startswith('/demand/my') %}is-active{% endif %}" href="{{ url_for('demand.my_demands') }}">我的供需</a>
+                <a class="le-tab {% if path.startswith('/demand/create') %}is-active{% endif %}" href="{{ url_for('demand.create') }}">发布供需</a>
+                {% endif %}
+            {% elif active_top == 'graph' and current_user.is_authenticated and current_user.role == 'admin' %}
+                <a class="le-tab {% if path.startswith('/dashboard/graph') %}is-active{% endif %}" href="/dashboard/graph">产业链图谱</a>
+                <a class="le-tab {% if path.startswith('/dashboard/stats') %}is-active{% endif %}" href="/dashboard/stats">政府大屏</a>
+                <a class="le-tab" href="/?view=thresholds">预警设置</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <main class="container le-main my-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h5 class="mb-1"><i class="bi bi-link-45deg"></i> 链易配</h5>
+                    <p class="mb-0" style="font-size:.85rem;">产业链供需智能匹配平台</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="mb-0" style="font-size:.85rem;">Flask + Neo4j + MySQL</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.0/dist/echarts.min.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

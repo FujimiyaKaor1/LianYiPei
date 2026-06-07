@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block title %}产能日历 - 链易配{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2>产能日历{% if enterprise and not is_owner %} - {{ enterprise.name }}{% endif %}</h2>
+            <p class="text-muted">可视化展示排产情况，让采购方了解交货能力</p>
+        </div>
+        {% if is_owner is not defined or is_owner %}
+        <div class="col-md-4 text-end">
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="bi bi-gear"></i> 公开范围设置
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" onclick="updateVisibility('public')">
+                        <i class="bi bi-globe"></i> 公开 - 所有人可见
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="updateVisibility('partners')">
+                        <i class="bi bi-people"></i> 仅合作伙伴可见
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="updateVisibility('private')">
+                        <i class="bi bi-lock"></i> 私密 - 仅自己可见
+                    </a></li>
+                </ul>
+            </div>
+            <span class="badge bg-info ms-2" id="currentVisibility">
+                {% if current_user.capacity_calendar_visibility == 'public' %}
+                    <i class="bi bi-globe"></i> 公开
+                {% elif current_user.capacity_calendar_visibility == 'partners' %}
+                    <i class="bi bi-people"></i> 仅合作伙伴
+                {% else %}
+                    <i class="bi bi-lock"></i> 私密
+                {% endif %}
+            </span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 产能概览 -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">当前订单</h5>
+                    <h2 class="text-primary">{{ calendar_data.current_orders }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">最大产能</h5>
+                    <h2 class="text-info">{{ calendar_data.max_capacity }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <h5 class="card-title">产能利用率</h5>
+                    <h2 class="{% if calendar_data.overall_utilization >= 80 %}text-danger{% elif calendar_data.overall_utilization >= 50 %}text-warning{% else %}text-success{% endif %}">
+                        {{ calendar_data.overall_utilization }}%
+                    </h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 月份导航 -->
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                {% if enterprise and not is_owner %}
+                <a href="{{ url_for('orders.view_calendar', enterprise_id=enterprise.id, year=year if month > 1 else year-1, month=month-1 if month > 1 else 12) }}" class="btn btn-outline-primary">
+                    <i class="bi bi-chevron-left"></i> 上月
+                </a>
+                {% else %}
+                <a href="{{ url_for('orders.capacity_calendar', year=year if month > 1 else year-1, month=month-1 if month > 1 else 12) }}" class="btn btn-outline-primary">
+                    <i class="bi bi-chevron-left"></i> 上月
+                </a>
+                {% endif %}
+                <h4>{{ year }}年{{ month }}月</h4>
+                {% if enterprise and not is_owner %}
+                <a href="{{ url_for('orders.view_calendar', enterprise_id=enterprise.id, year=year if month < 12 else year+1, month=month+1 if month < 12 else 1) }}" class="btn btn-outline-primary">
+                    下月 <i class="bi bi-chevron-right"></i>
+                </a>
+                {% else %}
+                <a href="{{ url_for('orders.capacity_calendar', year=year if month < 12 else year+1, month=month+1 if month < 12 else 1) }}" class="btn btn-outline-primary">
+                    下月 <i class="bi bi-chevron-right"></i>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 图例 -->
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-center">
+                <span class="badge bg-success me-2">产能充足 (<50%)</span>
+                <span class="badge bg-warning me-2">产能正常 (50%-80%)</span>
+                <span class="badge bg-danger">产能紧张 (>80%)</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 日历 -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered text-center">
+                    <thead>
+                        <tr>
+                            <th>周日</th>
+                            <th>周一</th>
+                            <th>周二</th>
+                            <th>周三</th>
+                            <th>周四</th>
+                            <th>周五</th>
+                            <th>周六</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set first_day = calendar_data.days[1].date %}
+                        {% set first_weekday = first_day | strftime('%w') | int %}
+                        {% set total_days = calendar_data.days | length %}
+                        
+                        {% set day_counter = 1 %}
+                        {% for week in range(6) %}
+                        <tr>
+                            {% for weekday in range(7) %}
+                            {% set cell_index = week * 7 + weekday %}
+                            {% if (week == 0 and weekday < first_weekday) or day_counter > total_days %}
+                            <td class="bg-light"></td>
+                            {% else %}
+                            {% set day_data = calendar_data.days[day_counter] %}
+                            <td class="calendar-day bg-{{ day_data.color }}-subtle" 
+                                style="cursor: pointer; height: 100px; vertical-align: top;"
+                                onclick="{% if is_owner is not defined or is_owner %}showDayOrders('{{ day_data.date }}'){% endif %}">
+                                <div class="fw-bold">{{ day_counter }}</div>
+                                <div class="small mt-2">
+                                    <div>订单: {{ day_data.orders_count }}</div>
+                                    <div>利用率: {{ day_data.utilization }}%</div>
+                                </div>
+                            </td>
+                            {% set day_counter = day_counter + 1 %}
+                            {% endif %}
+                            {% endfor %}
+                        </tr>
+                        {% if day_counter > total_days %}
+                        {% break %}
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 返回按钮 -->
+    <div class="row mt-3">
+        <div class="col-md-12">
+            {% if enterprise and not is_owner %}
+            <a href="javascript:history.back()" class="btn btn-secondary">返回</a>
+            {% else %}
+            <a href="{{ url_for('orders.index') }}" class="btn btn-secondary">返回订单列表</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 订单详情模态框 -->
+{% if is_owner is not defined or is_owner %}
+<div class="modal fade" id="ordersModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ordersModalTitle">订单详情</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="ordersModalBody">
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">加载中...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+{% if is_owner is not defined or is_owner %}
+function showDayOrders(dateStr) {
+    // 显示模态框
+    const modal = new bootstrap.Modal(document.getElementById('ordersModal'));
+    document.getElementById('ordersModalTitle').textContent = dateStr + ' 的订单';
+    document.getElementById('ordersModalBody').innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div></div>';
+    modal.show();
+    
+    // 加载订单数据
+    fetch(`/orders/api/orders-by-date/${dateStr}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                let html = '';
+                if (data.orders.length === 0) {
+                    html = '<p class="text-center text-muted">该日期暂无订单</p>';
+                } else {
+                    html = '<div class="table-responsive"><table class="table table-hover"><thead><tr><th>订单编号</th><th>产品</th><th>数量</th><th>客户</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+                    data.orders.forEach(order => {
+                        let statusBadge = '';
+                        if (order.status === 'pending') {
+                            statusBadge = '<span class="badge bg-warning">待处理</span>';
+                        } else if (order.status === 'in_progress') {
+                            statusBadge = '<span class="badge bg-info">进行中</span>';
+                        } else if (order.status === 'completed') {
+                            statusBadge = '<span class="badge bg-success">已完成</span>';
+                        } else if (order.status === 'cancelled') {
+                            statusBadge = '<span class="badge bg-secondary">已取消</span>';
+                        }
+                        
+                        html += `<tr>
+                            <td><a href="/orders/${order.id}">${order.order_no}</a></td>
+                            <td>${order.product_name}</td>
+                            <td>${order.quantity} ${order.unit}</td>
+                            <td>${order.customer_name}</td>
+                            <td>${statusBadge}</td>
+                            <td><a href="/orders/${order.id}" class="btn btn-sm btn-outline-primary">查看</a></td>
+                        </tr>`;
+                    });
+                    html += '</tbody></table></div>';
+                }
+                document.getElementById('ordersModalBody').innerHTML = html;
+            } else {
+                document.getElementById('ordersModalBody').innerHTML = '<p class="text-danger">加载失败: ' + data.message + '</p>';
+            }
+        })
+        .catch(error => {
+            document.getElementById('ordersModalBody').innerHTML = '<p class="text-danger">加载失败: ' + error + '</p>';
+        });
+}
+
+function updateVisibility(visibility) {
+    fetch('/orders/api/calendar-visibility', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ visibility: visibility })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 更新显示
+            let icon = '';
+            let text = '';
+            if (visibility === 'public') {
+                icon = '<i class="bi bi-globe"></i>';
+                text = '公开';
+            } else if (visibility === 'partners') {
+                icon = '<i class="bi bi-people"></i>';
+                text = '仅合作伙伴';
+            } else {
+                icon = '<i class="bi bi-lock"></i>';
+                text = '私密';
+            }
+            document.getElementById('currentVisibility').innerHTML = icon + ' ' + text;
+            
+            // 显示成功提示
+            alert('设置成功');
+        } else {
+            alert('设置失败: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('设置失败: ' + error);
+    });
+}
+{% endif %}
+</script>
+
+<style>
+.calendar-day:hover {
+    opacity: 0.8;
+    transform: scale(1.02);
+    transition: all 0.2s;
+}
+</style>
+{% endblock %}

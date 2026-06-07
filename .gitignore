@@ -1,0 +1,73 @@
+# ========== 环境变量（含密钥，禁止提交）==========
+.env
+.env.local
+.env.*.local
+
+# ========== Python ==========
+venv/
+env/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.Python
+eggs/
+
+# ========== IDE ==========
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+.kiro/
+.workbuddy/
+.hypothesis/
+
+# ========== 测试 ==========
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ========== 日志 ==========
+*.log
+flask_err.log
+flask_out.log
+
+# ========== 上传文件 ==========
+uploads/*
+
+# ========== Node.js 前端 ==========
+frontend/node_modules/
+frontend/dist/
+
+# ========== 模型文件 ==========
+model_service/model_cache/
+model_service/models/
+ollama/*.gguf
+
+# ========== Neo4j ==========
+neo4j/
+*.db
+
+# ========== macOS ==========
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# ========== Windows ==========
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ========== 杂项 ==========
+*.tmp
+*.temp
+*.bak

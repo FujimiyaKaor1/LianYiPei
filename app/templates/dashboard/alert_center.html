@@ -1,0 +1,423 @@
+{% extends "layout/base.html" %}
+
+{% block title %}预警中心 - 链易配{% endblock %}
+
+{% block extra_css %}
+<style>
+.alert-stat-card {
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    color: #fff;
+}
+.alert-stat-card.red   { background: linear-gradient(135deg, #dc3545, #c82333); }
+.alert-stat-card.yellow{ background: linear-gradient(135deg, #ffc107, #e0a800); color: #333; }
+.alert-stat-card.blue  { background: linear-gradient(135deg, #0d6efd, #0a58ca); }
+.alert-stat-card.total { background: linear-gradient(135deg, #6c757d, #545b62); }
+.alert-stat-card .stat-num { font-size: 2.2rem; font-weight: 700; }
+.alert-stat-card .stat-label { font-size: 0.85rem; opacity: .85; }
+
+.level-badge-red    { background: #dc3545; color: #fff; }
+.level-badge-yellow { background: #ffc107; color: #333; }
+.level-badge-blue   { background: #0d6efd; color: #fff; }
+
+.alert-row-red    { border-left: 4px solid #dc3545; }
+.alert-row-yellow { border-left: 4px solid #ffc107; }
+.alert-row-blue   { border-left: 4px solid #0d6efd; }
+
+.alert-row-highlighted { box-shadow: 0 0 0 3px rgba(255,193,7,.6); }
+
+.section-tab { cursor: pointer; }
+.section-tab.active { border-bottom: 3px solid #0d6efd; font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="bi bi-bell-fill text-danger"></i> 预警中心</h4>
+    <div class="d-flex gap-2">
+        <a href="/dashboard/alert-stats" class="btn btn-sm btn-outline-info">
+            <i class="bi bi-bar-chart"></i> 统计分析
+        </a>
+        <a href="/dashboard/alert-rules" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-gear"></i> 规则配置
+        </a>
+        <form method="post" action="/api/alerts/run-checks" class="d-inline">
+            <button type="submit" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-arrow-clockwise"></i> 立即检查
+            </button>
+        </form>
+    </div>
+</div>
+
+{# ── 统计卡片 ── #}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="alert-stat-card total">
+            <div class="stat-num">{{ stats.total }}</div>
+            <div class="stat-label">活跃预警总数</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="alert-stat-card red">
+            <div class="stat-num">{{ stats.red }}</div>
+            <div class="stat-label">红色预警（严重）</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="alert-stat-card yellow">
+            <div class="stat-num">{{ stats.yellow }}</div>
+            <div class="stat-label">黄色预警（警告）</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="alert-stat-card blue">
+            <div class="stat-num">{{ stats.blue }}</div>
+            <div class="stat-label">蓝色预警（提示）</div>
+        </div>
+    </div>
+</div>
+
+{# 处置率 & 平均响应时间 #}
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body d-flex align-items-center gap-3">
+                <i class="bi bi-check2-circle fs-2 text-success"></i>
+                <div>
+                    <div class="fw-bold fs-5">{{ stats.resolution_rate }}%</div>
+                    <div class="text-muted small">预警处置率</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body d-flex align-items-center gap-3">
+                <i class="bi bi-clock-history fs-2 text-primary"></i>
+                <div>
+                    <div class="fw-bold fs-5">
+                        {% if stats.avg_response_hours %}{{ stats.avg_response_hours }}小时{% else %}暂无数据{% endif %}
+                    </div>
+                    <div class="text-muted small">平均响应时间</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ── 筛选搜索栏 ── #}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small text-muted">关键词搜索</label>
+                <input type="text" name="q" class="form-control form-control-sm"
+                       placeholder="产品名称或预警内容..." value="{{ keyword }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted">预警等级</label>
+                <select name="level" class="form-select form-select-sm">
+                    <option value="">全部等级</option>
+                    <option value="red"    {% if level=='red'    %}selected{% endif %}>红色（严重）</option>
+                    <option value="yellow" {% if level=='yellow' %}selected{% endif %}>黄色（警告）</option>
+                    <option value="blue"   {% if level=='blue'   %}selected{% endif %}>蓝色（提示）</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small text-muted">预警类型</label>
+                <select name="alert_type" class="form-select form-select-sm">
+                    <option value="">全部类型</option>
+                    <option value="capacity_risk"      {% if alert_type=='capacity_risk'      %}selected{% endif %}>产能风险</option>
+                    <option value="supply_chain_break" {% if alert_type=='supply_chain_break' %}selected{% endif %}>供应链断链</option>
+                    <option value="business_risk"      {% if alert_type=='business_risk'      %}selected{% endif %}>企业经营风险</option>
+                    <option value="credit_anomaly"     {% if alert_type=='credit_anomaly'     %}selected{% endif %}>信用分异常</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm w-100">
+                    <i class="bi bi-search"></i> 筛选
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# ── 预警列表（分级展示）── #}
+
+{# 红色预警 #}
+{% if red_alerts %}
+<div class="card border-danger border-2 shadow-sm mb-4">
+    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-exclamation-triangle-fill"></i> 红色预警（严重）</span>
+        <span class="badge bg-white text-danger">{{ red_alerts|length }} 条</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:180px">对象</th>
+                        <th>预警内容</th>
+                        <th style="width:120px">类型</th>
+                        <th style="width:80px">严重度</th>
+                        <th style="width:140px">时间</th>
+                        <th style="width:80px">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in red_alerts %}
+                    <tr class="alert-row-red {% if highlighted and highlighted.id == a.id %}alert-row-highlighted{% endif %}">
+                        <td><strong>{{ a.product_name }}</strong></td>
+                        <td>
+                            {{ a.message }}
+                            {% if a.suggestion %}
+                            <div class="text-success small mt-1">
+                                <i class="bi bi-lightbulb"></i> {{ a.suggestion }}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">
+                                {% if a.alert_type == 'capacity_risk' %}产能风险
+                                {% elif a.alert_type == 'supply_chain_break' %}供应链断链
+                                {% elif a.alert_type == 'business_risk' %}经营风险
+                                {% elif a.alert_type == 'credit_anomaly' %}信用异常
+                                {% else %}{{ a.dimension }}{% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            {% if a.severity_score %}
+                            <div class="progress" style="height:6px" title="{{ (a.severity_score*100)|int }}%">
+                                <div class="progress-bar bg-danger" style="width:{{ (a.severity_score*100)|int }}%"></div>
+                            </div>
+                            <small class="text-muted">{{ (a.severity_score*100)|int }}%</small>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="text-muted small">{{ a.created_at.strftime('%m-%d %H:%M') }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger"
+                                    onclick="showAssignModal({{ a.id }}, '{{ a.product_name|e }}')">
+                                派单
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# 黄色预警 #}
+{% if yellow_alerts %}
+<div class="card border-warning border-2 shadow-sm mb-4">
+    <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-exclamation-circle-fill"></i> 黄色预警（警告）</span>
+        <span class="badge bg-dark text-warning">{{ yellow_alerts|length }} 条</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:180px">对象</th>
+                        <th>预警内容</th>
+                        <th style="width:120px">类型</th>
+                        <th style="width:80px">严重度</th>
+                        <th style="width:140px">时间</th>
+                        <th style="width:80px">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in yellow_alerts %}
+                    <tr class="alert-row-yellow {% if highlighted and highlighted.id == a.id %}alert-row-highlighted{% endif %}">
+                        <td><strong>{{ a.product_name }}</strong></td>
+                        <td>
+                            {{ a.message }}
+                            {% if a.suggestion %}
+                            <div class="text-success small mt-1">
+                                <i class="bi bi-lightbulb"></i> {{ a.suggestion }}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">
+                                {% if a.alert_type == 'capacity_risk' %}产能风险
+                                {% elif a.alert_type == 'supply_chain_break' %}供应链断链
+                                {% elif a.alert_type == 'business_risk' %}经营风险
+                                {% elif a.alert_type == 'credit_anomaly' %}信用异常
+                                {% else %}{{ a.dimension }}{% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            {% if a.severity_score %}
+                            <div class="progress" style="height:6px" title="{{ (a.severity_score*100)|int }}%">
+                                <div class="progress-bar bg-warning" style="width:{{ (a.severity_score*100)|int }}%"></div>
+                            </div>
+                            <small class="text-muted">{{ (a.severity_score*100)|int }}%</small>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="text-muted small">{{ a.created_at.strftime('%m-%d %H:%M') }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-warning"
+                                    onclick="showAssignModal({{ a.id }}, '{{ a.product_name|e }}')">
+                                派单
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# 蓝色预警 #}
+{% if blue_alerts %}
+<div class="card border-primary border-2 shadow-sm mb-4">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-info-circle-fill"></i> 蓝色预警（提示）</span>
+        <span class="badge bg-white text-primary">{{ blue_alerts|length }} 条</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:180px">对象</th>
+                        <th>预警内容</th>
+                        <th style="width:120px">类型</th>
+                        <th style="width:80px">严重度</th>
+                        <th style="width:140px">时间</th>
+                        <th style="width:80px">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in blue_alerts %}
+                    <tr class="alert-row-blue {% if highlighted and highlighted.id == a.id %}alert-row-highlighted{% endif %}">
+                        <td><strong>{{ a.product_name }}</strong></td>
+                        <td>
+                            {{ a.message }}
+                            {% if a.suggestion %}
+                            <div class="text-success small mt-1">
+                                <i class="bi bi-lightbulb"></i> {{ a.suggestion }}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">
+                                {% if a.alert_type == 'capacity_risk' %}产能风险
+                                {% elif a.alert_type == 'supply_chain_break' %}供应链断链
+                                {% elif a.alert_type == 'business_risk' %}经营风险
+                                {% elif a.alert_type == 'credit_anomaly' %}信用异常
+                                {% else %}{{ a.dimension }}{% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            {% if a.severity_score %}
+                            <div class="progress" style="height:6px" title="{{ (a.severity_score*100)|int }}%">
+                                <div class="progress-bar bg-primary" style="width:{{ (a.severity_score*100)|int }}%"></div>
+                            </div>
+                            <small class="text-muted">{{ (a.severity_score*100)|int }}%</small>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="text-muted small">{{ a.created_at.strftime('%m-%d %H:%M') }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary"
+                                    onclick="showAssignModal({{ a.id }}, '{{ a.product_name|e }}')">
+                                派单
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if not red_alerts and not yellow_alerts and not blue_alerts %}
+<div class="text-center py-5">
+    <i class="bi bi-check-circle fs-1 text-success"></i>
+    <p class="text-muted mt-3">暂无活跃预警</p>
+</div>
+{% endif %}
+
+{# ── 派单 Modal ── #}
+<div class="modal fade" id="assignModal" tabindex="-1" aria-labelledby="assignModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="assignModalLabel">派发预警任务</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">预警对象：<strong id="assignAlertName"></strong></p>
+                <div class="mb-3">
+                    <label class="form-label">处理人企业ID</label>
+                    <input type="number" id="assignTo" class="form-control" placeholder="输入处理人企业ID">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">要求完成时间（可选）</label>
+                    <input type="datetime-local" id="assignDeadline" class="form-control">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="submitAssign()">确认派单</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentAlertId = null;
+
+function showAssignModal(alertId, alertName) {
+    currentAlertId = alertId;
+    document.getElementById('assignAlertName').textContent = alertName;
+    document.getElementById('assignTo').value = '';
+    document.getElementById('assignDeadline').value = '';
+    new bootstrap.Modal(document.getElementById('assignModal')).show();
+}
+
+function submitAssign() {
+    const assignTo = document.getElementById('assignTo').value;
+    const deadline = document.getElementById('assignDeadline').value;
+
+    if (!assignTo) {
+        alert('请输入处理人企业ID');
+        return;
+    }
+
+    const body = { assigned_to: parseInt(assignTo) };
+    if (deadline) body.deadline = new Date(deadline).toISOString();
+
+    fetch(`/api/alerts/${currentAlertId}/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('assignModal')).hide();
+            if (confirm('派单成功！是否前往处置页面？')) {
+                location.href = `/dashboard/alert-workflow/${data.workflow_id}`;
+            } else {
+                location.reload();
+            }
+        } else {
+            alert('派单失败：' + (data.error || '未知错误'));
+        }
+    })
+    .catch(() => alert('请求失败，请重试'));
+}
+</script>
+{% endblock %}

@@ -1,0 +1,152 @@
+{% extends "layout/base.html" %}
+
+{% block title %}创建电子合同{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-10 offset-md-1">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-file-earmark-text"></i> 创建电子合同
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('contract.create_contract') }}">
+                        <!-- 买卖方信息 -->
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <h5 class="text-primary">买方信息</h5>
+                                <input type="hidden" name="buyer_id" value="{{ buyer.id if buyer else '' }}">
+                                <div class="mb-3">
+                                    <label class="form-label">企业名称</label>
+                                    <input type="text" class="form-control" value="{{ buyer.name if buyer else '' }}" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">联系人</label>
+                                    <input type="text" class="form-control" value="{{ buyer.contact if buyer else '' }}" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">联系电话</label>
+                                    <input type="text" class="form-control" value="{{ buyer.phone if buyer else '' }}" readonly>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h5 class="text-success">卖方信息</h5>
+                                <input type="hidden" name="seller_id" value="{{ seller.id if seller else '' }}">
+                                <div class="mb-3">
+                                    <label class="form-label">企业名称</label>
+                                    <input type="text" class="form-control" value="{{ seller.name if seller else '' }}" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">联系人</label>
+                                    <input type="text" class="form-control" value="{{ seller.contact if seller else '' }}" readonly>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">联系电话</label>
+                                    <input type="text" class="form-control" value="{{ seller.phone if seller else '' }}" readonly>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- 产品信息 -->
+                        <h5 class="text-info mb-3">产品信息</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">产品名称 <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" name="product_name" 
+                                           value="{{ product_name }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label">数量 <span class="text-danger">*</span></label>
+                                    <input type="number" class="form-control" name="quantity" required>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label">单位 <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" name="unit" placeholder="如：件、台、套" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">单价（元） <span class="text-danger">*</span></label>
+                                    <input type="number" step="0.01" class="form-control" name="price" 
+                                           id="price" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">总金额（元） <span class="text-danger">*</span></label>
+                                    <input type="number" step="0.01" class="form-control" name="total_amount" 
+                                           id="total_amount" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- 合同条款 -->
+                        <h5 class="text-warning mb-3">合同条款</h5>
+                        <div class="mb-3">
+                            <label class="form-label">交货时间 <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="delivery_time" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">质量要求</label>
+                            <textarea class="form-control" name="quality_requirements" rows="3" 
+                                      placeholder="请描述产品质量标准、验收标准等"></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">付款方式 <span class="text-danger">*</span></label>
+                            <select class="form-select" name="payment_terms" required>
+                                <option value="">请选择</option>
+                                <option value="预付30%，货到付70%">预付30%，货到付70%</option>
+                                <option value="货到付款">货到付款</option>
+                                <option value="月结30天">月结30天</option>
+                                <option value="月结60天">月结60天</option>
+                                <option value="其他">其他</option>
+                            </select>
+                        </div>
+
+                        <!-- 提交按钮 -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                            <a href="{{ url_for('main.index') }}" class="btn btn-secondary">
+                                <i class="bi bi-x-circle"></i> 取消
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-file-earmark-check"></i> 生成合同
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 自动计算总金额
+document.getElementById('price').addEventListener('input', calculateTotal);
+document.querySelector('[name="quantity"]').addEventListener('input', calculateTotal);
+
+function calculateTotal() {
+    const price = parseFloat(document.getElementById('price').value) || 0;
+    const quantity = parseFloat(document.querySelector('[name="quantity"]').value) || 0;
+    const total = price * quantity;
+    document.getElementById('total_amount').value = total.toFixed(2);
+}
+</script>
+{% endblock %}

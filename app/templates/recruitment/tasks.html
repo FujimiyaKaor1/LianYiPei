@@ -1,0 +1,488 @@
+{% extends "layout/base.html" %}
+
+{% block title %}招商任务管理 - 链易配{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+
+  <!-- 页面标题 -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h4 class="mb-1"><i class="bi bi-list-task me-2 text-primary"></i>招商任务管理</h4>
+      <p class="text-muted small mb-0">跟踪招商任务进展，管理任务分配与状态</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="/recruitment/gaps" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-diagram-3 me-1"></i>缺口分析
+      </a>
+      <button class="btn btn-primary btn-sm" onclick="openCreateModal()">
+        <i class="bi bi-plus me-1"></i>新建任务
+      </button>
+    </div>
+  </div>
+
+  <!-- 统计卡片 -->
+  <div class="row g-3 mb-4" id="statsRow">
+    <div class="col-md-2">
+      <div class="card text-center border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="text-muted small mb-1">全部任务</div>
+          <div class="fs-3 fw-bold text-secondary" id="statTotal">--</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card text-center border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="text-muted small mb-1">待跟进</div>
+          <div class="fs-3 fw-bold text-secondary" id="statPending">--</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card text-center border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="text-muted small mb-1">洽谈中</div>
+          <div class="fs-3 fw-bold text-primary" id="statNegotiating">--</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card text-center border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="text-muted small mb-1">已签约</div>
+          <div class="fs-3 fw-bold text-success" id="statSigned">--</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card text-center border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="text-muted small mb-1">已逾期</div>
+          <div class="fs-3 fw-bold text-danger" id="statOverdue">--</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="card text-center border-0 shadow-sm">
+        <div class="card-body py-3">
+          <div class="text-muted small mb-1">完成率</div>
+          <div class="fs-3 fw-bold text-info" id="statRate">--</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 筛选栏 -->
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-2 d-flex gap-2 flex-wrap align-items-center">
+      <select class="form-select form-select-sm" id="filterStatus" style="width:120px;" onchange="loadTasks()">
+        <option value="">全部状态</option>
+        <option value="pending">待跟进</option>
+        <option value="contacted">已联系</option>
+        <option value="negotiating">洽谈中</option>
+        <option value="signed">已签约</option>
+        <option value="failed">已终止</option>
+      </select>
+      <select class="form-select form-select-sm" id="filterPriority" style="width:120px;" onchange="loadTasks()">
+        <option value="">全部优先级</option>
+        <option value="high">高优先级</option>
+        <option value="normal">普通</option>
+        <option value="low">低优先级</option>
+      </select>
+      <div class="ms-auto d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm" id="btnKanban" onclick="switchView('kanban')">
+          <i class="bi bi-kanban me-1"></i>看板
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" id="btnList" onclick="switchView('list')">
+          <i class="bi bi-table me-1"></i>列表
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 看板视图 -->
+  <div id="kanbanView">
+    <div class="row g-3" id="kanbanBoard"></div>
+  </div>
+
+  <!-- 列表视图 -->
+  <div id="listView" style="display:none;">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div id="taskTable"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 任务详情 Modal -->
+<div class="modal fade" id="taskDetailModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-info-circle me-2"></i>任务详情</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="taskDetailBody">
+        <div class="text-center text-muted py-4">加载中...</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+        <button type="button" class="btn btn-primary" id="btnSaveDetail" onclick="saveTaskDetail()">保存进展</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 新建任务 Modal -->
+<div class="modal fade" id="createTaskModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>新建招商任务</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="createTaskForm">
+          <div class="mb-3">
+            <label class="form-label">任务名称 <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="newTaskName" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">目标产品 <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="newTaskProduct" required>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col">
+              <label class="form-label">目标企业名称</label>
+              <input type="text" class="form-control" id="newTaskEnterprise">
+            </div>
+            <div class="col">
+              <label class="form-label">目标企业地区</label>
+              <input type="text" class="form-control" id="newTaskLocation">
+            </div>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col">
+              <label class="form-label">优先级</label>
+              <select class="form-select" id="newTaskPriority">
+                <option value="high">高优先级</option>
+                <option value="normal" selected>普通</option>
+                <option value="low">低优先级</option>
+              </select>
+            </div>
+            <div class="col">
+              <label class="form-label">截止日期</label>
+              <input type="date" class="form-control" id="newTaskDeadline">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">备注</label>
+            <textarea class="form-control" id="newTaskNotes" rows="2"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" onclick="submitNewTask()">
+          <i class="bi bi-check-lg me-1"></i>创建
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const STATUS_CONFIG = {
+  pending:     { label: '待跟进',  color: 'secondary', icon: 'bi-clock' },
+  contacted:   { label: '已联系',  color: 'info',      icon: 'bi-telephone' },
+  negotiating: { label: '洽谈中',  color: 'primary',   icon: 'bi-chat-dots' },
+  signed:      { label: '已签约',  color: 'success',   icon: 'bi-check-circle' },
+  failed:      { label: '已终止',  color: 'danger',    icon: 'bi-x-circle' },
+};
+const PRIORITY_CONFIG = {
+  high:   { label: '高', color: 'danger' },
+  normal: { label: '普通', color: 'secondary' },
+  low:    { label: '低', color: 'light' },
+};
+
+let allTasks = [];
+let currentView = 'kanban';
+let editingTaskId = null;
+
+async function loadTasks() {
+  const status = document.getElementById('filterStatus').value;
+  const priority = document.getElementById('filterPriority').value;
+  let url = '/api/recruitment/tasks?per_page=200';
+  if (status) url += `&status=${status}`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    allTasks = (data.tasks || []).filter(t => !priority || t.priority === priority);
+    updateStats(allTasks);
+    if (currentView === 'kanban') renderKanban(allTasks);
+    else renderList(allTasks);
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function updateStats(tasks) {
+  document.getElementById('statTotal').textContent = tasks.length;
+  document.getElementById('statPending').textContent = tasks.filter(t => t.status === 'pending').length;
+  document.getElementById('statNegotiating').textContent = tasks.filter(t => t.status === 'negotiating').length;
+  document.getElementById('statSigned').textContent = tasks.filter(t => t.status === 'signed').length;
+  const today = new Date().toISOString().slice(0, 10);
+  const overdue = tasks.filter(t => t.deadline && t.deadline < today && !['signed','failed'].includes(t.status)).length;
+  document.getElementById('statOverdue').textContent = overdue;
+  const total = tasks.length;
+  const signed = tasks.filter(t => t.status === 'signed').length;
+  document.getElementById('statRate').textContent = total ? Math.round(signed / total * 100) + '%' : '0%';
+}
+
+function renderKanban(tasks) {
+  const columns = ['pending', 'contacted', 'negotiating', 'signed', 'failed'];
+  const board = document.getElementById('kanbanBoard');
+  board.innerHTML = columns.map(status => {
+    const cfg = STATUS_CONFIG[status];
+    const colTasks = tasks.filter(t => t.status === status);
+    return `
+    <div class="col">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center py-2">
+          <span class="fw-semibold small">
+            <i class="bi ${cfg.icon} me-1 text-${cfg.color}"></i>${cfg.label}
+          </span>
+          <span class="badge bg-${cfg.color}">${colTasks.length}</span>
+        </div>
+        <div class="card-body p-2" style="min-height:200px; max-height:60vh; overflow-y:auto;">
+          ${colTasks.length ? colTasks.map(t => renderTaskCard(t)).join('') : '<div class="text-center text-muted small py-4">暂无任务</div>'}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderTaskCard(t) {
+  const today = new Date().toISOString().slice(0, 10);
+  const isOverdue = t.deadline && t.deadline < today && !['signed','failed'].includes(t.status);
+  const priCfg = PRIORITY_CONFIG[t.priority] || PRIORITY_CONFIG.normal;
+  return `
+  <div class="card border mb-2 task-card" style="cursor:pointer;" onclick="openDetail(${t.id})">
+    <div class="card-body p-2">
+      <div class="d-flex justify-content-between align-items-start mb-1">
+        <div class="fw-semibold small text-truncate" style="max-width:140px;" title="${t.task_name}">${t.task_name}</div>
+        <span class="badge bg-${priCfg.color} ms-1">${priCfg.label}</span>
+      </div>
+      ${t.target_product ? `<div class="text-muted" style="font-size:.75rem;"><i class="bi bi-box me-1"></i>${t.target_product}</div>` : ''}
+      ${t.target_enterprise_name ? `<div class="text-muted" style="font-size:.75rem;"><i class="bi bi-building me-1"></i>${t.target_enterprise_name}</div>` : ''}
+      ${t.deadline ? `<div class="mt-1 ${isOverdue ? 'text-danger' : 'text-muted'}" style="font-size:.75rem;">
+        <i class="bi bi-calendar${isOverdue ? '-x' : ''} me-1"></i>${t.deadline}${isOverdue ? ' (逾期)' : ''}
+      </div>` : ''}
+    </div>
+  </div>`;
+}
+
+function renderList(tasks) {
+  if (!tasks.length) {
+    document.getElementById('taskTable').innerHTML = '<div class="text-center text-muted py-5">暂无招商任务</div>';
+    return;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById('taskTable').innerHTML = `
+  <table class="table table-hover mb-0">
+    <thead class="table-light">
+      <tr>
+        <th>任务名称</th><th>目标产品</th><th>目标企业</th>
+        <th>优先级</th><th>状态</th><th>截止日期</th><th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${tasks.map(t => {
+        const sc = STATUS_CONFIG[t.status] || {};
+        const pc = PRIORITY_CONFIG[t.priority] || {};
+        const isOverdue = t.deadline && t.deadline < today && !['signed','failed'].includes(t.status);
+        return `<tr class="${isOverdue ? 'table-danger' : ''}">
+          <td class="small">${t.task_name}</td>
+          <td class="small">${t.target_product || '-'}</td>
+          <td class="small">${t.target_enterprise_name || '-'}</td>
+          <td><span class="badge bg-${pc.color}">${pc.label}</span></td>
+          <td><span class="badge bg-${sc.color}">${sc.label}</span></td>
+          <td class="small ${isOverdue ? 'text-danger fw-bold' : ''}">${t.deadline || '-'}</td>
+          <td>
+            <button class="btn btn-outline-primary btn-sm py-0 px-2" onclick="openDetail(${t.id})">
+              <i class="bi bi-pencil"></i>
+            </button>
+          </td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>`;
+}
+
+function switchView(view) {
+  currentView = view;
+  document.getElementById('kanbanView').style.display = view === 'kanban' ? '' : 'none';
+  document.getElementById('listView').style.display = view === 'list' ? '' : 'none';
+  document.getElementById('btnKanban').className = `btn btn-sm ${view === 'kanban' ? 'btn-primary' : 'btn-outline-secondary'}`;
+  document.getElementById('btnList').className = `btn btn-sm ${view === 'list' ? 'btn-primary' : 'btn-outline-secondary'}`;
+  if (view === 'kanban') renderKanban(allTasks);
+  else renderList(allTasks);
+}
+
+async function openDetail(taskId) {
+  editingTaskId = taskId;
+  const modal = new bootstrap.Modal(document.getElementById('taskDetailModal'));
+  document.getElementById('taskDetailBody').innerHTML = '<div class="text-center text-muted py-4">加载中...</div>';
+  modal.show();
+
+  try {
+    const res = await fetch(`/api/recruitment/tasks/${taskId}`);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error);
+    renderTaskDetail(data.task);
+  } catch (e) {
+    document.getElementById('taskDetailBody').innerHTML = `<div class="text-danger">${e.message}</div>`;
+  }
+}
+
+function renderTaskDetail(t) {
+  const sc = STATUS_CONFIG[t.status] || {};
+  const pc = PRIORITY_CONFIG[t.priority] || {};
+  const today = new Date().toISOString().slice(0, 10);
+  const isOverdue = t.deadline && t.deadline < today && !['signed','failed'].includes(t.status);
+
+  document.getElementById('taskDetailBody').innerHTML = `
+  <div class="row g-3">
+    <div class="col-md-6">
+      <label class="form-label small text-muted">任务名称</label>
+      <div class="fw-semibold">${t.task_name}</div>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small text-muted">目标产品</label>
+      <div>${t.target_product || '-'}</div>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small text-muted">目标企业</label>
+      <div>${t.target_enterprise_name || '-'}</div>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label small text-muted">目标地区</label>
+      <div>${t.target_enterprise_location || '-'}</div>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small text-muted">优先级</label>
+      <select class="form-select form-select-sm" id="detailPriority">
+        ${Object.entries(PRIORITY_CONFIG).map(([v,c]) =>
+          `<option value="${v}" ${t.priority===v?'selected':''}>${c.label}</option>`
+        ).join('')}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small text-muted">当前状态</label>
+      <select class="form-select form-select-sm" id="detailStatus">
+        ${Object.entries(STATUS_CONFIG).map(([v,c]) =>
+          `<option value="${v}" ${t.status===v?'selected':''}>${c.label}</option>`
+        ).join('')}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small text-muted">截止日期</label>
+      <input type="date" class="form-control form-control-sm ${isOverdue?'border-danger':''}" id="detailDeadline" value="${t.deadline||''}">
+      ${isOverdue ? '<div class="text-danger small mt-1"><i class="bi bi-exclamation-triangle me-1"></i>已逾期</div>' : ''}
+    </div>
+    <div class="col-12">
+      <label class="form-label small text-muted">进展备注</label>
+      <textarea class="form-control" id="detailNotes" rows="3">${t.progress_notes||''}</textarea>
+    </div>
+    <div class="col-12 text-muted small">
+      创建时间：${(t.created_at||'').slice(0,16)}
+      ${t.updated_at ? ' · 最后更新：' + t.updated_at.slice(0,16) : ''}
+      ${t.is_overdue ? ' · <span class="text-danger">已逾期</span>' : ''}
+    </div>
+  </div>`;
+}
+
+async function saveTaskDetail() {
+  if (!editingTaskId) return;
+  const payload = {
+    status: document.getElementById('detailStatus').value,
+    priority: document.getElementById('detailPriority').value,
+    deadline: document.getElementById('detailDeadline').value || null,
+    progress_notes: document.getElementById('detailNotes').value,
+  };
+  try {
+    const res = await fetch(`/api/recruitment/tasks/${editingTaskId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data.success) {
+      bootstrap.Modal.getInstance(document.getElementById('taskDetailModal')).hide();
+      showToast('任务已更新', 'success');
+      loadTasks();
+    } else {
+      showToast(data.error || '更新失败', 'danger');
+    }
+  } catch (e) {
+    showToast('网络错误', 'danger');
+  }
+}
+
+function openCreateModal() {
+  document.getElementById('createTaskForm').reset();
+  new bootstrap.Modal(document.getElementById('createTaskModal')).show();
+}
+
+async function submitNewTask() {
+  const name = document.getElementById('newTaskName').value.trim();
+  const product = document.getElementById('newTaskProduct').value.trim();
+  if (!name || !product) { showToast('请填写任务名称和目标产品', 'warning'); return; }
+
+  const payload = {
+    task_name: name,
+    target_product: product,
+    target_enterprise_name: document.getElementById('newTaskEnterprise').value,
+    target_enterprise_location: document.getElementById('newTaskLocation').value,
+    priority: document.getElementById('newTaskPriority').value,
+    deadline: document.getElementById('newTaskDeadline').value || null,
+    progress_notes: document.getElementById('newTaskNotes').value,
+  };
+
+  try {
+    const res = await fetch('/api/recruitment/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data.success) {
+      bootstrap.Modal.getInstance(document.getElementById('createTaskModal')).hide();
+      showToast('任务已创建', 'success');
+      loadTasks();
+    } else {
+      showToast(data.error || '创建失败', 'danger');
+    }
+  } catch (e) {
+    showToast('网络错误', 'danger');
+  }
+}
+
+function showToast(msg, type) {
+  const el = document.createElement('div');
+  el.className = `alert alert-${type} position-fixed bottom-0 end-0 m-3 shadow`;
+  el.style.zIndex = 9999;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// 初始化
+switchView('kanban');
+loadTasks();
+</script>
+{% endblock %}

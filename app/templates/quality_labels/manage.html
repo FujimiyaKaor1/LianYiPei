@@ -1,0 +1,139 @@
+{% extends "layout/base.html" %}
+
+{% block title %}质量标签管理 - 链易配{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h4><i class="bi bi-patch-check me-2"></i>质量标签管理</h4>
+    <div class="d-flex gap-2">
+      {% if current_user.role in ('admin', 'government') %}
+      <a href="{{ url_for('quality_labels.grant_green_page') }}" class="btn btn-success btn-sm">
+        <i class="bi bi-award me-1"></i>颁发政府绿标
+      </a>
+      {% endif %}
+      {% if current_user.is_lead_enterprise or current_user.role == 'admin' %}
+      <a href="{{ url_for('quality_labels.inspection_page') }}" class="btn btn-primary btn-sm">
+        <i class="bi bi-clipboard-check me-1"></i>链主验厂管理
+      </a>
+      {% endif %}
+      <button class="btn btn-outline-secondary btn-sm" onclick="syncThirdParty()">
+        <i class="bi bi-arrow-repeat me-1"></i>同步第三方评分
+      </button>
+    </div>
+  </div>
+
+  <!-- 我的标签 -->
+  <div class="card mb-4">
+    <div class="card-header"><h6 class="mb-0">我的质量标签</h6></div>
+    <div class="card-body">
+      {% if labels %}
+      <div class="row g-3">
+        {% for lb in labels %}
+        <div class="col-md-6 col-lg-4">
+          <div class="border rounded p-3 position-relative
+            {% if lb.status == 'active' %}border-success{% elif lb.status == 'expired' %}border-secondary{% else %}border-danger{% endif %}">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                {% if lb.label_type == 'government_green' %}
+                <span class="badge bg-success mb-1"><i class="bi bi-award me-1"></i>政府绿标</span>
+                {% elif lb.label_type == 'lead_inspection' %}
+                <span class="badge bg-primary mb-1"><i class="bi bi-clipboard-check me-1"></i>链主验厂</span>
+                {% else %}
+                <span class="badge bg-info mb-1"><i class="bi bi-star me-1"></i>第三方评分</span>
+                {% endif %}
+                <div class="fw-semibold mt-1">{{ lb.label_name }}</div>
+                {% if lb.certificate_no %}
+                <div class="text-muted small">证书号：{{ lb.certificate_no }}</div>
+                {% endif %}
+                {% if lb.issuer_name %}
+                <div class="text-muted small">颁发方：{{ lb.issuer_name }}</div>
+                {% endif %}
+                {% if lb.valid_until %}
+                <div class="text-muted small">有效期至：{{ lb.valid_until }}</div>
+                {% endif %}
+              </div>
+              <span class="badge {% if lb.status == 'active' %}bg-success{% elif lb.status == 'expired' %}bg-secondary{% else %}bg-danger{% endif %}">
+                {% if lb.status == 'active' %}有效{% elif lb.status == 'expired' %}已过期{% else %}已撤销{% endif %}
+              </span>
+            </div>
+            {% if lb.status == 'active' and lb.label_type == 'lead_inspection' %}
+            <div class="mt-2">
+              <button class="btn btn-outline-warning btn-sm" onclick="applyReinspection({{ lb.issuer_id }})">
+                <i class="bi bi-arrow-repeat me-1"></i>申请重新验厂
+              </button>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-muted mb-0">暂无质量标签。</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- 申请重新验厂模态框 -->
+<div class="modal fade" id="reinspectionModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">申请重新验厂</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="reinspectionIssuerId">
+        <div class="mb-3">
+          <label class="form-label">申请原因</label>
+          <textarea class="form-control" id="reinspectionReason" rows="3" placeholder="请说明申请重新验厂的原因..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" onclick="submitReinspection()">提交申请</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function applyReinspection(issuerId) {
+  document.getElementById('reinspectionIssuerId').value = issuerId;
+  document.getElementById('reinspectionReason').value = '';
+  new bootstrap.Modal(document.getElementById('reinspectionModal')).show();
+}
+
+async function submitReinspection() {
+  const issuerId = document.getElementById('reinspectionIssuerId').value;
+  const reason = document.getElementById('reinspectionReason').value;
+  const res = await fetch('/quality-labels/api/reinspection', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({issuer_id: issuerId, reason})
+  });
+  const data = await res.json();
+  bootstrap.Modal.getInstance(document.getElementById('reinspectionModal')).hide();
+  alert(data.message || (data.success ? '申请已提交' : '提交失败'));
+}
+
+async function syncThirdParty() {
+  if (!confirm('确认同步第三方信用评分？')) return;
+  const res = await fetch('/quality-labels/api/sync-third-party', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({source: '企查查'})
+  });
+  const data = await res.json();
+  if (data.success) {
+    alert(`同步成功！评级：${data.rating}`);
+    location.reload();
+  } else {
+    alert('同步失败：' + (data.message || '未知错误'));
+  }
+}
+</script>
+{% endblock %}

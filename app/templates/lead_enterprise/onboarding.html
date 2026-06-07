@@ -1,0 +1,139 @@
+{% extends "layout/base.html" %}
+
+{% block title %}链主企业入驻申请{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="row">
+    <div class="col-md-8 offset-md-2">
+      <div class="card">
+        <div class="card-header bg-primary text-white">
+          <h4 class="mb-0">
+            <i class="bi bi-building me-2"></i>链主企业入驻申请
+          </h4>
+        </div>
+        <div class="card-body">
+          {% if existing_application %}
+            <div class="alert alert-info">
+              <i class="bi bi-info-circle me-2"></i>
+              您已提交入驻申请，当前状态：
+              <strong>
+                {% if existing_application.status == 'pending' %}
+                  待审核
+                {% elif existing_application.status == 'approved' %}
+                  已通过
+                {% elif existing_application.status == 'rejected' %}
+                  已拒绝
+                {% endif %}
+              </strong>
+            </div>
+            
+            {% if existing_application.status == 'rejected' and existing_application.review_notes %}
+              <div class="alert alert-warning">
+                <strong>拒绝原因：</strong>{{ existing_application.review_notes }}
+              </div>
+            {% endif %}
+          {% endif %}
+
+          <div class="mb-4">
+            <h5>链主企业权益</h5>
+            <ul>
+              <li>上传供应商验厂结果，为优质供应商背书</li>
+              <li>批量导入和管理供应商名单</li>
+              <li>配置供应商展示控制权</li>
+              <li>获得"链主企业"专属标识</li>
+              <li>贡献度统计和展示</li>
+            </ul>
+          </div>
+
+          <form id="onboardingForm">
+            <div class="mb-3">
+              <label for="qualificationDocs" class="form-label">企业资质证明 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="qualificationDocs" 
+                     placeholder="请输入资质证明文件URL" required>
+              <small class="form-text text-muted">请上传营业执照、行业资质等证明文件</small>
+            </div>
+
+            <div class="mb-3">
+              <label for="supplierManagementSystem" class="form-label">供应商管理制度 <span class="text-danger">*</span></label>
+              <input type="text" class="form-control" id="supplierManagementSystem" 
+                     placeholder="请输入供应商管理制度文件URL" required>
+              <small class="form-text text-muted">请上传供应商管理制度、验厂标准等文件</small>
+            </div>
+
+            <div class="mb-3">
+              <label for="supplierCount" class="form-label">现有供应商数量</label>
+              <input type="number" class="form-control" id="supplierCount" 
+                     placeholder="请输入现有供应商数量" min="0">
+            </div>
+
+            <div class="mb-3">
+              <label for="annualProcurement" class="form-label">年采购额（万元）</label>
+              <input type="number" class="form-control" id="annualProcurement" 
+                     placeholder="请输入年采购额" min="0" step="0.01">
+            </div>
+
+            <div class="mb-3">
+              <label for="description" class="form-label">申请说明</label>
+              <textarea class="form-control" id="description" rows="4" 
+                        placeholder="请简要说明您的企业情况、供应链管理经验等"></textarea>
+            </div>
+
+            <div class="d-grid gap-2">
+              <button type="submit" class="btn btn-primary" id="submitBtn">
+                <i class="bi bi-send me-2"></i>提交申请
+              </button>
+              <a href="{{ url_for('dashboard.main') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left me-2"></i>返回
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('onboardingForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>提交中...';
+  
+  const data = {
+    qualification_docs: document.getElementById('qualificationDocs').value,
+    supplier_management_system: document.getElementById('supplierManagementSystem').value,
+    supplier_count: parseInt(document.getElementById('supplierCount').value) || 0,
+    annual_procurement: parseFloat(document.getElementById('annualProcurement').value) || 0,
+    description: document.getElementById('description').value
+  };
+  
+  try {
+    const response = await fetch('/lead-enterprise/api/onboarding/submit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      alert('申请提交成功，请等待管理员审核');
+      window.location.reload();
+    } else {
+      alert('提交失败：' + result.message);
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i class="bi bi-send me-2"></i>提交申请';
+    }
+  } catch (error) {
+    alert('提交失败：' + error.message);
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="bi bi-send me-2"></i>提交申请';
+  }
+});
+</script>
+{% endblock %}

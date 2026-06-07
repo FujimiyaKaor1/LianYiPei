@@ -1,0 +1,289 @@
+{% extends "layout/base.html" %}
+
+{% block title %}企业中心 - 链易配{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-building"></i> 企业信息</h5>
+            </div>
+            <div class="card-body">
+                <h4>{{ current_user.name }}</h4>
+                <hr>
+                <p><i class="bi bi-geo-alt"></i> {{ current_user.address or '未填写' }}</p>
+                <p><i class="bi bi-person"></i> {{ current_user.contact or '未填写' }}</p>
+                <p><i class="bi bi-telephone"></i> {{ current_user.phone or '未填写' }}</p>
+                <p><i class="bi bi-award"></i> 信用评分: <span class="badge bg-success">{{ current_user.credit_score }}</span></p>
+                <p><i class="bi bi-graph-up"></i> 产能指数: <span class="badge bg-info">{{ current_user.capacity }}</span></p>
+                {% if current_user.patent_category %}<p><i class="bi bi-lightning"></i> 专利: {{ current_user.patent_category }}</p>{% endif %}
+                {% if current_user.rd_investment %}<p><i class="bi bi-cash-stack"></i> 研发投入: {{ current_user.rd_investment }}万元</p>{% endif %}
+                {% if current_user.longitude and current_user.latitude %}
+                <p><i class="bi bi-pin-map"></i> 经纬度: {{ current_user.longitude }}, {{ current_user.latitude }}</p>
+                {% endif %}
+                <a href="{{ url_for('enterprise.edit') }}" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-pencil"></i> 编辑信息
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        {% if profile is defined and profile %}
+        <div class="card mb-3">
+            <div class="card-header"><h5 class="mb-0"><i class="bi bi-graph-up-arrow"></i> 能力雷达图</h5></div>
+            <div class="card-body">
+                <div id="radarChart" style="height:280px;"></div>
+            </div>
+        </div>
+        <div class="card mb-3">
+            <div class="card-header"><h5 class="mb-0"><i class="bi bi-tags"></i> 能力与需求标签云</h5></div>
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-2">
+                    {% for tag in profile.supply_tags|default([]) %}
+                    <span class="badge bg-success" style="font-size: 0.9rem;">供应: {{ tag }}</span>
+                    {% endfor %}
+                    {% for tag in profile.demand_tags|default([]) %}
+                    <span class="badge bg-info" style="font-size: 0.9rem;">需求: {{ tag }}</span>
+                    {% endfor %}
+                    {% for kw in profile.tech_keywords|default([]) %}
+                    <span class="badge bg-secondary" style="font-size: 0.9rem;">{{ kw }}</span>
+                    {% endfor %}
+                    {% if not (profile.supply_tags|default([]) or profile.demand_tags|default([]) or profile.tech_keywords|default([])) %}
+                    <span class="text-muted">暂无标签，请添加产品或编辑技术关键词</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-box-seam"></i> 我的产品</h5>
+                <a href="{{ url_for('enterprise.add_product') }}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-lg"></i> 添加产品
+                </a>
+            </div>
+            <div class="card-body">
+                {% set products = current_user.products.all() %}
+                {% if products %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>产品名称</th>
+                                <th>类别</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for product in products %}
+                            <tr>
+                                <td>{{ product.name }}</td>
+                                <td>{{ product.category or '-' }}</td>
+                                <td>
+                                    <form action="{{ url_for('enterprise.delete_product', product_id=product.id) }}" method="POST" style="display:inline">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('确定删除？')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">暂无产品，请添加</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- 绿色档案卡片 -->
+        <div class="card mb-3">
+            <div class="card-header" style="background:linear-gradient(135deg,#dcfce7,#f0fdf4)!important;border-bottom:1px solid #bbf7d0;">
+                <h5 class="mb-0" style="color:#16a34a;"><i class="bi bi-leaf"></i> 绿色档案</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-6 col-md-4">
+                        <div class="text-center p-2 rounded" style="background:#f0fdf4;">
+                            {% if current_user.is_green_factory %}
+                            <i class="bi bi-check-circle-fill fs-3" style="color:#22c55e;"></i>
+                            <div class="fw-bold mt-1" style="color:#16a34a;">绿色工厂</div>
+                            {% else %}
+                            <i class="bi bi-x-circle fs-3 text-muted"></i>
+                            <div class="text-muted mt-1">未认证</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <div class="text-center p-2 rounded" style="background:#f0f9ff;">
+                            <div class="fs-3 fw-bold" style="color:#0284c7;">{{ current_user.carbon_emission_level or '-' }}</div>
+                            <div class="text-muted" style="font-size:.82rem;">碳排放等级</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <div class="text-center p-2 rounded" style="background:#fefce8;">
+                            <div class="fs-3 fw-bold" style="color:#ca8a04;">{{ (current_user.clean_energy_usage or 0) | round(0) | int }}%</div>
+                            <div class="text-muted" style="font-size:.82rem;">清洁能源占比</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <div class="text-center p-2 rounded" style="background:#faf5ff;">
+                            <div class="fs-4 fw-bold" style="color:#9333ea;">{{ current_user.environment_protection_patents or 0 }}</div>
+                            <div class="text-muted" style="font-size:.82rem;">环保专利</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <div class="text-center p-2 rounded" style="background:#f0fdf4;">
+                            <div class="fs-6 fw-bold" style="color:#16a34a;">{{ current_user.green_supplier_rank or '未评级' }}</div>
+                            <div class="text-muted" style="font-size:.82rem;">绿色供应商等级</div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <div class="p-2 rounded" style="background:#ecfdf5;">
+                            <div style="font-size:.82rem;color:#16a34a;font-weight:600;margin-bottom:4px;">绿色认证</div>
+                            {% set certs = current_user.green_certification or [] %}
+                            {% if certs %}
+                            <div class="d-flex flex-wrap gap-1">
+                                {% for c in certs %}
+                                <span class="badge" style="background:#bbf7d0;color:#166534;font-size:.75rem;">{{ c }}</span>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <span class="text-muted" style="font-size:.8rem;">暂无认证</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 质量标签 需求: 18.1-18.5 -->
+        <div class="card mb-3" id="qualityLabelsCard">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-patch-check me-1"></i> 质量标签</h5>
+            <a href="{{ url_for('quality_labels.manage') }}" class="btn btn-outline-secondary btn-sm">
+              <i class="bi bi-gear me-1"></i>管理标签
+            </a>
+          </div>
+          <div class="card-body" id="qualityLabelsBody">
+            <p class="text-muted small">加载中...</p>
+          </div>
+        </div>
+
+        <!-- 合作案例库 需求: 8.7 -->
+        <div class="card mb-3" id="caseLibraryCard">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-collection me-1"></i> 合作案例库</h5>
+                <a href="{{ url_for('fulfillment.cases') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-gear me-1"></i>管理案例
+                </a>
+            </div>
+            <div class="card-body" id="caseLibraryBody">
+                <p class="text-muted small">加载中...</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-list-check"></i> 快捷操作</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-2">
+                        <a href="{{ url_for('demand.create') }}" class="btn btn-outline-success w-100">
+                            <i class="bi bi-plus-circle"></i> 发布供需
+                        </a>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <a href="{{ url_for('demand.my_demands') }}" class="btn btn-outline-info w-100">
+                            <i class="bi bi-list"></i> 我的供需
+                        </a>
+                    </div>
+                    <div class="col-md-4 mb-2">
+                        <a href="{{ url_for('match.index') }}" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-search"></i> 智能匹配
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if profile is defined and profile and profile.radar_data is defined %}
+<script type="text/javascript">
+document.addEventListener('DOMContentLoaded', function() {
+    var el = document.getElementById('radarChart');
+    if (!el) return;
+    var chart = echarts.init(el);
+    var rd = {{ profile.radar_data | tojson }};
+    chart.setOption({
+        tooltip: {},
+        radar: {
+            indicator: [
+                { name: '信用评分', max: 100 },
+                { name: '产能指数', max: 100 },
+                { name: '技术能力', max: 100 },
+                { name: '供应能力', max: 100 },
+                { name: '需求覆盖', max: 100 }
+            ]
+        },
+        series: [{
+            type: 'radar',
+            data: [{ value: [rd.credit, rd.capacity, rd.tech, rd.supply, rd.demand], name: '企业能力' }]
+        }]
+    });
+});
+</script>
+{% endif %}
+<script>
+// 加载质量标签
+(async function() {
+  const eid = {{ current_user.id }};
+  const res = await fetch(`/quality-labels/api/enterprise/${eid}`);
+  const data = await res.json();
+  const body = document.getElementById('qualityLabelsBody');
+  if (!body) return;
+  if (!data.success || !data.labels || !data.labels.length) {
+    body.innerHTML = '<p class="text-muted small mb-0">暂无质量标签</p>';
+    return;
+  }
+  const typeColors = {government_green: 'success', lead_inspection: 'primary', third_party: 'info'};
+  const typeIcons = {government_green: 'bi-award', lead_inspection: 'bi-clipboard-check', third_party: 'bi-star'};
+  body.innerHTML = `<div class="d-flex flex-wrap gap-2">${data.labels.map(lb => `
+    <div class="border rounded px-3 py-2 border-${typeColors[lb.label_type] || 'secondary'}">
+      <span class="badge bg-${typeColors[lb.label_type] || 'secondary'} mb-1">
+        <i class="bi ${typeIcons[lb.label_type] || 'bi-patch-check'} me-1"></i>${lb.label_type_name}
+      </span>
+      <div class="fw-semibold small">${lb.label_name}</div>
+      ${lb.issuer_name ? `<div class="text-muted" style="font-size:.78rem;">颁发方：${lb.issuer_name}</div>` : ''}
+      ${lb.valid_until ? `<div class="text-muted" style="font-size:.78rem;">有效期至：${lb.valid_until}</div>` : ''}
+    </div>`).join('')}</div>`;
+})();
+
+// 加载合作案例库（企业画像）
+(async function() {
+  const supplierId = {{ current_user.id }};
+  const res = await fetch(`/fulfillment/api/cases/public/${supplierId}`);
+  const data = await res.json();
+  const body = document.getElementById('caseLibraryBody');
+  if (!body) return;
+  if (!data.success || !data.cases.length) {
+    body.innerHTML = '<p class="text-muted small mb-0">暂无公开案例</p>';
+    return;
+  }
+  body.innerHTML = `<div class="row g-2">${data.cases.map(c => `
+    <div class="col-md-6">
+      <div class="border rounded p-2 small">
+        <div class="fw-semibold">${c.buyer_name_masked}</div>
+        <div class="text-muted">${c.product_category} · ${c.cooperation_time}</div>
+        <div class="text-muted">合同金额：${c.amount_range}</div>
+      </div>
+    </div>`).join('')}</div>`;
+})();
+</script>
+{% endblock %}

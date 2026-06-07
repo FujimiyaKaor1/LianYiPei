@@ -1,0 +1,47 @@
+{% extends "layout/base.html" %}
+
+{% block title %}添加产品 - 链易配{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="bi bi-plus-circle"></i> 添加产品</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">产品名称 *</label>
+                        <input type="text" class="form-control" id="name" name="name" required placeholder="如：电机、电路板、特种钢材">
+                    </div>
+                    <div class="mb-3">
+                        <label for="category" class="form-label">产品类别</label>
+                        <select class="form-select" id="category" name="category">
+                            <option value="">请选择</option>
+                            <option value="机械部件">机械部件</option>
+                            <option value="电子元件">电子元件</option>
+                            <option value="原材料">原材料</option>
+                            <option value="零部件">零部件</option>
+                            <option value="其他">其他</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="industry_code" class="form-label">行业标准编码</label>
+                        <select class="form-select" id="industry_code" name="industry_code">
+                            <option value="">请选择</option>
+                            {% for code, name in industry_codes %}
+                            <option value="{{ code }}">{{ code }} {{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> 添加
+                    </button>
+                    <a href="{{ url_for('enterprise.products') }}" class="btn btn-secondary">取消</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

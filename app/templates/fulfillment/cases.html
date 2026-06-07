@@ -1,0 +1,85 @@
+{% extends "layout/base.html" %}
+
+{% block title %}合作案例库{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-collection me-2"></i>合作案例库</h4>
+    <span class="text-muted small">案例由系统在合作完成后自动生成，您可设置公开/私密</span>
+  </div>
+
+  <div class="alert alert-info small mb-3">
+    <i class="bi bi-info-circle me-1"></i>
+    信用分 ≥ 80 分时，公开案例将在企业画像中全部展示；低于 80 分最多展示 3 条。
+  </div>
+
+  <div class="card">
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0" id="casesTable">
+        <thead class="table-light">
+          <tr>
+            <th>合作方（脱敏）</th>
+            <th>产品类别</th>
+            <th>合作时间</th>
+            <th>金额区间</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="casesBody">
+          <tr><td colspan="6" class="text-center text-muted py-3">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+async function loadCases() {
+  const res = await fetch('/fulfillment/api/cases');
+  const data = await res.json();
+  const tbody = document.getElementById('casesBody');
+
+  if (!data.success || !data.cases.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">暂无案例，完成合作后系统将自动生成</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = data.cases.map(c => `
+    <tr id="case-row-${c.id}">
+      <td>${c.buyer_name_masked || '-'}</td>
+      <td>${c.product_category || '-'}</td>
+      <td>${c.cooperation_time || '-'}</td>
+      <td>${c.amount_range || '-'}</td>
+      <td>
+        ${c.is_public
+          ? '<span class="badge bg-success">公开</span>'
+          : '<span class="badge bg-secondary">私密</span>'}
+      </td>
+      <td>
+        ${c.is_public
+          ? `<button class="btn btn-sm btn-outline-secondary" onclick="toggleCase(${c.id}, false)">设为私密</button>`
+          : `<button class="btn btn-sm btn-outline-success" onclick="toggleCase(${c.id}, true)">设为公开</button>`}
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function toggleCase(caseId, isPublic) {
+  const res = await fetch(`/fulfillment/api/cases/${caseId}/toggle`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ is_public: isPublic }),
+  });
+  const data = await res.json();
+  if (data.success) {
+    loadCases();
+  } else {
+    alert(data.message || '操作失败');
+  }
+}
+
+loadCases();
+</script>
+{% endblock %}

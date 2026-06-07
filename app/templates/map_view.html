@@ -1,0 +1,220 @@
+{% extends "layout/base.html" %}
+{% block title %}地理距离 - 链易配{% endblock %}
+
+{# 高德 JS API 2.0：安全密钥必须在 maps 脚本之前注入（官方要求） #}
+{% block head_scripts %}
+{% if AMAP_JS_KEY and AMAP_SECURITY_JS_CODE %}
+<script>
+  window._AMapSecurityConfig = { securityJsCode: {{ AMAP_SECURITY_JS_CODE | tojson }} };
+</script>
+<script src="https://webapi.amap.com/maps?v=2.0&key={{ AMAP_JS_KEY | urlencode }}"></script>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .map-page-wrap { max-width: 1200px; margin: 0 auto; }
+  .map-hero {
+    background: linear-gradient(135deg, rgba(58,201,160,.12), rgba(110,231,183,.08));
+    border: 1px solid rgba(58,201,160,.25);
+    border-radius: 16px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+  }
+  .map-hero h1 { font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0; }
+  .map-meta { font-size: .875rem; color: #64748b; margin-top: .35rem; }
+  .map-meta strong { color: #3AC9A0; }
+  #map-container {
+    width: 100%;
+    height: min(72vh, 640px);
+    min-height: 360px;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 8px 30px rgba(15,23,42,.06);
+  }
+  @media (max-width: 768px) {
+    #map-container { height: 55vh; min-height: 280px; border-radius: 12px; }
+  }
+  .map-error {
+    padding: 2rem;
+    text-align: center;
+    color: #b45309;
+    background: #fffbeb;
+    border-radius: 12px;
+    border: 1px solid #fde68a;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="map-page-wrap">
+  <div class="map-hero">
+    <h1><i class="bi bi-geo-alt-fill text-success"></i> 厂家与商家位置</h1>
+    <p class="map-meta mb-0" id="map-distance-line">
+      正在加载距离信息…
+    </p>
+  </div>
+
+  {% if not AMAP_JS_KEY or not AMAP_SECURITY_JS_CODE %}
+  <div class="map-error mb-3">
+    请在服务端 <code>.env</code> 中同时配置 <code>AMAP_JS_KEY</code> 与 <code>AMAP_SECURITY_JS_CODE</code> 后重启应用。
+    后端地理编码等 Web 服务请配置 <code>AMAP_SERVICE_KEY</code>（或兼容 <code>AMAP_KEY</code>）。
+  </div>
+  {% endif %}
+
+  <div id="map-container" role="application" aria-label="高德地图"></div>
+  <p class="small text-muted mt-2 mb-0">
+    坐标系为 GCJ-02（国测局）。直线距离由后端 geopy 计算；驾车距离可选调用高德接口。
+  </p>
+</div>
+
+<script>
+  window.__MAP_PAGE__ = {
+    supplierId: {{ supplier_id | tojson }},
+    buyerId: {{ buyer_id | tojson }},
+    mapReady: {{ (AMAP_JS_KEY and AMAP_SECURITY_JS_CODE) | tojson }}
+  };
+</script>
+{% endblock %}
+
+{% block extra_js %}
+{% if AMAP_JS_KEY and AMAP_SECURITY_JS_CODE %}
+<script>
+(function () {
+  if (typeof AMap === 'undefined') {
+    var distEl = document.getElementById('map-distance-line');
+    if (distEl) distEl.innerHTML = '<span class="text-danger">地图脚本未加载，请检查 Key 与安全码配置。</span>';
+    return;
+  }
+
+  var cfg = window.__MAP_PAGE__ || {};
+  var supplierId = cfg.supplierId;
+  var buyerId = cfg.buyerId;
+  var distEl = document.getElementById('map-distance-line');
+
+  function setDistHtml(html) {
+    if (distEl) distEl.innerHTML = html;
+  }
+
+  if (!supplierId || !buyerId) {
+    setDistHtml('<strong>参数缺失</strong>：需要 <code>supplier_id</code> 与有效的 <code>buyer_id</code>。');
+    return;
+  }
+
+  function fetchLoc(id) {
+    return fetch('/api/map/location?enterprise_id=' + encodeURIComponent(id), {
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' }
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
+  function postDistance(a, b) {
+    return fetch('/api/map/distance', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        supplier: { longitude: a.longitude, latitude: a.latitude },
+        buyer: { longitude: b.longitude, latitude: b.latitude },
+        mode: 'straight'
+      })
+    }).then(function (r) { return r.json(); });
+  }
+
+  function thumbHtml(urls) {
+    if (!urls || !urls.length) return '';
+    var u = urls[0];
+    return '<div class="mb-2"><img src="' + u.replace(/"/g, '&quot;') + '" alt="" style="max-width:160px;max-height:88px;border-radius:8px;object-fit:cover;border:1px solid #e2e8f0"/></div>';
+  }
+
+  function infoHtml(role, d) {
+    return (
+      '<div style="min-width:200px;max-width:260px;font-size:13px;line-height:1.45">' +
+      thumbHtml(d.company_images) +
+      '<div style="font-weight:800;color:#0f172a;margin-bottom:4px">' + (d.name || '') +
+      '<span style="font-weight:600;color:#64748b;margin-left:6px">(' + role + ')</span></div>' +
+      '<div style="color:#64748b">' + (d.address || '暂无地址') + '</div>' +
+      (d.contact ? '<div style="margin-top:4px">联系人：' + d.contact + '</div>' : '') +
+      (d.phone ? '<div>电话：' + d.phone + '</div>' : '') +
+      '<div class="small text-muted mt-1">坐标来源：' + (d.coordinate_source || '-') + '</div></div>'
+    );
+  }
+
+  function markerContent(color) {
+    var el = document.createElement('div');
+    el.style.cssText = 'width:18px;height:18px;border-radius:50%;background:' + color +
+      ';border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.2)';
+    return el;
+  }
+
+  Promise.all([fetchLoc(supplierId), fetchLoc(buyerId)])
+    .then(function (pair) {
+      var sup = pair[0];
+      var buy = pair[1];
+      if (sup.error) throw new Error(sup.error);
+      if (buy.error) throw new Error(buy.error);
+
+      var centerLng = (sup.longitude + buy.longitude) / 2;
+      var centerLat = (sup.latitude + buy.latitude) / 2;
+
+      var map = new AMap.Map('map-container', {
+        zoom: 8,
+        center: [centerLng, centerLat],
+        mapStyle: 'amap://styles/light',
+        viewMode: '2D',
+      });
+
+      var mSup = new AMap.Marker({
+        position: [sup.longitude, sup.latitude],
+        title: sup.name,
+        content: markerContent('#1677FF'),
+        offset: new AMap.Pixel(-9, -9),
+      });
+      var mBuy = new AMap.Marker({
+        position: [buy.longitude, buy.latitude],
+        title: buy.name,
+        content: markerContent('#3AC9A0'),
+        offset: new AMap.Pixel(-9, -9),
+      });
+      map.add([mSup, mBuy]);
+
+      var iwSup = new AMap.InfoWindow({ offset: new AMap.Pixel(0, -12), isCustom: false });
+      var iwBuy = new AMap.InfoWindow({ offset: new AMap.Pixel(0, -12), isCustom: false });
+
+      mSup.on('click', function () {
+        iwSup.setContent(infoHtml('厂家', sup));
+        iwSup.open(map, mSup.getPosition());
+      });
+      mBuy.on('click', function () {
+        iwBuy.setContent(infoHtml('商家', buy));
+        iwBuy.open(map, mBuy.getPosition());
+      });
+
+      map.setFitView([mSup, mBuy], false, [48, 48, 48, 48]);
+
+      return postDistance(sup, buy).then(function (dist) {
+        var m = dist.meters;
+        if (typeof m !== 'number') {
+          setDistHtml('距离计算返回异常。');
+          return;
+        }
+        var km = (m / 1000).toFixed(2);
+        setDistHtml(
+          '直线距离约 <strong>' + km + ' km</strong>（' + Math.round(m) + ' m，' +
+          (dist.mode || 'straight') + ' / ' + (dist.source || '') + '）' +
+          ' · <span class="text-muted">蓝色锚点：厂家，绿色锚点：商家</span>'
+        );
+      });
+    })
+    .catch(function (e) {
+      console.error(e);
+      setDistHtml('<span class="text-danger">加载失败：' + (e.message || e) + '</span>');
+    });
+})();
+</script>
+{% endif %}
+{% endblock %}

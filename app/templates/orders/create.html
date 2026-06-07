@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}创建订单 - 链易配{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h4>创建订单</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('orders.create') }}">
+                        <div class="mb-3">
+                            <label for="product_name" class="form-label">产品名称 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="product_name" name="product_name" required>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="quantity" class="form-label">数量 <span class="text-danger">*</span></label>
+                                    <input type="number" class="form-control" id="quantity" name="quantity" min="1" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="unit" class="form-label">单位 <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="unit" name="unit" required>
+                                        <option value="">请选择</option>
+                                        <option value="件">件</option>
+                                        <option value="个">个</option>
+                                        <option value="台">台</option>
+                                        <option value="套">套</option>
+                                        <option value="吨">吨</option>
+                                        <option value="千克">千克</option>
+                                        <option value="米">米</option>
+                                        <option value="平方米">平方米</option>
+                                        <option value="立方米">立方米</option>
+                                        <option value="箱">箱</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="customer_name" class="form-label">客户名称 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="customer_name" name="customer_name" required>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="order_date" class="form-label">订单日期 <span class="text-danger">*</span></label>
+                                    <input type="date" class="form-control" id="order_date" name="order_date" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="delivery_date" class="form-label">预计交货日期</label>
+                                    <input type="date" class="form-control" id="delivery_date" name="delivery_date">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">备注</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('orders.index') }}" class="btn btn-secondary">取消</a>
+                            <button type="submit" class="btn btn-primary">创建订单</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// 设置默认订单日期为今天
+document.getElementById('order_date').valueAsDate = new Date();
+</script>
+{% endblock %}
