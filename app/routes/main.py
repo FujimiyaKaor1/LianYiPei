@@ -240,3 +240,16 @@ def api_enterprise_tags():
             'demand_tags': prof.get('demand_tags', []),
         }
     )
+
+
+@main.route('/<path:path>')
+def spa_catchall(path):
+    """兜底路由：所有未命中的 GET 请求返回 React SPA（支持前端路由刷新）。"""
+    if request.method != 'GET':
+        from flask import abort
+        abort(404)
+    skip_prefixes = ('api/', 'auth/', 'static/', 'admin/', 'login', 'logout', 'favicon')
+    if path.startswith(skip_prefixes):
+        from flask import abort
+        abort(404)
+    return _render_spa()
