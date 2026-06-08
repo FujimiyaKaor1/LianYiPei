@@ -481,7 +481,7 @@ export default function OrderPipeline() {
                               </span>
                             ) : null}
                             {card.status === 'completed' ? (
-                              <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                              <CheckCircle className="w-3.5 h-3.5 text-blue-500" />
                             ) : null}
                           </div>
 

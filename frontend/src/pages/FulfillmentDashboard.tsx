@@ -4,9 +4,10 @@ import { Activity, TrendingUp, Clock, Eye, EyeOff, Loader2, RefreshCw, ChevronUp
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '@/src/context/AuthContext';
+import { useToast } from '@/src/components/ToastProvider';
 import { api, type ActiveFulfillmentItem, type FulfillmentDashboardData, type CaseItem } from '@/src/services/api';
 
-function FulfillmentPipelineCard({ row }: { row: ActiveFulfillmentItem }) {
+const FulfillmentPipelineCard: React.FC<{ row: ActiveFulfillmentItem }> = ({ row }) => {
   const nodes = Array.isArray(row.logistics_nodes) ? row.logistics_nodes : [];
   const steps =
     nodes.length > 0
@@ -85,6 +86,7 @@ function MiniLineChart({ data }: { data: { month: string; score: number }[] }) {
 export default function FulfillmentDashboard() {
   const navigate = useNavigate();
   const { user, loading: authLoading, setIsLoginModalOpen } = useAuth();
+  const { showToast } = useToast();
   const [dashData, setDashData] = useState<FulfillmentDashboardData | null>(null);
   const [cases, setCases] = useState<CaseItem[]>([]);
   const [fetching, setFetching] = useState(false);
@@ -130,7 +132,9 @@ export default function FulfillmentDashboard() {
     try {
       await api.toggleCaseVisibility(c.id, !c.is_public);
       setCases(prev => prev.map(item => item.id === c.id ? { ...item, is_public: !item.is_public } : item));
-    } catch { /* ignore */ }
+    } catch {
+      showToast('操作失败，请重试', 'error');
+    }
   };
 
   if (authLoading || fetching) {
@@ -150,7 +154,7 @@ export default function FulfillmentDashboard() {
   const activeList = dashData.active_fulfillments ?? [];
 
   const dimEntries = Object.entries(dashData.dimensions).filter(([, v]) => v !== 0);
-  const maxDim = Math.max(...dimEntries.map(([, v]) => Math.abs(v)), 1);
+  const maxDim = Math.max(...dimEntries.map(([, v]) => Math.abs(v as number)), 1);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -200,9 +204,10 @@ export default function FulfillmentDashboard() {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {activeList.map(row => (
-              <FulfillmentPipelineCard key={row.id} row={row} />
-            ))}
+            {activeList.map((rawRow) => {
+              const row = rawRow as ActiveFulfillmentItem;
+              return <FulfillmentPipelineCard key={row.id} row={row} />;
+            })}
           </div>
         )}
       </motion.div>
@@ -222,17 +227,20 @@ export default function FulfillmentDashboard() {
         >
           <h3 className="text-sm font-bold mb-4 tracking-tight">信用分维度构成</h3>
           <div className="space-y-3">
-            {dimEntries.map(([label, val]) => (
+            {dimEntries.map(([label, val]) => {
+              const v = val as number;
+              return (
               <div key={label} className="flex items-center gap-3">
                 <span className="w-16 text-xs text-neutral-500 shrink-0">{label}</span>
                 <div className="flex-1 h-2 bg-neutral-100 rounded-full overflow-hidden">
-                  <div className={cn('h-full rounded-full', val >= 0 ? 'bg-black' : 'bg-red-400')} style={{ width: `${Math.min(100, Math.abs(val) / maxDim * 100)}%` }} />
+                  <div className={cn('h-full rounded-full', v >= 0 ? 'bg-black' : 'bg-red-400')} style={{ width: `${Math.min(100, Math.abs(v) / maxDim * 100)}%` }} />
                 </div>
-                <span className={cn('text-xs font-bold w-10 text-right', val >= 0 ? 'text-black' : 'text-red-500')}>
-                  {val >= 0 ? '+' : ''}{val.toFixed(1)}
+                <span className={cn('text-xs font-bold w-10 text-right', v >= 0 ? 'text-black' : 'text-red-500')}>
+                  {v >= 0 ? '+' : ''}{v.toFixed(1)}
                 </span>
               </div>
-            ))}
+              );
+            })}
           </div>
         </motion.div>
       </div>
@@ -249,15 +257,15 @@ export default function FulfillmentDashboard() {
             {dashData.history.map(h => (
               <div key={String(h.id)} className="flex items-center justify-between py-3">
                 <div className="flex items-center gap-3">
-                  <div className={cn('w-7 h-7 rounded-full flex items-center justify-center', h.change_value >= 0 ? 'bg-green-50' : 'bg-red-50')}>
-                    {h.change_value >= 0 ? <ChevronUp className="w-4 h-4 text-green-600" /> : <ChevronDown className="w-4 h-4 text-red-500" />}
+                  <div className={cn('w-7 h-7 rounded-full flex items-center justify-center', h.change_value >= 0 ? 'bg-blue-50' : 'bg-red-50')}>
+                    {h.change_value >= 0 ? <ChevronUp className="w-4 h-4 text-blue-600" /> : <ChevronDown className="w-4 h-4 text-red-500" />}
                   </div>
                   <div>
                     <p className="text-xs font-medium">{h.reason || h.change_type}</p>
                     <p className="text-[10px] text-neutral-400">{h.created_at}</p>
                   </div>
                 </div>
-                <span className={cn('text-sm font-bold', h.change_value >= 0 ? 'text-green-600' : 'text-red-500')}>
+                <span className={cn('text-sm font-bold', h.change_value >= 0 ? 'text-blue-600' : 'text-red-500')}>
                   {h.change_value >= 0 ? '+' : ''}{h.change_value}
                 </span>
               </div>

@@ -30,9 +30,9 @@ export function Layout() {
   };
 
   return (
-    <div className="flex min-h-screen w-full bg-[#F5F5F7]">
+    <div className="flex min-h-screen w-full bg-canvas-soft">
       <Sidebar />
-      <main className="flex flex-1 flex-col min-w-0">
+      <main className="flex flex-1 flex-col min-w-0 min-h-screen">
         <TopBar title={getTitle(location.pathname)} />
         <div className="w-full p-4 md:p-6 pb-12 min-h-0">
           <Outlet />

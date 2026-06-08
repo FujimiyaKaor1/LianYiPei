@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Search, 
   Plus,
@@ -11,6 +12,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '@/src/context/AuthContext';
+import { useToast } from '@/src/components/ToastProvider';
 import { api, type GroupPurchaseItem, NETWORK_ERROR_MESSAGE } from '@/src/services/api';
 
 // ── 工具函数 ──────────────────────────────────────────────────────────────
@@ -111,6 +113,8 @@ function getAvatarsForGp(gp: GroupPurchaseItem) {
 
 export default function GroupPurchase() {
   const { user, loading: authLoading, setIsLoginModalOpen } = useAuth();
+  const { showToast } = useToast();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [items, setItems] = useState<GroupPurchaseItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -216,7 +220,10 @@ export default function GroupPurchase() {
             <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
           </button>
           
-          <button className="bg-black text-white px-5 py-2.5 rounded-lg text-xs font-bold hover:bg-neutral-800 transition-all flex items-center gap-2 shadow-[0_4px_14px_0_rgb(0,0,0,0.1)] shrink-0">
+          <button
+            onClick={() => showToast('拼单创建功能即将上线', 'info')}
+            className="bg-black text-white px-5 py-2.5 rounded-lg text-xs font-bold hover:bg-neutral-800 transition-all flex items-center gap-2 shadow-[0_4px_14px_0_rgb(0,0,0,0.1)] shrink-0"
+          >
             <Plus className="w-3.5 h-3.5" />
             发起新拼单
           </button>
@@ -242,6 +249,7 @@ export default function GroupPurchase() {
           <p className="text-xs text-neutral-400 text-center mb-6">当前没有开放中的拼单。发起新拼单并写入数据库后将在此展示。</p>
           <button
             type="button"
+            onClick={() => showToast('拼单创建功能即将上线', 'info')}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-black text-white text-xs font-bold hover:bg-neutral-800 shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -328,7 +336,10 @@ export default function GroupPurchase() {
                         {deadline.text === '已截止' ? '已截止' : `距截止 ${deadline.text}`}
                       </div>
                       <div className="flex items-center gap-3">
-                        <button className="text-[13px] font-bold text-neutral-500 hover:text-black transition-colors">
+                        <button
+                          onClick={() => navigate(`/group-purchase/${gp.id}`)}
+                          className="text-[13px] font-bold text-neutral-500 hover:text-black transition-colors"
+                        >
                           查看详情
                         </button>
                         <button 
@@ -366,7 +377,10 @@ export default function GroupPurchase() {
             基于 Lianyi 平台全球供应链数据，为您提供最具参考价值的采购决策建议。本季度原材料成本预计下降 4.3% ...
           </p>
           <div className="pt-2">
-            <button className="bg-white/10 hover:bg-white/20 text-white border border-white/10 px-6 py-2.5 rounded-lg font-bold text-xs transition-all">
+            <button
+              onClick={() => showToast('洞察报告即将上线', 'info')}
+              className="bg-white/10 hover:bg-white/20 text-white border border-white/10 px-6 py-2.5 rounded-lg font-bold text-xs transition-all"
+            >
               提取完整洞察
             </button>
           </div>

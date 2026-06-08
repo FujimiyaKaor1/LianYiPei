@@ -56,7 +56,7 @@ export default function RuleConfigPage() {
     let ok = true;
     for (const [idStr, val] of Object.entries(pendingChanges)) {
       const id = parseInt(idStr);
-      const r = await apiRules.updateCreditRule(id, { score_change: val, change_reason: changeReason.trim() });
+      const r = await apiRules.updateCreditRule(id, { score_change: val as number, change_reason: changeReason.trim() });
       if (!(r as { success?: boolean }).success) {
         ok = false;
         showToast(`规则 ${id} 更新失败`, 'error');
@@ -220,7 +220,7 @@ export default function RuleConfigPage() {
                         />
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`text-sm font-semibold ${pending != null ? (pending >= 0 ? 'text-green-600' : 'text-red-500') : 'text-neutral-900'}`}>
+                        <span className={`text-sm font-semibold ${pending != null ? (pending >= 0 ? 'text-blue-600' : 'text-red-500') : 'text-neutral-900'}`}>
                           {pending != null ? pending : rule.score_change}
                           {pending != null && pending !== rule.score_change && (
                             <span className="text-xs ml-1 text-neutral-400">

@@ -42,6 +42,7 @@ import {
   type EnterpriseProfile,
 } from '@/src/services/api';
 import { useAuth } from '@/src/context/AuthContext';
+import { useToast } from '@/src/components/ToastProvider';
 import { motion, AnimatePresence } from 'motion/react';
 import { BusinessCardModal, type BusinessCardData } from '@/src/components/BusinessCardModal';
 import { FavoritesContent } from '@/src/pages/Favorites';
@@ -140,7 +141,7 @@ function extractEnterpriseId(message: SalesMessageItem): number | null {
 function getRiskStyle(risk: CreditRiskResult | null) {
   if (!risk) return { value: '评估中', text: '正在计算风险等级', color: 'text-neutral-500' };
   if (risk.risk_level === '低风险') {
-    return { value: '风险较低', text: `信用评级：${risk.level}（${Math.round(risk.credit_score)}分）`, color: 'text-green-600' };
+    return { value: '风险较低', text: `信用评级：${risk.level}（${Math.round(risk.credit_score)}分）`, color: 'text-blue-600' };
   }
   if (risk.risk_level === '高风险') {
     return { value: '风险偏高', text: `信用评级：${risk.level}（${Math.round(risk.credit_score)}分）`, color: 'text-red-500' };
@@ -429,6 +430,7 @@ function chatItemToSalesMessageLike(item: ChatThreadItem): SalesMessageItem {
 
 export default function SalesConsole() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -1195,9 +1197,9 @@ export default function SalesConsole() {
                 safeActiveInquiryChat.status === 'active'
                   ? 'bg-blue-50 text-blue-600'
                   : safeActiveInquiryChat.status === 'quoted'
-                  ? 'bg-green-50 text-green-600'
+                  ? 'bg-blue-50 text-blue-600'
                   : safeActiveInquiryChat.status === 'contracted'
-                  ? 'bg-emerald-100 text-emerald-700'
+                  ? 'bg-blue-100 text-blue-700'
                   : 'bg-neutral-100 text-neutral-500',
               )}>
                 {safeActiveInquiryChat.status === 'active' ? '询价中' : safeActiveInquiryChat.status === 'quoted' ? '已报价' : safeActiveInquiryChat.status === 'contracted' ? '已合作' : '已关闭'}
@@ -1440,18 +1442,18 @@ export default function SalesConsole() {
                     if (isIntentQuoteSent && intentQuoteData) {
                       return (
                         <div key={msg.id} className="flex justify-center my-3">
-                          <div className="w-full max-w-sm rounded-2xl border-2 border-emerald-200 bg-gradient-to-br from-emerald-50 to-white shadow-lg overflow-hidden">
-                            <div className="bg-emerald-500 px-4 py-2 flex items-center justify-between">
+                          <div className="w-full max-w-sm rounded-2xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-lg overflow-hidden">
+                            <div className="bg-blue-500 px-4 py-2 flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <FileText className="w-4 h-4 text-white" />
                                 <span className="text-sm font-bold text-white">意向报价单</span>
                               </div>
-                              <span className="text-[10px] text-emerald-100">待对方确认</span>
+                              <span className="text-[10px] text-blue-100">待对方确认</span>
                             </div>
                             <div className="p-4 space-y-3">
                               <div className="flex items-start gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
-                                  <Building className="w-5 h-5 text-emerald-600" />
+                                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                                  <Building className="w-5 h-5 text-blue-600" />
                                 </div>
                                 <div className="flex-1">
                                   <p className="text-sm font-bold text-neutral-900">
@@ -1460,7 +1462,7 @@ export default function SalesConsole() {
                                   <p className="text-xs text-neutral-500 mt-0.5">发起了意向报价</p>
                                 </div>
                               </div>
-                              <div className="bg-white rounded-xl p-3 space-y-2 border border-emerald-100">
+                              <div className="bg-white rounded-xl p-3 space-y-2 border border-blue-100">
                                 {msg.content.split('\n').slice(1).filter(line => line.trim()).map((line, i) => {
                                   const [label, ...valueParts] = line.split('：');
                                   const value = valueParts.join('：');
@@ -1484,11 +1486,14 @@ export default function SalesConsole() {
                                             void loadInquiryMessages(activeInquiryChatId);
                                           }
                                         })
-                                        .catch(() => {})
+                                        .catch((err) => {
+                                          showToast('同意报价失败，请重试', 'error');
+                                          console.error('acceptIntentQuote failed:', err);
+                                        })
                                         .finally(() => setSellerAcceptLoading(false));
                                     }}
                                     disabled={sellerAcceptLoading}
-                                    className="flex-1 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-1.5"
+                                    className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-1.5"
                                   >
                                     {sellerAcceptLoading ? (
                                       <><Loader2 className="w-3.5 h-3.5 animate-spin" /> 处理中...</>
@@ -1504,6 +1509,10 @@ export default function SalesConsole() {
                                           if (activeInquiryChatId) {
                                             void loadInquiryMessages(activeInquiryChatId);
                                           }
+                                        })
+                                        .catch((err) => {
+                                          showToast('操作失败，请重试', 'error');
+                                          console.error('rejectIntentQuote failed:', err);
                                         });
                                     }}
                                     className="px-4 py-2 border border-neutral-200 text-neutral-600 rounded-xl text-sm font-medium hover:bg-neutral-50 transition-colors"
@@ -1597,7 +1606,7 @@ export default function SalesConsole() {
                           </button>
                         </div>
                       </div>
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shrink-0">
                         <Zap className="w-4 h-4 text-white" />
                       </div>
                     </div>
@@ -1626,14 +1635,14 @@ export default function SalesConsole() {
                 )}
                 {/* 名片交换状态提示 */}
                 {canExchangeCard && !showCardModal && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-100 text-xs text-emerald-700">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-700">
                     <IdCard className="w-4 h-4 shrink-0" />
                     <span>卖方已同意意向报价，可交换名片达成合作</span>
                     <button
                       type="button"
                       onClick={() => void handleExchangeCard()}
                       disabled={cardExchangeLoading}
-                      className="ml-auto shrink-0 flex items-center gap-1 px-3 py-1 bg-emerald-600 text-white rounded-lg text-[10px] font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                      className="ml-auto shrink-0 flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded-lg text-[10px] font-bold hover:bg-blue-700 transition-colors disabled:opacity-50"
                     >
                       {cardExchangeLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <IdCard className="w-3 h-3" />}
                       {cardExchangeLoading ? '交换中…' : '交换名片'}
@@ -1704,7 +1713,7 @@ export default function SalesConsole() {
                         }
                         setShowIntentQuoteModal(true);
                       }}
-                      className="shrink-0 flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                      className="shrink-0 flex items-center gap-1.5 rounded-xl bg-blue-50 border border-blue-200 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
                     >
                       <DollarSign className="w-4 h-4" />
                       发起意向报价
@@ -1727,7 +1736,7 @@ export default function SalesConsole() {
                   label: '匹配度',
                   value: `${displayMatchPercent}%`,
                   icon: ShieldCheck,
-                  color: displayMatchPercent >= 75 ? 'text-green-500' : 'text-amber-500',
+                  color: displayMatchPercent >= 75 ? 'text-blue-500' : 'text-amber-500',
                   progress: displayMatchPercent,
                   loading: insightLoading,
                 },
@@ -1753,7 +1762,7 @@ export default function SalesConsole() {
                       {item.loading ? '--' : item.value}
                     </span>
                     {item.icon && <item.icon className={cn('w-5 h-5', item.color)} />}
-                    {item.sub && <span className="text-[10px] text-green-500 font-bold">{item.sub}</span>}
+                    {item.sub && <span className="text-[10px] text-blue-500 font-bold">{item.sub}</span>}
                   </div>
                   {item.subText && <p className="text-[10px] text-neutral-400 mt-2">{item.subText}</p>}
                   {item.label === '匹配度' && !item.loading && (
@@ -1775,16 +1784,16 @@ export default function SalesConsole() {
               <button
                 type="button"
                 onClick={handleViewSavedCards}
-                className="flex items-center gap-3 p-4 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-2xl hover:from-emerald-100 hover:to-teal-100 transition-all"
+                className="flex items-center gap-3 p-4 bg-gradient-to-r from-blue-50 to-teal-50 border border-blue-100 rounded-2xl hover:from-blue-100 hover:to-teal-100 transition-all"
               >
-                <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
                   <IdCard className="w-5 h-5 text-white" />
                 </div>
                 <div className="text-left flex-1">
-                  <div className="text-sm font-bold text-emerald-700">名片已交换</div>
-                  <div className="text-[10px] text-emerald-600">点击查看双方名片</div>
+                  <div className="text-sm font-bold text-blue-700">名片已交换</div>
+                  <div className="text-[10px] text-blue-600">点击查看双方名片</div>
                 </div>
-                <ChevronRight className="w-4 h-4 text-emerald-400" />
+                <ChevronRight className="w-4 h-4 text-blue-400" />
               </button>
             )}
 
@@ -1808,7 +1817,10 @@ export default function SalesConsole() {
             <h2 className="font-bold text-lg">意向合作漏斗</h2>
             <p className="text-xs text-neutral-400 mt-1">当前进行中的 48 个合作项目</p>
           </div>
-          <button className="text-xs font-bold text-neutral-400 hover:text-primary transition-colors flex items-center gap-1">
+          <button
+            onClick={() => showToast('全部合作动态即将上线', 'info')}
+            className="text-xs font-bold text-neutral-400 hover:text-primary transition-colors flex items-center gap-1"
+          >
             全部动态 <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -1816,7 +1828,7 @@ export default function SalesConsole() {
           {[
             { name: '某大型通讯企业', project: '5G 基站精密连接器采购', status: '意向报价中', amount: '¥ 458,000.00', date: '截止日期：明天', icon: Factory, color: 'text-blue-500', bg: 'bg-blue-50' },
             { name: '东莞泰科电子', project: '高频线束定制打样', status: '线下打样中', amount: '待定', date: '进度：样品已寄出', icon: Cpu, color: 'text-orange-500', bg: 'bg-orange-50' },
-            { name: '华南仪器厂', project: '年度传感模块框架协议', status: '待签电子合同', amount: '¥ 2,240,000.00', date: '生效期：2024Q3', icon: FileText, color: 'text-green-500', bg: 'bg-green-50' },
+            { name: '华南仪器厂', project: '年度传感模块框架协议', status: '待签电子合同', amount: '¥ 2,240,000.00', date: '生效期：2024Q3', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-50' },
           ].map((item, i) => (
             <div key={i} className="group flex items-center justify-between gap-3 p-4 hover:bg-surface-container-low rounded-2xl transition-all border border-transparent hover:border-neutral-100">
               <div className="flex items-center gap-4 min-w-0 flex-1 cursor-pointer">
@@ -1866,10 +1878,13 @@ export default function SalesConsole() {
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-neutral-400">本月回款：</span>
-                <span className="font-bold text-green-400">¥ 842,500.00</span>
+                <span className="font-bold text-blue-400">¥ 842,500.00</span>
               </div>
             </div>
-            <button className="mt-8 w-full py-4 bg-white text-primary rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-neutral-100 transition-colors">
+            <button
+              onClick={() => showToast('SaaS订单系统同步功能即将上线', 'info')}
+              className="mt-8 w-full py-4 bg-white text-primary rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-neutral-100 transition-colors"
+            >
               <RefreshCw className="w-4 h-4" />
               一键同步 SaaS 订单系统
             </button>
@@ -1885,7 +1900,11 @@ export default function SalesConsole() {
               { icon: Award, label: '优质商机' },
               { icon: Zap, label: 'AI 营销' },
             ].map((item, i) => (
-              <button key={i} className="p-4 bg-surface-container-low rounded-2xl flex flex-col gap-2 items-center text-center hover:bg-neutral-100 transition-colors group">
+              <button
+                key={i}
+                onClick={() => showToast(`${item.label}功能即将上线`, 'info')}
+                className="p-4 bg-surface-container-low rounded-2xl flex flex-col gap-2 items-center text-center hover:bg-neutral-100 transition-colors group"
+              >
                 <item.icon className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
                 <span className="text-[10px] font-bold">{item.label}</span>
               </button>

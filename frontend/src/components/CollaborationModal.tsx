@@ -653,7 +653,7 @@ export function CollaborationModal({
               className={cn(
                 'px-4 py-3 rounded-2xl shadow-lg text-sm font-semibold flex items-center gap-2 border',
                 toast.type === 'success'
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  ? 'bg-blue-50 text-blue-800 border-blue-200'
                   : 'bg-red-50 text-red-800 border-red-200',
               )}
               role="status"

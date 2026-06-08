@@ -110,11 +110,11 @@ export default function DashboardPage() {
           color="bg-blue-50"
         />
         <StatCard
-          icon={<PackageSearch className="w-5 h-5 text-green-600" />}
+          icon={<PackageSearch className="w-5 h-5 text-blue-600" />}
           label="供需发布"
           value={`${stats?.supply_count ?? '-'}/${stats?.demand_count ?? '-'}`}
           sub="供应/需求"
-          color="bg-green-50"
+          color="bg-blue-50"
         />
         <StatCard
           icon={<AlertTriangle className="w-5 h-5 text-red-500" />}
@@ -123,10 +123,10 @@ export default function DashboardPage() {
           color="bg-red-50"
         />
         <StatCard
-          icon={<Activity className="w-5 h-5 text-purple-600" />}
+          icon={<Activity className="w-5 h-5 text-blue-600" />}
           label="交易记录"
           value={stats?.transaction_count ?? '-'}
-          color="bg-purple-50"
+          color="bg-blue-50"
         />
       </div>
 
@@ -149,7 +149,7 @@ export default function DashboardPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-neutral-500">休眠率</span>
-                <span className={`text-sm font-semibold ${quality.dormant_rate > 20 ? 'text-red-500' : 'text-green-600'}`}>
+                <span className={`text-sm font-semibold ${quality.dormant_rate > 20 ? 'text-red-500' : 'text-blue-600'}`}>
                   {quality.dormant_rate}%
                 </span>
               </div>
@@ -178,7 +178,7 @@ export default function DashboardPage() {
           {scheduler ? (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${scheduler.running ? 'bg-green-500' : 'bg-red-500'}`} />
+                <span className={`w-2 h-2 rounded-full ${scheduler.running ? 'bg-blue-500' : 'bg-red-500'}`} />
                 <span className="text-sm font-medium">{scheduler.running ? '调度器运行中' : '调度器已停止'}</span>
               </div>
               {scheduler.jobs.map((job) => (

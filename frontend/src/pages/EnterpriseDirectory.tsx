@@ -237,7 +237,7 @@ export default function EnterpriseDirectory() {
                       <h3 className="text-lg font-semibold text-neutral-800 truncate group-hover:text-neutral-900 transition-colors" title={ent.name}>
                         {ent.name}
                       </h3>
-                      <div className="shrink-0 bg-emerald-50 text-emerald-600 px-2.5 py-0.5 rounded-full font-bold text-[10px] tracking-tight uppercase">
+                      <div className="shrink-0 bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full font-bold text-[10px] tracking-tight uppercase">
                         信用 {Math.round(ent.credit_score)}
                       </div>
                     </div>

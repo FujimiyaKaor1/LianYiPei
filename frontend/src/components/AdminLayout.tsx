@@ -43,17 +43,17 @@ export function AdminLayout() {
   };
 
   return (
-    <div className="flex min-h-screen w-full bg-[#F5F5F7]">
-      <aside className="w-64 h-screen sticky top-0 flex-shrink-0 flex flex-col border-r border-gray-200 bg-white">
-        <div className="h-16 flex-shrink-0 flex items-center px-6 border-b border-gray-100">
-          <LayoutDashboard className="w-5 h-5 mr-2 text-neutral-700" />
-          <h1 className="text-lg font-black tracking-tighter text-primary">链易配</h1>
-          <span className="ml-2 text-[9px] text-neutral-400 font-medium tracking-widest uppercase">
+    <div className="flex min-h-screen w-full bg-canvas-soft">
+      <aside className="sidebar-width h-screen sticky top-0 flex-shrink-0 flex flex-col border-r border-border bg-canvas">
+        <div className="h-16 flex-shrink-0 flex items-center px-5 border-b border-border">
+          <LayoutDashboard className="w-5 h-5 mr-2 text-ink-soft" />
+          <h1 className="text-lg font-bold tracking-tighter text-brand">链易配</h1>
+          <span className="ml-2 text-[9px] text-ink-muted font-medium tracking-widest uppercase">
             管理后台
           </span>
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
           {adminNavItems.map((item) => (
             <NavLink
               key={item.path + item.label}
@@ -61,27 +61,27 @@ export function AdminLayout() {
               end={item.path === '/admin/dashboard'}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200',
+                  'flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-150 text-sm',
                   isActive
-                    ? 'bg-neutral-900 text-white font-bold shadow-sm'
-                    : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900',
+                    ? 'bg-ink text-on-brand font-semibold shadow-elevation-1'
+                    : 'text-ink-soft hover:bg-canvas-muted hover:text-ink',
                 )
               }
             >
               <item.icon className="w-5 h-5" />
-              <span className="text-sm">{item.label}</span>
+              <span>{item.label}</span>
             </NavLink>
           ))}
         </nav>
 
-        <div className="flex-shrink-0 p-4 border-t border-gray-100">
+        <div className="flex-shrink-0 p-3 border-t border-border">
           <button
             type="button"
             onClick={() => !user && !loading && setIsLoginModalOpen(true)}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left hover:bg-neutral-100 transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left hover:bg-canvas-muted transition-colors"
             disabled={loading}
           >
-            <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-bold">
+            <div className="w-9 h-9 rounded-full bg-brand/10 text-brand flex items-center justify-center text-sm font-bold">
               {loading ? '…' : initial}
             </div>
             <div className="min-w-0 flex-1">

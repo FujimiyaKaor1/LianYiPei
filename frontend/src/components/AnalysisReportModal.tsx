@@ -30,7 +30,7 @@ export function AnalysisReportModal({ open, onClose }: AnalysisReportModalProps)
     setRefreshing(true);
     try {
       // 获取企业列表数据
-      const data = await api.getEnterpriseDirectory({ limit: 1000 });
+      const data = await api.fetchEnterpriseDirectory({ limit: 1000 });
       const enterprises = data.enterprises || [];
       
       // 计算统计数据
@@ -86,7 +86,7 @@ export function AnalysisReportModal({ open, onClose }: AnalysisReportModalProps)
         {/* 头部 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center">
               <Activity className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -125,10 +125,10 @@ export function AnalysisReportModal({ open, onClose }: AnalysisReportModalProps)
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-neutral-100 p-4 bg-green-50/50">
+                <div className="rounded-xl border border-neutral-100 p-4 bg-blue-50/50">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                      <CheckCircle className="w-5 h-5 text-green-600" />
+                    <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                      <CheckCircle className="w-5 h-5 text-blue-600" />
                     </div>
                     <div>
                       <p className="text-xs text-neutral-500">正常企业</p>
@@ -175,7 +175,7 @@ export function AnalysisReportModal({ open, onClose }: AnalysisReportModalProps)
                 <h3 className="text-sm font-bold text-neutral-800 mb-3">状态分类说明</h3>
                 <div className="space-y-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-3 h-3 rounded-full bg-green-500" />
+                    <div className="w-3 h-3 rounded-full bg-blue-500" />
                     <span className="text-xs text-neutral-600">正常企业：信用分 ≥ 60分，经营状态良好</span>
                   </div>
                   <div className="flex items-center gap-3">

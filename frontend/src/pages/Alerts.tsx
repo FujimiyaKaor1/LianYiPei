@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Bell,
   ShieldAlert,
@@ -19,6 +20,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '@/src/context/AuthContext';
+import { useToast } from '@/src/components/ToastProvider';
 import { api, type AlertData } from '@/src/services/api';
 
 // ── 工具函数 ──────────────────────────────────────────────────────────────
@@ -87,6 +89,8 @@ function MiniBarChart({ data }: { data: number[] }) {
 
 export default function Alerts() {
   const { user, loading: authLoading, setIsLoginModalOpen } = useAuth();
+  const { showToast } = useToast();
+  const navigate = useNavigate();
   const [alerts, setAlerts] = useState<AlertData[]>([]);
   const [fetching, setFetching] = useState(false);
   const [loadIssue, setLoadIssue] = useState(false);
@@ -226,7 +230,7 @@ export default function Alerts() {
             </div>
           ) : filteredAlerts.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-center">
-              <CheckCircle2 className="w-8 h-8 text-emerald-400 mb-2" />
+              <CheckCircle2 className="w-8 h-8 text-blue-400 mb-2" />
               <p className="text-xs text-neutral-400 font-medium">暂无预警消息</p>
             </div>
           ) : (
@@ -385,14 +389,25 @@ export default function Alerts() {
             {/* 底部操作栏 */}
             <div className="px-8 py-4 border-t border-neutral-100 bg-[#fafafa] shrink-0 flex justify-between items-center">
               <div className="flex items-center gap-3">
-                <button className="px-4 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-semibold text-neutral-600 hover:border-neutral-400 hover:text-black transition-all">
+                <button
+                  onClick={() => {
+                    if (activeAlert) showToast(`预警 WRN-${String(activeAlert.id).padStart(8, '0')} 已标记为已知晓`, 'success');
+                  }}
+                  className="px-4 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-semibold text-neutral-600 hover:border-neutral-400 hover:text-black transition-all"
+                >
                   已知晓预警
                 </button>
-                <button className="px-4 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-semibold text-neutral-600 hover:border-neutral-400 hover:text-black transition-all">
+                <button
+                  onClick={() => showToast('数据申诉功能即将上线', 'info')}
+                  className="px-4 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-semibold text-neutral-600 hover:border-neutral-400 hover:text-black transition-all"
+                >
                   发起数据申诉
                 </button>
               </div>
-              <button className="flex items-center gap-2 px-5 py-2 bg-black text-white text-xs font-bold rounded-lg hover:bg-neutral-800 transition-all shadow-[0_4px_14px_0_rgb(0,0,0,0.1)]">
+              <button
+                onClick={() => navigate('/quote-pool')}
+                className="flex items-center gap-2 px-5 py-2 bg-black text-white text-xs font-bold rounded-lg hover:bg-neutral-800 transition-all shadow-[0_4px_14px_0_rgb(0,0,0,0.1)]"
+              >
                 <Zap className="w-3.5 h-3.5 fill-white" />
                 一键生成意向报价去接单
               </button>

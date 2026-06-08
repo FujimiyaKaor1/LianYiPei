@@ -14,8 +14,10 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
+import { useToast } from '@/src/components/ToastProvider';
 import { api, ApiError, type UserSettingsData, NETWORK_ERROR_MESSAGE } from '@/src/services/api';
 export default function Settings() {
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState(0);
   const [data, setData] = useState<UserSettingsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,10 +62,10 @@ export default function Settings() {
     setIsSaving(true);
     try {
       await api.updateUserSettings(formData);
-      alert('设置已成功保存！');
+      showToast('设置已成功保存！', 'success');
       setData(prev => ({ ...prev!, ...formData }));
     } catch (error) {
-      alert(error instanceof Error ? error.message : '保存失败');
+      showToast(error instanceof Error ? error.message : '保存失败', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -147,6 +149,7 @@ export default function Settings() {
         await api.logout();
         window.location.href = '/login';
       } catch (err) {
+        showToast('退出登录失败，请重试', 'error');
         console.error(err);
       }
     }
@@ -271,7 +274,7 @@ export default function Settings() {
               <h3 className="text-xl font-bold">安全设置</h3>
               <div className="bg-white rounded-[2rem] border border-neutral-100 shadow-sm divide-y divide-neutral-50">
                 {[
-                  { title: '双重身份验证', desc: '开启后，登录时需要验证码。', status: '已开启', color: 'text-green-500' },
+                  { title: '双重身份验证', desc: '开启后，登录时需要验证码。', status: '已开启', color: 'text-blue-500' },
                   { title: '登录日志', desc: '查看最近的账户登录活动。', status: '查看', color: 'text-black font-bold' },
                   { title: 'API 密钥管理', desc: '管理用于外部集成的 API 密钥。', status: '管理', color: 'text-black font-bold' },
                 ].map((item, i) => (
@@ -344,7 +347,7 @@ export default function Settings() {
                   {bindMsg && (
                     <p className={cn(
                       'text-xs font-medium px-3 py-2 rounded-lg',
-                      bindMsg.includes('成功') ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'
+                      bindMsg.includes('成功') ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-red-50 text-red-600 border border-red-100'
                     )}>
                       {bindMsg}
                     </p>
@@ -378,7 +381,7 @@ export default function Settings() {
                     'text-xs font-medium whitespace-pre-wrap break-all',
                     wechatTestFeedback === 'error' && 'text-red-500',
                     wechatTestFeedback === 'warn' && 'text-amber-600',
-                    wechatTestFeedback === 'ok' && 'text-green-600',
+                    wechatTestFeedback === 'ok' && 'text-blue-600',
                     wechatTestFeedback === null && 'text-neutral-600',
                   )}>
                     {wechatMsg}

@@ -253,7 +253,7 @@ export function LoginModal() {
             </form>
           ) : registerSuccess ? (
             <div className="space-y-4">
-              <p className="text-sm text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-3">
+              <p className="text-sm text-blue-800 bg-blue-50 border border-blue-100 rounded-xl px-3 py-3">
                 {registerSuccess}
               </p>
               <button

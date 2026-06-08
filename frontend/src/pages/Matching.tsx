@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/src/components/ToastProvider';
 import {
   Search,
   ChevronRight,
@@ -15,6 +16,7 @@ import {
   ArrowRightLeft,
   Sparkles,
   Brain,
+  Leaf,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
@@ -148,6 +150,7 @@ function SkeletonCard() {
 
 export default function Matching() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const { user, setIsLoginModalOpen } = useAuth();
   const demoTimersRef = useRef<{ t1?: ReturnType<typeof setTimeout>; t2?: ReturnType<typeof setTimeout> }>({});
 
@@ -160,6 +163,7 @@ export default function Matching() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorText, setErrorText] = useState('');
   const [algorithmMode, setAlgorithmMode] = useState<'rule' | 'deep_learning'>('rule');
+  const [greenOnly, setGreenOnly] = useState(false);
   const [modelChoice, setModelChoice] = useState<'qwen' | 'deepseek'>(getStoredModelChoice());
   const [isBasicMatch, setIsBasicMatch] = useState(false);
   
@@ -369,8 +373,21 @@ export default function Matching() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button className="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 transition-colors rounded-lg text-xs font-semibold">
+          <button
+            onClick={() => showToast('匹配算法参数调优将根据历史数据自动推荐最佳权重，此功能即将上线', 'info')}
+            className="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 transition-colors rounded-lg text-xs font-semibold"
+          >
             参数调优
+          </button>
+          <button
+            onClick={() => setGreenOnly(!greenOnly)}
+            className={cn(
+              'px-4 py-2 border rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5',
+              greenOnly ? 'bg-success-soft text-success border-success/30' : 'bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50',
+            )}
+          >
+            <Leaf className="w-3.5 h-3.5" />
+            绿色优先
           </button>
           <button 
             onClick={handleSearch}
@@ -454,7 +471,7 @@ export default function Matching() {
                         <h4 className="font-semibold text-[13px] truncate leading-tight tracking-tight mb-1">{item.name}</h4>
                         <div className="flex flex-wrap gap-1">
                           {(item.tags || []).filter(Boolean).slice(0, 3).map((tag, idx) => (
-                            <span key={idx} className={cn(
+                            <span key={`${tag}-${idx}`} className={cn(
                               "px-1 py-0.5 text-[9px] font-medium rounded-sm",
                               isActive ? "bg-white/10 text-white/90" : "bg-neutral-100 text-neutral-600"
                             )}>
@@ -486,7 +503,7 @@ export default function Matching() {
                          产能利用率 <span className={cn(isActive ? "text-white font-semibold" : "text-neutral-900 font-semibold")}>{utilization}%</span>
                        </span>
                        <span className={cn("flex items-center gap-1.5")}>
-                         <div className={cn("w-1.5 h-1.5 rounded-full", isAmple ? (isActive ? "bg-emerald-400" : "bg-emerald-500") : (isActive ? "bg-amber-400" : "bg-amber-500"))}></div>
+                         <div className={cn("w-1.5 h-1.5 rounded-full", isAmple ? (isActive ? "bg-blue-400" : "bg-blue-500") : (isActive ? "bg-amber-400" : "bg-amber-500"))}></div>
                          <span className={cn(isActive ? "text-white/90" : "text-neutral-600")}>{isAmple ? '近期充裕' : '排期较紧'}</span>
                        </span>
                     </div>
@@ -615,7 +632,7 @@ export default function Matching() {
                     <div className="grid grid-cols-6 gap-2">
                       {getCapacityHeatmap(Number(activeSupplier.id)).map((status, idx) => (
                         <motion.div 
-                          key={idx}
+                          key={`cap-day-${idx}`}
                           initial={{ opacity: 0, scale: 0.9 }}
                           animate={{ opacity: 1, scale: 1 }}
                           transition={{ delay: idx * 0.01 }}

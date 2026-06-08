@@ -93,7 +93,7 @@ export default function CapacityCalendar() {
   const getColor = (util: number) => {
     if (util >= 80) return 'bg-red-100 text-red-700 border-red-200';
     if (util >= 50) return 'bg-amber-50 text-amber-700 border-amber-200';
-    if (util > 0) return 'bg-green-50 text-green-700 border-green-200';
+    if (util > 0) return 'bg-blue-50 text-blue-700 border-blue-200';
     return 'bg-neutral-50 text-neutral-400 border-neutral-100';
   };
 
@@ -115,7 +115,7 @@ export default function CapacityCalendar() {
           </button>
         </div>
         <div className="flex items-center gap-3 text-[10px] font-bold">
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-green-100 border border-green-200" /> &lt;50%</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-blue-100 border border-blue-200" /> &lt;50%</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-amber-50 border border-amber-200" /> 50-80%</span>
           <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-red-100 border border-red-200" /> &gt;80%</span>
         </div>
@@ -212,7 +212,7 @@ export default function CapacityCalendar() {
                     </div>
                     <span className={cn(
                       'px-2 py-0.5 rounded text-[9px] font-bold',
-                      order.status === 'completed' ? 'bg-green-50 text-green-600' :
+                      order.status === 'completed' ? 'bg-blue-50 text-blue-600' :
                       order.status === 'in_progress' ? 'bg-blue-50 text-blue-600' :
                       'bg-neutral-100 text-neutral-500',
                     )}>

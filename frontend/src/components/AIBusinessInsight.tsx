@@ -143,7 +143,7 @@ export function AIBusinessInsightCard({
               </span>
             </div>
             <div className="flex items-center gap-1.5">
-              <ShieldCheck className="w-3 h-3 text-green-500" />
+              <ShieldCheck className="w-3 h-3 text-blue-500" />
               <span className="text-neutral-600">
                 信用 {profile.credit_score}分 ({profile.credit_level})
               </span>
@@ -167,7 +167,7 @@ export function AIBusinessInsightCard({
               {profile.patent_count}项专利 · {profile.cooperation_risk}
             </span>
             {profile.green_level !== '未认证' && (
-              <span className="flex items-center gap-1 text-[10px] text-green-600 font-bold">
+              <span className="flex items-center gap-1 text-[10px] text-blue-600 font-bold">
                 <Leaf className="w-3 h-3" />
                 绿色认证
               </span>

@@ -176,7 +176,7 @@ export default function GovAlerts() {
               </div>
             ) : filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 text-neutral-400">
-                <CheckCircle2 className="w-6 h-6 mb-2 text-emerald-300" />
+                <CheckCircle2 className="w-6 h-6 mb-2 text-blue-300" />
                 <p className="text-xs">暂无符合条件的预警</p>
               </div>
             ) : filtered.map((a, i) => (

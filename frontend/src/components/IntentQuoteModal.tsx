@@ -143,7 +143,7 @@ export function IntentQuoteModal({
         <div className="sticky top-0 bg-white flex items-start justify-between gap-3 border-b border-neutral-100 px-6 py-5">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <DollarSign className="w-4 h-4 text-emerald-600" />
+              <DollarSign className="w-4 h-4 text-blue-600" />
               <h3 className="text-base font-bold text-neutral-900">发起意向报价</h3>
             </div>
             <p className="text-xs text-neutral-500">
@@ -163,8 +163,8 @@ export function IntentQuoteModal({
         <div className="px-6 py-5 space-y-5">
           {step === 'success' ? (
             <div className="text-center py-8">
-              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-8 h-8 text-emerald-600" />
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-8 h-8 text-blue-600" />
               </div>
               <h4 className="text-lg font-bold text-neutral-900 mb-2">意向报价已发送</h4>
               <p className="text-sm text-neutral-500 mb-6">
@@ -210,7 +210,7 @@ export function IntentQuoteModal({
                       <span className="text-neutral-500">产能状态</span>
                       <p className={cn(
                         'font-medium mt-0.5',
-                        aiSuggestion.capacity_available ? 'text-green-600' : 'text-amber-600'
+                        aiSuggestion.capacity_available ? 'text-blue-600' : 'text-amber-600'
                       )}>
                         {aiSuggestion.capacity_available ? '产能充足' : '产能紧张'}
                       </p>
@@ -335,7 +335,7 @@ export function IntentQuoteModal({
                   type="button"
                   onClick={() => void handleSubmit()}
                   disabled={loading}
-                  className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                  className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
                 >
                   {loading ? (
                     <>
@@ -395,7 +395,7 @@ export function CardExchangeButton({
       type="button"
       onClick={() => void onClick()}
       disabled={loading}
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-medium hover:bg-emerald-100 transition-colors disabled:opacity-50"
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-blue-200 bg-blue-50 text-blue-700 rounded-lg text-xs font-medium hover:bg-blue-100 transition-colors disabled:opacity-50"
     >
       {loading ? (
         <Loader2 className="w-3.5 h-3.5 animate-spin" />

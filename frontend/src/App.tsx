@@ -27,6 +27,10 @@ import Settings from './pages/Settings';
 import FulfillmentDashboard from './pages/FulfillmentDashboard';
 import CapacityCalendar from './pages/CapacityCalendar';
 import EnterpriseDirectory from './pages/EnterpriseDirectory';
+import AlertWorkflow from './pages/AlertWorkflow';
+import ContractManagement from './pages/ContractManagement';
+import InvoiceManagement from './pages/InvoiceManagement';
+import LogisticsMap from './pages/LogisticsMap';
 
 // Government pages
 import GovDashboard from './pages/gov/GovDashboard';
@@ -111,6 +115,10 @@ export default function App() {
           <Route path="quote-pool" element={<QuotePool />} />
           <Route path="fulfillment" element={<FulfillmentDashboard />} />
           <Route path="capacity-calendar" element={<CapacityCalendar />} />
+          <Route path="alert-workflow" element={<AlertWorkflow />} />
+          <Route path="contracts" element={<ContractManagement />} />
+          <Route path="invoice" element={<InvoiceManagement />} />
+          <Route path="logistics" element={<LogisticsMap />} />
           <Route path="data-auth" element={<Navigate to="/settings" replace />} />
         </Route>
 
@@ -144,6 +152,14 @@ export default function App() {
         </Route>
 
         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+
+        <Route path="*" element={
+          <div className="min-h-screen flex flex-col items-center justify-center bg-[#F5F5F7] text-neutral-500">
+            <p className="text-6xl font-bold text-neutral-200 mb-4">404</p>
+            <p className="text-sm mb-6">页面未找到</p>
+            <a href="/" className="text-sm text-blue-500 hover:underline">返回首页</a>
+          </div>
+        } />
       </Route>
     </Routes>
   );

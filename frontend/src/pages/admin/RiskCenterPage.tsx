@@ -132,7 +132,7 @@ export default function RiskCenterPage() {
       {/* 统计卡片 */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <RiskStatCard icon={<Activity className="w-5 h-5 text-blue-600" />} label="企业总数" value={stats?.total ?? '-'} color="bg-blue-50" />
-        <RiskStatCard icon={<CheckCircle className="w-5 h-5 text-green-600" />} label="正常企业" value={stats?.active ?? '-'} color="bg-green-50" />
+        <RiskStatCard icon={<CheckCircle className="w-5 h-5 text-blue-600" />} label="正常企业" value={stats?.active ?? '-'} color="bg-blue-50" />
         <RiskStatCard icon={<XCircle className="w-5 h-5 text-red-500" />} label="异常企业" value={stats?.abnormal ?? '-'} color="bg-red-50" />
         <RiskStatCard icon={<AlertTriangle className="w-5 h-5 text-yellow-500" />} label="休眠企业" value={stats?.dormant ?? '-'} color="bg-yellow-50" />
       </div>
@@ -152,7 +152,7 @@ export default function RiskCenterPage() {
             <button
               onClick={() => void handleToggleConfig('enabled')}
               className={`relative w-12 h-6 rounded-full transition-colors ${
-                config?.enabled ? 'bg-green-500' : 'bg-neutral-200'
+                config?.enabled ? 'bg-blue-500' : 'bg-neutral-200'
               }`}
             >
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
@@ -169,7 +169,7 @@ export default function RiskCenterPage() {
             <button
               onClick={() => void handleToggleConfig('auto_delist_enabled')}
               className={`relative w-12 h-6 rounded-full transition-colors ${
-                config?.auto_delist_enabled ? 'bg-green-500' : 'bg-neutral-200'
+                config?.auto_delist_enabled ? 'bg-blue-500' : 'bg-neutral-200'
               }`}
             >
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
@@ -286,7 +286,7 @@ export default function RiskCenterPage() {
                     <td className="px-5 py-3 font-medium text-neutral-800">{h.enterprise_name}</td>
                     <td className="px-5 py-3">
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                        h.result === 'normal' ? 'bg-green-100 text-green-700' :
+                        h.result === 'normal' ? 'bg-blue-100 text-blue-700' :
                         h.result === 'abnormal' ? 'bg-red-100 text-red-700' :
                         'bg-neutral-100 text-neutral-600'
                       }`}>

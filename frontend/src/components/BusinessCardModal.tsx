@@ -85,7 +85,7 @@ export function AmapLocation({ longitude, latitude, name, height = 160 }: AmapLo
         <button
           type="button"
           onClick={() => openAmapNavigation(longitude, latitude, name || '目标位置')}
-          className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors shrink-0"
+          className="flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-700 transition-colors shrink-0"
         >
           <ExternalLink className="w-3 h-3" />
           高德导航
@@ -162,8 +162,8 @@ function SingleCard({
         {/* 标签 */}
         <div className="flex flex-wrap gap-1.5">
           {card.is_green_factory && (
-            <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded-full">
-              <ShieldCheck className="w-2.5 h-2.5 fill-emerald-400" />
+            <span className="inline-flex items-center gap-1 text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-1 rounded-full">
+              <ShieldCheck className="w-2.5 h-2.5 fill-blue-400" />
               政府绿标
             </span>
           )}
@@ -224,7 +224,7 @@ function SingleCard({
           <button
             type="button"
             onClick={() => openAmapNavigation(card.longitude!, card.latitude!, card.name)}
-            className="flex items-center gap-1 text-[9px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors"
+            className="flex items-center gap-1 text-[9px] font-bold text-blue-600 hover:text-blue-700 transition-colors"
           >
             <MapPin className="w-2.5 h-2.5" />
             高德导航

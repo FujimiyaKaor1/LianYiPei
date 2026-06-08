@@ -13,6 +13,8 @@ import {
   Activity,
   CalendarDays,
   SlidersHorizontal,
+  FileText,
+  Truck,
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '@/src/context/AuthContext';
@@ -26,6 +28,9 @@ const navItems = [
   { icon: BarChart3, label: '企业看板', path: '/sales-console' },
   { icon: Activity, label: '履约看板', path: '/fulfillment' },
   { icon: CalendarDays, label: '产能日历', path: '/capacity-calendar' },
+  { icon: FileText, label: '电子合同', path: '/contracts' },
+  { icon: Receipt, label: '发票管理', path: '/invoice' },
+  { icon: Truck, label: '物流距离', path: '/logistics' },
   { icon: ShieldAlert, label: '风险监测', path: '/risk' },
   { icon: Package, label: '订单工作流', path: '/orders' },
   { icon: Wallet, label: '资产管理', path: '/assets' },
@@ -38,48 +43,56 @@ export function Sidebar() {
   const initial = displayName !== '未登录' ? displayName.slice(0, 1) : '?';
 
   return (
-    <aside className="w-64 h-full flex-shrink-0 flex flex-col border-r border-gray-200 bg-white">
-      <div className="h-16 flex-shrink-0 flex items-center px-6 border-b border-gray-100">
-        <h1 className="text-xl font-black tracking-tighter text-primary">链易配</h1>
-        <span className="ml-2 text-[10px] text-neutral-400 font-medium tracking-widest uppercase">企业工作台</span>
+    <aside className="sidebar-width sticky top-0 h-screen flex-shrink-0 flex flex-col bg-sidebar-bg">
+      {/* Logo */}
+      <div className="h-16 flex-shrink-0 flex items-center px-5 border-b border-sidebar-divider">
+        <div className="w-8 h-8 rounded-md bg-brand flex items-center justify-center mr-3 shrink-0">
+          <span className="text-white text-sm font-extrabold">链</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <h1 className="text-base font-bold tracking-tighter text-sidebar-text-active leading-tight">链易配</h1>
+          <span className="text-[10px] text-sidebar-text font-medium tracking-wide">企业工作台</span>
+        </div>
       </div>
-      
-      <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5 scrollbar-hide">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             className={({ isActive }) => cn(
-              "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group",
+              "flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-150 text-sm",
               isActive 
-                ? "bg-gray-100 text-primary font-bold" 
-                : "text-neutral-500 hover:bg-gray-50 hover:text-primary"
+                ? "bg-sidebar-item-active text-sidebar-text-active font-semibold" 
+                : "text-sidebar-text hover:bg-sidebar-item-hover hover:text-sidebar-text-active"
             )}
           >
-            <item.icon className="w-5 h-5" />
-            <span className="text-sm">{item.label}</span>
+            <item.icon className="w-4.5 h-4.5 shrink-0" />
+            <span className="truncate">{item.label}</span>
           </NavLink>
         ))}
       </nav>
-      
-      <div className="flex-shrink-0 p-4 border-t border-gray-100">
+
+      {/* User profile at bottom */}
+      <div className="flex-shrink-0 p-3 border-t border-sidebar-divider">
         <button
           type="button"
           onClick={() => !user && !loading && setIsLoginModalOpen(true)}
-          className="w-full text-left flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100/80 transition-colors disabled:opacity-70"
+          className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-sidebar-item-hover transition-colors disabled:opacity-70"
           disabled={loading}
+          aria-label={user ? `当前用户 ${displayName}` : '点击登录'}
         >
-          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold text-neutral-600 shrink-0">
+          <div className="w-8 h-8 rounded-full bg-sidebar-item-active flex items-center justify-center text-xs font-bold text-sidebar-text-active shrink-0">
             {initial}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold truncate" title={displayName}>
+            <p className="text-xs font-semibold text-sidebar-text-active truncate" title={displayName}>
               {loading ? '…' : displayName}
             </p>
-            <div className="flex items-center gap-1 text-[10px] text-neutral-500">
-              <ShieldAlert className="w-3 h-3 text-green-600 shrink-0" />
-              <span>{user ? '履约认证企业' : '点击登录'}</span>
-            </div>
+            <p className="text-[10px] text-sidebar-text mt-0.5">
+              {user ? '履约认证企业' : '点击登录'}
+            </p>
           </div>
         </button>
       </div>

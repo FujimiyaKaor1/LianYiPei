@@ -75,7 +75,7 @@ export default function Assets() {
               <div className="flex items-center gap-4 mb-3">
                 <h1 className="text-4xl font-extrabold tracking-tight">{data.name}</h1>
                 {data.is_certified && (
-                  <span className="px-3 py-1 bg-green-500/20 text-green-400 text-[10px] font-black rounded uppercase tracking-widest border border-green-500/30">已认证</span>
+                  <span className="px-3 py-1 bg-blue-500/20 text-blue-400 text-[10px] font-black rounded uppercase tracking-widest border border-green-500/30">已认证</span>
                 )}
               </div>
               <div className="flex flex-wrap gap-6 text-sm text-neutral-400 font-medium mt-4">
@@ -126,7 +126,7 @@ export default function Assets() {
                       <p className="text-[10px] text-neutral-400 mt-1">{cert.date}</p>
                     </div>
                   </div>
-                  {cert.status === '有效' && <ShieldCheck className="w-5 h-5 text-green-500" />}
+                  {cert.status === '有效' && <ShieldCheck className="w-5 h-5 text-blue-500" />}
                 </div>
               ))}
               {data.qualifications.length === 0 && (
@@ -163,7 +163,7 @@ export default function Assets() {
                     <div className="flex items-center gap-6">
                       <span className={cn(
                         "px-3 py-1 rounded-full text-[10px] font-bold",
-                        sys.status === '已连接' ? "bg-green-50 text-green-600" : "bg-neutral-100 text-neutral-400"
+                        sys.status === '已连接' ? "bg-blue-50 text-blue-600" : "bg-neutral-100 text-neutral-400"
                       )}>{sys.status}</span>
                       <button className="p-2 hover:bg-white rounded-lg transition-all">
                         {sys.status === '已连接' ? <Lock className="w-4 h-4 text-neutral-400" /> : <Plus className="w-4 h-4 text-neutral-400" />}

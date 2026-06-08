@@ -1660,6 +1660,108 @@ export const api = {
       };
     }>(`/api/inquiry-chat/${chatId}/exchange-card`, { method: 'POST' });
   },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 电子合同
+  // ═══════════════════════════════════════════════════════════════════════
+
+  getContractsList() {
+    return request<{ contracts: ContractItem[] }>('/contract/list');
+  },
+
+  getContractDetail(contractId: number) {
+    return request<ContractDetail>(`/contract/view/${contractId}`);
+  },
+
+  createContract(data: {
+    buyer_id: number;
+    seller_id: number;
+    product_name: string;
+    quantity: number;
+    unit: string;
+    price: number;
+    total_amount: number;
+    delivery_time: string;
+    quality_requirements: string;
+    payment_terms: string;
+  }) {
+    return request<{ success: boolean; contract_id: number; contract_no: string }>(
+      '/contract/create',
+      { method: 'POST', body: JSON.stringify(data) },
+    );
+  },
+
+  signContract(contractId: number, signatureData: Record<string, unknown>) {
+    return request<{ code: number; message: string; data: { status: string; collaboration_code?: string } }>(
+      '/contract/api/sign',
+      { method: 'POST', body: JSON.stringify({ contract_id: String(contractId), signature_data: signatureData }) },
+    );
+  },
+
+  getContractStatus(contractId: number) {
+    return request<{ code: number; data: { contract_id: number; status: string } }>(
+      `/contract/api/status/${contractId}`,
+    );
+  },
+
+  downloadContract(contractId: number) {
+    return request<Blob>(`/contract/download/${contractId}`, { responseType: 'blob' } as any);
+  },
+
+  fulfillContract(contractId: number, invoiceInfo: Record<string, unknown>) {
+    return request<{ code: number; data: Record<string, unknown> }>(
+      '/contract/api/fulfill',
+      { method: 'POST', body: JSON.stringify({ contract_id: String(contractId), invoice_info: invoiceInfo }) },
+    );
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 绿色低碳 / 碳排估算
+  // ═══════════════════════════════════════════════════════════════════════
+
+  greenPriority(params: { product_name: string; quantity?: number; latitude?: number; longitude?: number }) {
+    return request<{ results: SupplierSearchItem[]; mode: string }>(
+      '/api/green-priority',
+      { method: 'POST', body: JSON.stringify(params) },
+    );
+  },
+
+  carbonEstimate(params: { supplier_id: number; quantity?: number; latitude?: number; longitude?: number }) {
+    return request<CarbonEstimateData>(
+      '/api/carbon-estimate',
+      { method: 'POST', body: JSON.stringify(params) },
+    );
+  },
+
+  getGreenProfile(enterpriseId: number) {
+    return request<GreenProfileData>(`/api/enterprise/${enterpriseId}/green-profile`);
+  },
+
+  getGreenRiskAlerts() {
+    return request<{ alerts: Array<{ id: number; product_name: string; message: string; level: string; suggestion: string; created_at: string }> }>(
+      '/api/alert/green-risk/list',
+    );
+  },
+
+  // CLIP 图文匹配
+  clipMatch(formData: FormData) {
+    return request<{ results: Array<{ name: string; score: number; image_url: string }> }>(
+      '/api/clip-match',
+      { method: 'POST', body: formData, headers: {} },
+    );
+  },
+
+  // 高德地图
+  getMapDistance(params: { from: string; to: string }) {
+    const q = new URLSearchParams(params);
+    return request<{ distance_km: number; duration_min: number }>(`/api/map/distance?${q}`);
+  },
+
+  getMapLocation(address: string) {
+    return request<{ longitude: number; latitude: number; address: string }>(
+      `/api/map/location?address=${encodeURIComponent(address)}`,
+    );
+  },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1883,6 +1985,59 @@ export interface BusinessInsightsData {
   risk_detail: string;
   credit_score: number;
   level: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 电子合同
+
+export interface ContractItem {
+  id: number;
+  contract_no: string;
+  product_name: string;
+  buyer_name: string;
+  seller_name: string;
+  total_amount: number;
+  status: 'draft' | 'pending_sign' | 'signed' | 'fulfilled';
+  created_at: string;
+  signed_at?: string;
+}
+
+export interface ContractDetail extends ContractItem {
+  quantity: number;
+  unit: string;
+  price: number;
+  delivery_time: string;
+  quality_requirements: string;
+  payment_terms: string;
+  buyer_signed: boolean;
+  seller_signed: boolean;
+  collaboration_code?: string;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 绿色低碳
+
+export interface GreenProfileData {
+  id: number;
+  name: string;
+  is_green_factory: boolean;
+  green_certification: string;
+  clean_energy_usage: number;
+  carbon_emission_level: string;
+  environment_protection_patents: number;
+  green_supplier_rank: number;
+}
+
+export interface CarbonEstimateData {
+  supplier_id: number;
+  quantity: number;
+  carbon: {
+    total_emission_kg: number;
+    emission_per_unit_kg: number;
+    transport_emission_kg: number;
+    production_emission_kg: number;
+    carbon_label: string;
+  };
 }
 
 export { ApiError, NETWORK_ERROR_MESSAGE };

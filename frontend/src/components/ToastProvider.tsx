@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react';
 
 type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -15,13 +15,12 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue>({ showToast: () => {} });
 
-let toastId = 0;
-
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastIdRef = useRef(0);
 
   const showToast = useCallback((message: string, type: ToastType = 'info') => {
-    const id = ++toastId;
+    const id = ++toastIdRef.current;
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -33,14 +32,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   };
 
   const iconMap: Record<ToastType, React.ReactNode> = {
-    success: <CheckCircle className="w-4 h-4 text-green-500" />,
+    success: <CheckCircle className="w-4 h-4 text-blue-500" />,
     error: <XCircle className="w-4 h-4 text-red-500" />,
     warning: <AlertTriangle className="w-4 h-4 text-yellow-500" />,
     info: <Info className="w-4 h-4 text-blue-500" />,
   };
 
   const bgMap: Record<ToastType, string> = {
-    success: 'bg-green-50 border-green-200',
+    success: 'bg-blue-50 border-blue-200',
     error: 'bg-red-50 border-red-200',
     warning: 'bg-yellow-50 border-yellow-200',
     info: 'bg-blue-50 border-blue-200',

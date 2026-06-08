@@ -253,7 +253,7 @@ export default function APIGatewayPage() {
                     <div className="flex items-center gap-3">
                       <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
                         iface.status === 'ok' || iface.status === 'available'
-                          ? 'bg-green-500'
+                          ? 'bg-blue-500'
                           : iface.status === 'error'
                           ? 'bg-red-500'
                           : 'bg-neutral-300'
@@ -286,7 +286,7 @@ export default function APIGatewayPage() {
                       <span className="text-neutral-500">状态</span>
                       <span className={`font-medium ${
                         iface.status === 'ok' || iface.status === 'available'
-                          ? 'text-green-600'
+                          ? 'text-blue-600'
                           : iface.status === 'error'
                           ? 'text-red-500'
                           : 'text-neutral-400'
@@ -298,7 +298,7 @@ export default function APIGatewayPage() {
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-neutral-500">启用状态</span>
-                      <span className={`font-medium ${iface.enabled ? 'text-green-600' : 'text-neutral-400'}`}>
+                      <span className={`font-medium ${iface.enabled ? 'text-blue-600' : 'text-neutral-400'}`}>
                         {iface.enabled ? '已启用' : '已禁用'}
                       </span>
                     </div>
@@ -354,7 +354,7 @@ export default function APIGatewayPage() {
                       <td className="px-4 py-3 text-neutral-400 text-xs hidden lg:table-cell">{key.created_at}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                          key.is_active ? 'bg-green-100 text-green-700' : 'bg-neutral-100 text-neutral-500'
+                          key.is_active ? 'bg-blue-100 text-blue-700' : 'bg-neutral-100 text-neutral-500'
                         }`}>
                           {key.is_active ? '启用' : '禁用'}
                         </span>
@@ -427,12 +427,12 @@ export default function APIGatewayPage() {
             {createdKey ? (
               <>
                 <div className="flex items-center gap-2 mb-4">
-                  <CheckCircle className="w-5 h-5 text-green-500" />
+                  <CheckCircle className="w-5 h-5 text-blue-500" />
                   <h3 className="text-base font-bold text-neutral-900">Key 已生成</h3>
                 </div>
                 <div className="rounded-xl bg-neutral-900 p-4 break-all">
                   <p className="text-xs text-neutral-400 mb-1">API Key（请妥善保管，仅显示一次）</p>
-                  <p className="text-sm font-mono text-green-400">{createdKey}</p>
+                  <p className="text-sm font-mono text-blue-400">{createdKey}</p>
                 </div>
                 <div className="flex justify-end mt-5">
                   <button

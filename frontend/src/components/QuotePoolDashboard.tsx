@@ -68,7 +68,7 @@ export function QuotePoolDashboard() {
     remarks: '',
   });
 
-  const creditScore = user?.creditScore || 78;
+  const creditScore = (user as any)?.credit_score ?? 78;
 
   // 获取价格指数
   const fetchPriceIndex = async (product: string) => {
@@ -99,7 +99,7 @@ export function QuotePoolDashboard() {
   // 获取我的报价
   const fetchMyQuotes = async () => {
     try {
-      const resp = await api.fetchQuotes({ page: 1 });
+      const resp = await api.getQuotesList({ page: 1 });
       setMyQuotes(resp.quotes || []);
     } catch (e) {
       console.error(e);
@@ -210,8 +210,8 @@ export function QuotePoolDashboard() {
             <Award className="w-5 h-5 text-amber-500" />
             <span className="font-medium">当前信用分</span>
           </div>
-          <div className="text-3xl font-black text-emerald-600">{creditScore}</div>
-          <div className="text-xs px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full font-medium">
+          <div className="text-3xl font-black text-blue-600">{creditScore}</div>
+          <div className="text-xs px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
             {creditScore >= 80 ? '优秀' : creditScore >= 70 ? '良好' : '一般'}
           </div>
         </div>
@@ -256,7 +256,7 @@ export function QuotePoolDashboard() {
                 <div className="text-4xl font-black text-blue-600">
                   ¥{priceIndex?.median_price?.toLocaleString() || '1,220'}
                 </div>
-                <div className="text-xs text-emerald-600 flex items-center gap-1 justify-end">
+                <div className="text-xs text-blue-600 flex items-center gap-1 justify-end">
                   <ArrowUp className="w-3 h-3" /> 较上周 +2.1%
                 </div>
               </div>
@@ -331,7 +331,7 @@ export function QuotePoolDashboard() {
           <div className="bg-white rounded-3xl p-6 border border-neutral-100">
             <div className="flex items-center justify-between mb-4">
               <div className="font-medium">本品类概况</div>
-              <TrendingUp className="w-5 h-5 text-emerald-500" />
+              <TrendingUp className="w-5 h-5 text-blue-500" />
             </div>
             
             <div className="grid grid-cols-2 gap-4 text-center">
@@ -378,7 +378,7 @@ export function QuotePoolDashboard() {
                     <td className="py-4 font-mono">¥{q.price}</td>
                     <td className="py-4 text-neutral-500">{q.quantity || '-'}</td>
                     <td className="py-4">
-                      <span className="inline-block px-3 py-0.5 text-xs rounded-full bg-emerald-100 text-emerald-700">
+                      <span className="inline-block px-3 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
                         {q.status === 'active' ? '有效' : '已采纳'}
                       </span>
                     </td>

@@ -19,6 +19,7 @@ import {
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { api, type FavoriteSupplierItem, NETWORK_ERROR_MESSAGE } from '@/src/services/api';
+import { useToast } from '@/src/components/ToastProvider';
 import { cn } from '@/src/lib/utils';
 
 export type FavoritesContentProps = {
@@ -29,10 +30,12 @@ export type FavoritesContentProps = {
 };
 
 export function FavoritesContent({ embedded, onClose, className }: FavoritesContentProps) {
+  const { showToast } = useToast();
   const [favorites, setFavorites] = useState<FavoriteSupplierItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorText, setErrorText] = useState('');
   const [isRemoving, setIsRemoving] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const loadData = async () => {
     setIsLoading(true);
@@ -81,7 +84,7 @@ export function FavoritesContent({ embedded, onClose, className }: FavoritesCont
       await api.removeFavoriteById(item.supplier_id);
       setFavorites((prev) => prev.filter((f) => f.supplier_id !== item.supplier_id));
     } catch (error) {
-      alert(error instanceof Error ? error.message : '取消收藏失败');
+      showToast(error instanceof Error ? error.message : '取消收藏失败', 'error');
     } finally {
       setIsRemoving(null);
     }
@@ -123,6 +126,7 @@ export function FavoritesContent({ embedded, onClose, className }: FavoritesCont
           </div>
           <button
             type="button"
+            onClick={() => showToast('筛选功能即将上线', 'info')}
             className="px-4 py-2 bg-white border border-neutral-100 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm hover:bg-neutral-50 transition-colors"
           >
             <Filter className="w-3 h-3" />
@@ -139,11 +143,19 @@ export function FavoritesContent({ embedded, onClose, className }: FavoritesCont
             <RefreshCw className={cn('w-4 h-4', isLoading && 'animate-spin')} />
           </button>
           <div className="flex bg-white border border-neutral-100 rounded-xl p-1 shadow-sm">
-            <button type="button" className="p-1.5 bg-neutral-100 rounded-lg">
-              <Grid className="w-4 h-4 text-black" />
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              className={cn('p-1.5 rounded-lg transition-colors', viewMode === 'grid' ? 'bg-neutral-100' : 'hover:bg-neutral-50')}
+            >
+              <Grid className={cn('w-4 h-4', viewMode === 'grid' ? 'text-black' : 'text-neutral-400')} />
             </button>
-            <button type="button" className="p-1.5 hover:bg-neutral-50 rounded-lg transition-colors">
-              <ListIcon className="w-4 h-4 text-neutral-400" />
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={cn('p-1.5 rounded-lg transition-colors', viewMode === 'list' ? 'bg-neutral-100' : 'hover:bg-neutral-50')}
+            >
+              <ListIcon className={cn('w-4 h-4', viewMode === 'list' ? 'text-black' : 'text-neutral-400')} />
             </button>
           </div>
         </div>
@@ -227,7 +239,7 @@ export function FavoritesContent({ embedded, onClose, className }: FavoritesCont
 
               <div className="flex flex-wrap gap-2 mb-8">
                 {item.is_green_factory && (
-                  <span className="px-2 py-0.5 bg-green-50 text-green-600 text-[10px] font-black rounded uppercase tracking-widest flex items-center gap-1">
+                  <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-black rounded uppercase tracking-widest flex items-center gap-1">
                     <Leaf className="w-3 h-3" />
                     绿色工厂
                   </span>
@@ -249,7 +261,7 @@ export function FavoritesContent({ embedded, onClose, className }: FavoritesCont
                   <div className="text-[9px] text-neutral-400 font-bold uppercase tracking-widest mb-1">履约信用分</div>
                   <div className="flex items-center gap-2">
                     <span className="text-xl font-black text-neutral-900">{Math.round(item.credit_score || 70)}</span>
-                    <ShieldCheck className="w-4 h-4 text-green-500" />
+                    <ShieldCheck className="w-4 h-4 text-blue-500" />
                   </div>
                 </div>
                 <div className="p-4 bg-neutral-50 rounded-2xl flex flex-col justify-between">

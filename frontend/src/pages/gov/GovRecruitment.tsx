@@ -171,7 +171,7 @@ export default function GovRecruitment() {
           </button>
         )}
         {tab === 'gaps' && neo4jEnriched && (
-          <span className="text-[10px] font-medium text-emerald-600">已合并 Neo4j 图谱缺口</span>
+          <span className="text-[10px] font-medium text-blue-600">已合并 Neo4j 图谱缺口</span>
         )}
         <button type="button" onClick={() => void refreshAll().catch(() => {})} className="ml-auto p-2 hover:bg-neutral-100 rounded-lg transition-colors" title="刷新">
           <RefreshCw className={cn('w-4 h-4 text-neutral-400', (gapsLoading || tasksLoading) && 'animate-spin')} />

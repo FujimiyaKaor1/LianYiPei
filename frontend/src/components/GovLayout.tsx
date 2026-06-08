@@ -16,7 +16,7 @@ export function GovLayout() {
   };
 
   return (
-    <div className="flex min-h-screen w-full bg-[#F5F5F7]">
+    <div className="flex min-h-screen w-full bg-canvas-soft">
       <GovSidebar />
       <main className="flex flex-1 flex-col min-w-0">
         <TopBar title={getTitle(location.pathname)} />

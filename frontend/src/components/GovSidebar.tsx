@@ -26,16 +26,16 @@ export function GovSidebar() {
   const initial = displayName !== '未登录' ? displayName.slice(0, 1) : '?';
 
   return (
-    <aside className="w-64 h-screen sticky top-0 flex-shrink-0 flex flex-col border-r border-gray-200 bg-white">
-      <div className="h-16 flex-shrink-0 flex items-center px-6 border-b border-gray-100">
-        <ShieldCheck className="w-5 h-5 mr-2 text-neutral-700" />
-        <h1 className="text-lg font-black tracking-tighter text-primary">链易配</h1>
-        <span className="ml-2 text-[9px] text-neutral-400 font-medium tracking-widest uppercase">
+    <aside className="sidebar-width h-screen sticky top-0 flex-shrink-0 flex flex-col border-r border-border bg-canvas">
+      <div className="h-16 flex-shrink-0 flex items-center px-5 border-b border-border">
+        <ShieldCheck className="w-5 h-5 mr-2 text-ink-soft" />
+        <h1 className="text-lg font-bold tracking-tighter text-brand">链易配</h1>
+        <span className="ml-2 text-[9px] text-ink-muted font-medium tracking-widest uppercase">
           产业监管
         </span>
       </div>
 
-      <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+      <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
         {govNavItems.map((item) => (
           <NavLink
             key={item.path}
@@ -43,10 +43,10 @@ export function GovSidebar() {
             end={item.path === '/gov'}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group',
+                'flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-150 text-sm',
                 isActive
-                  ? 'bg-neutral-900 text-white font-bold shadow-sm'
-                  : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900',
+                  ? 'bg-ink text-on-brand font-semibold shadow-elevation-1'
+                  : 'text-ink-soft hover:bg-canvas-muted hover:text-ink',
               )
             }
           >

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Gauge, 
   TrendingUp, 
@@ -21,6 +22,7 @@ import { useAuth } from '@/src/context/AuthContext';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [isCollaborationModalOpen, setIsCollaborationModalOpen] = useState(false);
   const [creditScore, setCreditScore] = useState<CreditScoreData | null>(null);
   const [creditLoading, setCreditLoading] = useState(true);
@@ -46,7 +48,7 @@ export default function Dashboard() {
       const data = await api.fetchCreditScore(user.id);
       setCreditScore(data);
       if (creditCacheKey) {
-        localStorage.setItem(creditCacheKey, JSON.stringify(data));
+        try { localStorage.setItem(creditCacheKey, JSON.stringify(data)); } catch { /* quota exceeded or private browsing */ }
       }
     } catch {
       setCreditError(NETWORK_ERROR_MESSAGE);
@@ -187,7 +189,7 @@ export default function Dashboard() {
             </div>
             <div>
               <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full text-[10px] font-semibold border border-white/10">
-                <span className={cn("w-1.5 h-1.5 rounded-full", creditScore?.credit_score && creditScore.credit_score >= 70 ? 'bg-green-400 animate-pulse' : 'bg-amber-400')}></span>
+                <span className={cn("w-1.5 h-1.5 rounded-full", creditScore?.credit_score && creditScore.credit_score >= 70 ? 'bg-blue-400 animate-pulse' : 'bg-amber-400')}></span>
                 {privilegeText}
               </div>
             </div>
@@ -263,7 +265,7 @@ export default function Dashboard() {
           </div>
         ) : alerts.length === 0 ? (
           <div className="flex flex-col items-center justify-center flex-1 min-h-0 text-neutral-400">
-            <CheckCircle2 className="w-6 h-6 mb-2 text-green-400" />
+            <CheckCircle2 className="w-6 h-6 mb-2 text-blue-400" />
             <p className="text-xs">当前无风险预警</p>
           </div>
         ) : (
@@ -302,7 +304,7 @@ export default function Dashboard() {
       >
         <div className="flex items-center justify-between mb-4 shrink-0">
           <h4 className="text-base font-bold">智能匹配推荐</h4>
-          <button className="text-[10px] font-bold text-primary flex items-center gap-1 hover:underline">
+          <button onClick={() => navigate('/matching')} className="text-[10px] font-bold text-primary flex items-center gap-1 hover:underline">
             查看全部 <ChevronRight className="w-3 h-3" />
           </button>
         </div>

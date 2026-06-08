@@ -140,7 +140,7 @@ export default function VerificationPage() {
 
   const statusColor: Record<string, string> = {
     pending: 'bg-yellow-100 text-yellow-700',
-    approved: 'bg-green-100 text-green-700',
+    approved: 'bg-blue-100 text-blue-700',
     rejected: 'bg-red-100 text-red-700',
   };
 
@@ -152,7 +152,7 @@ export default function VerificationPage() {
           <>
             <StatChip label="全部" value={stats.total} active={filter === 'all'} onClick={() => setFilter('all')} />
             <StatChip label="待审核" value={stats.pending} active={filter === 'pending'} color="text-yellow-600" onClick={() => setFilter('pending')} />
-            <StatChip label="已通过" value={stats.approved} active={filter === 'approved'} color="text-green-600" onClick={() => setFilter('approved')} />
+            <StatChip label="已通过" value={stats.approved} active={filter === 'approved'} color="text-blue-600" onClick={() => setFilter('approved')} />
             <StatChip label="已驳回" value={stats.rejected} active={filter === 'rejected'} color="text-red-600" onClick={() => setFilter('rejected')} />
           </>
         )}
@@ -243,7 +243,7 @@ export default function VerificationPage() {
                             onClick={() => handleApprove(item.id)}
                             disabled={actionLoading === item.id}
                             title="通过"
-                            className="rounded-lg p-1.5 hover:bg-green-50 text-neutral-400 hover:text-green-600 disabled:opacity-50 transition-colors"
+                            className="rounded-lg p-1.5 hover:bg-blue-50 text-neutral-400 hover:text-blue-600 disabled:opacity-50 transition-colors"
                           >
                             <CheckCircle className="w-3.5 h-3.5" />
                           </button>

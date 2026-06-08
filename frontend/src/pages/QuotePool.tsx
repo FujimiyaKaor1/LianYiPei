@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
+import { useToast } from '@/src/components/ToastProvider';
 import { api, type QuoteListItem, type PriceIndexResponse, type QuoteSubmitPayload, NETWORK_ERROR_MESSAGE } from '@/src/services/api';
 
 // ── 工具函数 ──────────────────────────────────────────────────────────────
@@ -28,6 +29,7 @@ function formatAmount(num: number | null): string {
 // ── 主组件 ────────────────────────────────────────────────────────────────
 
 export default function QuotePool() {
+  const { showToast } = useToast();
   const [quotes, setQuotes] = useState<QuoteListItem[]>([]);
   const [totalQuotes, setTotalQuotes] = useState(0);
   const [priceIndex, setPriceIndex] = useState<PriceIndexResponse | null>(null);
@@ -68,7 +70,7 @@ export default function QuotePool() {
 
   const handleSubmitQuote = async () => {
     if (!formData.price || formData.price <= 0) {
-      alert('请输入有效报价');
+      showToast('请输入有效报价', 'warning');
       return;
     }
 
@@ -86,12 +88,12 @@ export default function QuotePool() {
 
       const result = await api.submitQuote(payload);
       
-      alert(`✅ 报价提交成功！剩余今日报价次数：${result.remaining_quotes_today || '充足'}`);
+      showToast(`报价提交成功！剩余今日报价次数：${result.remaining_quotes_today || '充足'}`, 'success');
       
       setFormData(prev => ({...prev, price: Math.round(prev.price * 0.97), remarks: ''}));
       await loadData();
     } catch (error: any) {
-      alert('提交失败：' + (error.message || '请稍后重试'));
+      showToast('提交失败：' + (error.message || '请稍后重试'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -247,7 +249,10 @@ export default function QuotePool() {
               </div>
             ))}
           </div>
-          <button className="mt-8 lg:mt-0 w-full py-4 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl text-xs font-bold transition-all text-neutral-300 hover:text-white">
+          <button
+            onClick={() => showToast('完整审计报告即将上线', 'info')}
+            className="mt-8 lg:mt-0 w-full py-4 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl text-xs font-bold transition-all text-neutral-300 hover:text-white"
+          >
             查看完整审计报告
           </button>
         </div>
@@ -258,8 +263,8 @@ export default function QuotePool() {
         <div className="p-6 lg:p-8 border-b border-neutral-50 flex justify-between items-center">
           <h4 className="font-bold">最新意向报价单集合</h4>
           <div className="flex gap-3">
-            <button className="p-2 hover:bg-neutral-50 rounded-lg transition-colors"><Filter className="w-4 h-4 text-neutral-400" /></button>
-            <button className="p-2 hover:bg-neutral-50 rounded-lg transition-colors"><Download className="w-4 h-4 text-neutral-400" /></button>
+            <button onClick={() => showToast('筛选功能即将上线', 'info')} className="p-2 hover:bg-neutral-50 rounded-lg transition-colors"><Filter className="w-4 h-4 text-neutral-400" /></button>
+            <button onClick={() => showToast('导出功能即将上线', 'info')} className="p-2 hover:bg-neutral-50 rounded-lg transition-colors"><Download className="w-4 h-4 text-neutral-400" /></button>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -308,7 +313,10 @@ export default function QuotePool() {
                       </span>
                     </td>
                     <td className="px-8 py-5 text-right">
-                      <button className="p-2 hover:bg-white rounded-lg transition-all group-hover:shadow-sm inline-flex">
+                      <button
+                        onClick={() => showToast(`报价单 ${row.quote_id} 详情即将上线`, 'info')}
+                        className="p-2 hover:bg-white rounded-lg transition-all group-hover:shadow-sm inline-flex"
+                      >
                         <MoreHorizontal className="w-4 h-4 text-neutral-400" />
                       </button>
                     </td>
