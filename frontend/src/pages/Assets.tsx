@@ -75,7 +75,7 @@ export default function Assets() {
               <div className="flex items-center gap-4 mb-3">
                 <h1 className="text-4xl font-extrabold tracking-tight">{data.name}</h1>
                 {data.is_certified && (
-                  <span className="px-3 py-1 bg-blue-500/20 text-blue-400 text-[10px] font-black rounded uppercase tracking-widest border border-green-500/30">已认证</span>
+                  <span className="px-3 py-1 bg-blue-500/20 text-blue-400 text-[10px] font-black rounded uppercase tracking-widest border border-blue-500/30">已认证</span>
                 )}
               </div>
               <div className="flex flex-wrap gap-6 text-sm text-neutral-400 font-medium mt-4">
