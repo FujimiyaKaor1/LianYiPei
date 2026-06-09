@@ -196,7 +196,7 @@ export default function Dashboard() {
             className="panel overflow-hidden"
           >
             <div className="grid min-h-[300px] grid-cols-1 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="relative overflow-hidden bg-sidebar-bg p-6 text-white">
+              <div className="relative overflow-hidden bg-brand-hero p-6 text-white">
                 <div className="absolute inset-0 bg-grid-fade opacity-10" />
                 <div className="relative flex h-full flex-col">
                   <div className="flex items-start justify-between gap-4">

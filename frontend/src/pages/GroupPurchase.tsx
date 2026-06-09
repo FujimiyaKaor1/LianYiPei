@@ -98,7 +98,7 @@ function getAvatarsForGp(gp: GroupPurchaseItem) {
     { bg: 'bg-slate-800', text: 'text-white' },
     { bg: 'bg-gray-200', text: 'text-gray-700' },
     { bg: 'bg-neutral-100', text: 'text-neutral-500' },
-    { bg: 'bg-neutral-800', text: 'text-white' },
+    { bg: 'bg-brand-solid', text: 'text-white' },
     { bg: 'bg-zinc-600', text: 'text-white' },
   ];
   const name = gp.product_name || '拼';
@@ -181,7 +181,7 @@ export default function GroupPurchase() {
         <button
           type="button"
           onClick={() => setIsLoginModalOpen(true)}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-black text-white text-xs font-bold hover:bg-neutral-800"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-brand-solid text-white text-xs font-bold hover:bg-brand-solid-hover"
         >
           去登录
         </button>
@@ -222,7 +222,7 @@ export default function GroupPurchase() {
           
           <button
             onClick={() => showToast('拼单创建功能即将上线', 'info')}
-            className="bg-black text-white px-5 py-2.5 rounded-lg text-xs font-bold hover:bg-neutral-800 transition-all flex items-center gap-2 shadow-[0_4px_14px_0_rgb(0,0,0,0.1)] shrink-0"
+            className="bg-brand-solid text-white px-5 py-2.5 rounded-lg text-xs font-bold hover:bg-brand-solid-hover transition-all flex items-center gap-2 shadow-[0_4px_14px_0_rgb(0,0,0,0.1)] shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
             发起新拼单
@@ -250,7 +250,7 @@ export default function GroupPurchase() {
           <button
             type="button"
             onClick={() => showToast('拼单创建功能即将上线', 'info')}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-black text-white text-xs font-bold hover:bg-neutral-800 shadow-sm"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-brand-solid text-white text-xs font-bold hover:bg-brand-solid-hover shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" />
             发起新拼单
@@ -285,7 +285,7 @@ export default function GroupPurchase() {
                     <h3 className="text-[17px] font-bold tracking-tight leading-snug text-neutral-900 group-hover:text-black transition-colors line-clamp-2">
                       {gp.product_name}
                     </h3>
-                    <div className="bg-black text-white px-2 py-1 rounded-[4px] text-[9px] font-bold uppercase tracking-widest shrink-0">
+                    <div className="bg-brand-solid text-white px-2 py-1 rounded-[4px] text-[9px] font-bold uppercase tracking-widest shrink-0">
                       {discount}
                     </div>
                   </div>
@@ -301,7 +301,7 @@ export default function GroupPurchase() {
                         initial={{ width: 0 }}
                         animate={{ width: `${progress}%` }}
                         transition={{ duration: 0.8, ease: 'easeOut' }}
-                        className="h-full bg-black rounded-full"
+                        className="h-full bg-brand-solid rounded-full"
                       />
                     </div>
                   </div>
@@ -345,7 +345,7 @@ export default function GroupPurchase() {
                         <button 
                           disabled={isJoining || deadline.text === '已截止'}
                           onClick={() => void handleJoin(gp.id)}
-                          className="bg-black text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-neutral-800 transition-all shadow-sm disabled:opacity-40 flex items-center gap-1.5"
+                          className="bg-brand-solid text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-brand-solid-hover transition-all shadow-sm disabled:opacity-40 flex items-center gap-1.5"
                         >
                           {isJoining ? (
                             <><Loader2 className="w-3 h-3 animate-spin" /> 加入中</>
@@ -364,7 +364,7 @@ export default function GroupPurchase() {
       </section>
 
       {/* 底部深色报告 Banner */}
-      <section className="mt-6 bg-[#0f1115] text-white rounded-3xl p-8 md:p-12 flex flex-col lg:flex-row gap-8 items-center relative overflow-hidden shadow-2xl">
+      <section className="mt-6 bg-brand-hero text-white rounded-3xl p-8 md:p-12 flex flex-col lg:flex-row gap-8 items-center relative overflow-hidden shadow-2xl">
         <div className="absolute inset-0 bg-gradient-to-r from-transparent to-white/5 pointer-events-none"></div>
         <div className="flex-1 space-y-4 relative z-10 w-full">
           <div className="text-[9px] font-black tracking-[0.2em] uppercase text-neutral-500">

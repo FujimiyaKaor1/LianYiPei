@@ -183,7 +183,7 @@ function InsightCard({
         {sub && <div className="text-[10px] text-neutral-400 mt-1.5 leading-relaxed">{sub}</div>}
         {progress !== undefined && !loading && (
           <div className="mt-2.5 w-full h-1 bg-neutral-100 rounded-full overflow-hidden">
-            <div className="h-full bg-neutral-900 rounded-full transition-all duration-700" style={{ width: `${progress}%` }} />
+            <div className="h-full bg-brand-solid rounded-full transition-all duration-700" style={{ width: `${progress}%` }} />
           </div>
         )}
       </div>
@@ -288,7 +288,7 @@ function QuoteModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-[2px] p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-brand-solid/50 backdrop-blur-[2px] p-4">
       <div
         role="dialog"
         aria-modal="true"
@@ -323,7 +323,7 @@ function QuoteModal({
               placeholder="例如 128.50"
               value={form.price}
               onChange={(e) => setForm((p) => ({ ...p, price: e.target.value }))}
-              className="mt-1.5 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10"
+              className="mt-1.5 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-brand-solid focus:ring-2 focus:ring-neutral-900/10"
             />
           </label>
 
@@ -336,7 +336,7 @@ function QuoteModal({
               placeholder="例如 15"
               value={form.deliveryDays}
               onChange={(e) => setForm((p) => ({ ...p, deliveryDays: e.target.value }))}
-              className="mt-1.5 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10"
+              className="mt-1.5 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-brand-solid focus:ring-2 focus:ring-neutral-900/10"
             />
           </label>
 
@@ -347,7 +347,7 @@ function QuoteModal({
               rows={3}
               value={form.remarks}
               onChange={(e) => setForm((p) => ({ ...p, remarks: e.target.value }))}
-              className="mt-1.5 w-full resize-none rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 min-h-[80px]"
+              className="mt-1.5 w-full resize-none rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-brand-solid focus:ring-2 focus:ring-neutral-900/10 min-h-[80px]"
             />
           </label>
 
@@ -382,7 +382,7 @@ function QuoteModal({
             type="button"
             disabled={submitting}
             onClick={() => void handleSubmit()}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-neutral-900 py-3 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-solid py-3 text-sm font-semibold text-white transition hover:bg-brand-solid-hover disabled:opacity-50"
           >
             {submitting ? (
               <>
@@ -1112,7 +1112,7 @@ export default function SalesConsole() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="fixed bottom-8 left-1/2 z-[70] -translate-x-1/2 rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white shadow-lg"
+            className="fixed bottom-8 left-1/2 z-[70] -translate-x-1/2 rounded-full bg-brand-solid px-5 py-2.5 text-sm font-medium text-white shadow-lg"
           >
             ✅ 意向报价已成功发送
           </motion.div>
@@ -1300,7 +1300,7 @@ export default function SalesConsole() {
                       <div className={cn(
                         'w-9 h-9 rounded-lg flex items-center justify-center font-bold text-xs shrink-0',
                         activeInquiryChatId === chat.id
-                          ? 'bg-neutral-900 text-white'
+                          ? 'bg-brand-solid text-white'
                           : 'bg-neutral-100 text-neutral-500',
                       )}>
                         {chat.counterparty_name.charAt(0)}
@@ -1546,7 +1546,7 @@ export default function SalesConsole() {
                       >
                         <div className={cn(
                           'w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0',
-                          msg.is_mine ? 'bg-neutral-900 text-white' : 'bg-neutral-200 text-neutral-600',
+                          msg.is_mine ? 'bg-brand-solid text-white' : 'bg-neutral-200 text-neutral-600',
                         )}>
                           {msg.is_mine ? '我' : msg.sender_name.charAt(0)}
                         </div>
@@ -1554,7 +1554,7 @@ export default function SalesConsole() {
                           <div className={cn(
                             'px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm',
                             msg.is_mine
-                              ? 'bg-neutral-900 text-white rounded-tr-none'
+                              ? 'bg-brand-solid text-white rounded-tr-none'
                               : 'bg-white text-neutral-700 rounded-tl-none border border-neutral-100',
                           )}>
                             {msg.content}
@@ -1571,7 +1571,7 @@ export default function SalesConsole() {
                 // ── 旧版消息（意向报价风格）───────────────────────────────
                 <>
                   <div className="flex items-start gap-4 max-w-[80%]">
-                    <div className="w-8 h-8 rounded-full bg-neutral-800 shrink-0" />
+                    <div className="w-8 h-8 rounded-full bg-brand-solid shrink-0" />
                     <div className="p-4 bg-white rounded-2xl rounded-tl-none shadow-sm border border-neutral-100">
                       <p className="text-sm text-neutral-700 leading-relaxed">{demandText}</p>
                       <span className="text-[10px] text-neutral-400 mt-2 block">
@@ -1679,13 +1679,13 @@ export default function SalesConsole() {
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={handleKeyDown}
                     disabled={sending || textSendBlocked}
-                    className="flex-1 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm outline-none focus:border-neutral-900 focus:ring-2 focus:ring-neutral-900/10 transition-colors disabled:opacity-50"
+                    className="flex-1 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm outline-none focus:border-brand-solid focus:ring-2 focus:ring-neutral-900/10 transition-colors disabled:opacity-50"
                   />
                   <button
                     type="button"
                     onClick={() => void handleSend()}
                     disabled={sending || !inputValue.trim() || textSendBlocked}
-                    className="shrink-0 rounded-xl bg-neutral-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-neutral-800 disabled:opacity-50"
+                    className="shrink-0 rounded-xl bg-brand-solid px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-solid-hover disabled:opacity-50"
                   >
                     {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : '发送'}
                   </button>
@@ -1767,7 +1767,7 @@ export default function SalesConsole() {
                   {item.subText && <p className="text-[10px] text-neutral-400 mt-2">{item.subText}</p>}
                   {item.label === '匹配度' && !item.loading && (
                     <div className="mt-2 w-full h-1 bg-neutral-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-black" style={{ width: `${item.progress || 0}%` }}></div>
+                      <div className="h-full bg-brand-solid" style={{ width: `${item.progress || 0}%` }}></div>
                     </div>
                   )}
                 </div>
@@ -1857,7 +1857,7 @@ export default function SalesConsole() {
           模块 C：企业资产画像 + 快速特权（保留原有模块）
       ═══════════════════════════════════════════════════════════════════ */}
       <section className="col-span-4 flex flex-col gap-6">
-        <div className="bg-gradient-to-br from-neutral-900 via-neutral-800 to-black rounded-[24px] p-8 text-white relative overflow-hidden shadow-xl">
+        <div className="bg-gradient-to-br from-brand-solid via-brand-solid-hover to-brand-deep rounded-[24px] p-8 text-white relative overflow-hidden shadow-xl">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl rounded-full"></div>
           <div className="relative z-10">
             <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-4">企业资产画像</h3>

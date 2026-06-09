@@ -9,7 +9,7 @@ import { cn } from '@/src/lib/utils';
 import { api, type AlertData, type WorkflowStatsData } from '@/src/services/api';
 
 const LEVEL_COLORS: Record<string, string> = {
-  red: 'bg-neutral-900 text-white border-neutral-900 shadow-sm',
+  red: 'bg-brand-solid text-white border-brand-solid shadow-sm',
   yellow: 'bg-neutral-200 text-neutral-800 border-neutral-300',
   blue: 'bg-neutral-50 text-neutral-500 border-neutral-200',
 };
@@ -150,7 +150,7 @@ export default function GovAlerts() {
                 <button
                   key={val}
                   onClick={() => setLevelFilter(val)}
-                  className={cn('px-2 py-1 rounded-md text-[9px] font-bold transition-all', levelFilter === val ? 'bg-black text-white shadow-md' : 'bg-neutral-50 border border-neutral-200 text-neutral-500 hover:bg-neutral-100')}
+                  className={cn('px-2 py-1 rounded-md text-[9px] font-bold transition-all', levelFilter === val ? 'bg-brand-solid text-white shadow-md' : 'bg-neutral-50 border border-neutral-200 text-neutral-500 hover:bg-neutral-100')}
                 >
                   {label}
                 </button>
@@ -188,7 +188,7 @@ export default function GovAlerts() {
                 onClick={() => { setActiveId(a.id); setAssignResult(''); }}
                 className={cn(
                   'cursor-pointer px-3.5 py-3 rounded-xl border transition-all',
-                  activeId === a.id ? 'bg-black border-black text-white' : 'bg-white border-neutral-100 hover:border-neutral-200',
+                  activeId === a.id ? 'bg-brand-solid border-brand-solid text-white' : 'bg-white border-neutral-100 hover:border-neutral-200',
                 )}
               >
                 <div className="flex items-center justify-between mb-1">
@@ -260,7 +260,7 @@ export default function GovAlerts() {
                         </div>
                       </div>
                       <button onClick={() => void handleAssign()} disabled={!assignTo || assignLoading}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-black text-white rounded-lg text-xs font-bold hover:bg-neutral-800 transition-all disabled:opacity-50">
+                        className="flex items-center gap-2 px-4 py-2.5 bg-brand-solid text-white rounded-lg text-xs font-bold hover:bg-brand-solid-hover transition-all disabled:opacity-50">
                         {assignLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                         确认派单
                       </button>
@@ -274,7 +274,7 @@ export default function GovAlerts() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setPanel(panel?.alertId === activeAlert.id && panel.mode === 'assign' ? null : { alertId: activeAlert.id, mode: 'assign' })}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-bold hover:border-black transition-all"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-bold hover:border-brand-solid transition-all"
                   >
                     <UserCheck className="w-3.5 h-3.5" /> 派单给专员
                   </button>

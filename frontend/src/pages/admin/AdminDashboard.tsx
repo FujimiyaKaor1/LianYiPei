@@ -43,7 +43,7 @@ export default function AdminDashboard() {
     <div className="mx-auto max-w-[1440px] space-y-5">
       <section className="panel overflow-hidden">
         <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="relative overflow-hidden bg-sidebar-bg p-7 text-white">
+          <div className="relative overflow-hidden bg-brand-hero p-7 text-white">
             <div className="absolute inset-0 bg-grid-fade opacity-10" />
             <div className="relative">
               <p className="mb-2 text-xs font-bold uppercase text-sidebar-text">平台管理后台</p>

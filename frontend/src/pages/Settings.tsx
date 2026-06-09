@@ -196,7 +196,7 @@ export default function Settings() {
               onClick={() => setActiveTab(i)}
               className={cn(
                 'w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-sm font-bold transition-all',
-                activeTab === i ? 'bg-black text-white shadow-lg' : 'text-neutral-500 hover:bg-neutral-100',
+                activeTab === i ? 'bg-brand-solid text-white shadow-lg' : 'text-neutral-500 hover:bg-neutral-100',
               )}
             >
               <item.icon className="w-5 h-5" />
@@ -224,7 +224,7 @@ export default function Settings() {
                 <div className="flex items-center gap-8 pb-8 border-b border-neutral-50">
                   <div className="w-24 h-24 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-400 relative group cursor-pointer font-black text-2xl overflow-hidden shrink-0">
                     {data?.name.slice(0, 1)}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold">更换头像</div>
+                    <div className="absolute inset-0 bg-brand-solid/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold">更换头像</div>
                   </div>
                   <div className="flex-1">
                     <h4 className="text-lg font-bold">{data?.name} · {data?.role === 'buyer' ? '采购商' : data?.role === 'supplier' ? '供应商' : '企业账户'}</h4>
@@ -257,7 +257,7 @@ export default function Settings() {
                   {hasChanges && (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-end pt-4">
                       <button onClick={() => void handleSave()} disabled={isSaving}
-                        className="px-6 py-3 bg-black text-white rounded-xl text-sm font-bold shadow-lg shadow-black/20 hover:bg-neutral-800 hover:-translate-y-0.5 transition-all disabled:opacity-50 flex items-center gap-2">
+                        className="px-6 py-3 bg-brand-solid text-white rounded-xl text-sm font-bold shadow-lg shadow-brand-solid/20 hover:bg-brand-solid-hover hover:-translate-y-0.5 transition-all disabled:opacity-50 flex items-center gap-2">
                         {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                         {isSaving ? '正在保存...' : '保存更改'}
                       </button>
@@ -364,7 +364,7 @@ export default function Settings() {
                   ] as ['all' | 'urgent_only' | 'off', string, string][]).map(([val, label, desc]) => (
                     <label key={val} className={cn(
                       'flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all',
-                      wechatPref === val ? 'border-black bg-neutral-50' : 'border-neutral-100 hover:border-neutral-200',
+                      wechatPref === val ? 'border-brand-solid bg-neutral-50' : 'border-neutral-100 hover:border-neutral-200',
                     )}>
                       <input type="radio" name="pref" value={val} checked={wechatPref === val} onChange={() => setWechatPref(val)}
                         className="mt-0.5 accent-black shrink-0" />
@@ -390,12 +390,12 @@ export default function Settings() {
 
                 <div className="flex gap-3 pt-2">
                   <button onClick={() => void handleSaveWechat()} disabled={wechatSaving}
-                    className="flex items-center gap-2 px-5 py-3 bg-black text-white rounded-xl text-sm font-bold hover:bg-neutral-800 transition-all disabled:opacity-50">
+                    className="flex items-center gap-2 px-5 py-3 bg-brand-solid text-white rounded-xl text-sm font-bold hover:bg-brand-solid-hover transition-all disabled:opacity-50">
                     {wechatSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                     保存偏好
                   </button>
                   <button onClick={() => void handleTestPush()} disabled={testLoading}
-                    className="flex items-center gap-2 px-5 py-3 bg-white border border-neutral-200 rounded-xl text-sm font-bold hover:border-black transition-all disabled:opacity-50">
+                    className="flex items-center gap-2 px-5 py-3 bg-white border border-neutral-200 rounded-xl text-sm font-bold hover:border-brand-solid transition-all disabled:opacity-50">
                     {testLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     发送测试推送
                   </button>

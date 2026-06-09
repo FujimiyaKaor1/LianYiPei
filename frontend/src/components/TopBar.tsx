@@ -61,7 +61,7 @@ export function TopBar({ title, showSearch = true }: TopBarProps) {
             <span className="text-xs text-ink-muted px-2">…</span>
           ) : user ? (
             <div className="hidden items-center gap-2 rounded-md border border-border bg-surface px-2.5 py-1.5 shadow-elevation-1 xl:flex">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-sidebar-bg text-[11px] font-bold text-white">
+              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-solid text-[11px] font-bold text-white">
                 {user.enterpriseName?.slice(0, 1) || '企'}
               </div>
               <div className="min-w-0">

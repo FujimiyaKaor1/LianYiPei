@@ -167,7 +167,7 @@ export default function VerificationPage() {
               onClick={() => setFilter(s)}
               className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-colors ${
                 filter === s
-                  ? 'bg-neutral-900 text-white'
+                  ? 'bg-brand-solid text-white'
                   : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'
               }`}
             >
@@ -315,7 +315,7 @@ export default function VerificationPage() {
 
       {/* 驳回弹窗 */}
       {rejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-solid/40 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold text-neutral-900">驳回原因</h3>
@@ -373,7 +373,7 @@ function StatChip({
       onClick={onClick}
       className={`rounded-2xl border p-4 text-left transition-all ${
         active
-          ? 'border-neutral-900 bg-neutral-900 text-white shadow-md'
+          ? 'border-brand-solid bg-brand-solid text-white shadow-md'
           : 'border-neutral-200 bg-white hover:border-neutral-300'
       }`}
     >
@@ -394,7 +394,7 @@ function DetailDrawer({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="flex-1 bg-brand-solid/30 backdrop-blur-sm" onClick={onClose} />
       <div className="w-full max-w-md bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
         <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100">
           <h3 className="text-base font-bold text-neutral-900">企业详情</h3>

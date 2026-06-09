@@ -126,7 +126,7 @@ export default function CapacityCalendar() {
           <CalendarDays className="w-10 h-10 text-neutral-300 mb-3" strokeWidth={1.25} />
           <p className="text-sm text-neutral-500 mb-1 text-center">无法加载产能日历</p>
           {loadErrorMessage ? <p className="text-[11px] text-neutral-400 mb-4 text-center">{loadErrorMessage}</p> : null}
-          <button type="button" onClick={() => void loadCalendar(year, month)} className="flex items-center gap-1.5 px-4 py-2 bg-neutral-900 text-white rounded-lg text-xs font-bold hover:bg-neutral-800">
+          <button type="button" onClick={() => void loadCalendar(year, month)} className="flex items-center gap-1.5 px-4 py-2 bg-brand-solid text-white rounded-lg text-xs font-bold hover:bg-brand-solid-hover">
             <RefreshCw className="w-3.5 h-3.5" /> 重试
           </button>
         </div>
@@ -169,7 +169,7 @@ export default function CapacityCalendar() {
                       <span className="text-sm font-bold">{day}</span>
                       {info && <span className="text-[8px] font-medium">{util}%</span>}
                       {info && oc > 0 && (
-                        <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-black/30" />
+                        <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-brand-solid/30" />
                       )}
                     </motion.button>
                   );

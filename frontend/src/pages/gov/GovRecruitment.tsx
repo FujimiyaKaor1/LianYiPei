@@ -9,7 +9,7 @@ import { cn } from '@/src/lib/utils';
 import { api, type RecruitmentGap, type RecruitmentTask, type RecommendedEnterprise } from '@/src/services/api';
 
 const URGENCY_COLORS: Record<string, string> = {
-  critical: 'bg-neutral-900 text-white border-neutral-900 shadow-sm',
+  critical: 'bg-brand-solid text-white border-brand-solid shadow-sm',
   high: 'bg-neutral-600 text-white border-neutral-600',
   medium: 'bg-neutral-200 text-neutral-800 border-neutral-300',
   low: 'bg-neutral-50 text-neutral-500 border-neutral-200',
@@ -32,8 +32,8 @@ function urgencyKey(gap: RecruitmentGap): string {
 const STATUS_COLS = [
   { key: 'pending', label: '待处理', color: 'bg-neutral-300' },
   { key: 'contacted', label: '已联系', color: 'bg-neutral-500' },
-  { key: 'negotiating', label: '洽谈中', color: 'bg-neutral-700' },
-  { key: 'signed', label: '已签约', color: 'bg-neutral-900' },
+  { key: 'negotiating', label: '洽谈中', color: 'bg-brand-solid-hover' },
+  { key: 'signed', label: '已签约', color: 'bg-brand-solid' },
 ];
 
 type Tab = 'gaps' | 'tasks';
@@ -134,8 +134,8 @@ export default function GovRecruitment() {
   };
 
   const PRIORITY_COLORS: Record<string, string> = {
-    high: 'bg-neutral-800 text-white shadow-sm',
-    urgent: 'bg-black text-white shadow-md',
+    high: 'bg-brand-solid text-white shadow-sm',
+    urgent: 'bg-brand-solid text-white shadow-md',
     normal: 'bg-neutral-100 text-neutral-600',
     low: 'bg-neutral-50 text-neutral-400',
   };
@@ -151,7 +151,7 @@ export default function GovRecruitment() {
             onClick={() => setTab(key)}
             className={cn(
               'flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all',
-              tab === key ? 'bg-black text-white shadow-lg shadow-black/10' : 'bg-white border border-neutral-200 text-neutral-600 hover:border-neutral-400',
+              tab === key ? 'bg-brand-solid text-white shadow-lg shadow-brand-solid/10' : 'bg-white border border-neutral-200 text-neutral-600 hover:border-neutral-400',
             )}
           >
             {label}
@@ -164,7 +164,7 @@ export default function GovRecruitment() {
           <button
             type="button"
             onClick={() => void loadGaps(true)}
-            className="flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs font-bold text-neutral-600 hover:border-black"
+            className="flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs font-bold text-neutral-600 hover:border-brand-solid"
           >
             <Database className="h-3.5 w-3.5" />
             合并 Neo4j 图谱缺口（较慢）
@@ -257,13 +257,13 @@ export default function GovRecruitment() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => void handleRecommend(gap)}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-bold hover:border-black transition-all"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-bold hover:border-brand-solid transition-all"
                   >
                     <Building2 className="w-3.5 h-3.5" /> 推荐潜在企业
                   </button>
                   <button
                     onClick={() => void handleCreateTask(gap)}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-black text-white rounded-lg text-xs font-bold hover:bg-neutral-800 transition-all"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-brand-solid text-white rounded-lg text-xs font-bold hover:bg-brand-solid-hover transition-all"
                   >
                     <Plus className="w-3.5 h-3.5" /> 创建招商任务
                   </button>
@@ -369,7 +369,7 @@ export default function GovRecruitment() {
       <AnimatePresence>
         {showCreateModal && createGap && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-brand-solid/50 z-50 flex items-center justify-center p-4"
             onClick={e => e.target === e.currentTarget && setShowCreateModal(false)}
           >
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
@@ -400,7 +400,7 @@ export default function GovRecruitment() {
               <button
                 onClick={() => void submitCreateTask()}
                 disabled={createLoading}
-                className="w-full py-3 bg-black text-white rounded-xl text-sm font-bold hover:bg-neutral-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3 bg-brand-solid text-white rounded-xl text-sm font-bold hover:bg-brand-solid-hover transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {createLoading ? <span className="inline-block h-4 w-4 animate-pulse rounded-full bg-white/80" /> : <Plus className="w-4 h-4" />}
                 确认创建

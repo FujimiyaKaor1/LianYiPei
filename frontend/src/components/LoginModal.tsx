@@ -171,7 +171,7 @@ export function LoginModal() {
   if (!isLoginModalOpen) return null;
 
   return createPortal(
-    <div className="pointer-events-auto fixed inset-0 z-[1000] flex items-center justify-center bg-sidebar-bg/58 p-4 backdrop-blur-sm">
+    <div className="pointer-events-auto fixed inset-0 z-[1000] flex items-center justify-center bg-brand-deep/55 p-4 backdrop-blur-sm">
       <div
         className={cn(
           'pointer-events-auto relative z-[1001] flex max-h-[min(92vh,720px)] w-full flex-col rounded-md border border-border bg-white shadow-elevation-3 animate-in fade-in zoom-in duration-200',

@@ -216,7 +216,7 @@ export default function APIGatewayPage() {
               onClick={() => setTab(t.key as 'interfaces' | 'keys')}
               className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
                 tab === t.key
-                  ? 'bg-neutral-900 text-white'
+                  ? 'bg-brand-solid text-white'
                   : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'
               }`}
             >
@@ -380,7 +380,7 @@ export default function APIGatewayPage() {
 
       {/* 配置弹窗 */}
       {configModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-solid/40 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-base font-bold text-neutral-900">配置 {configModal.name || configModal.interface_type}</h3>
@@ -411,7 +411,7 @@ export default function APIGatewayPage() {
               <button
                 onClick={() => void handleSaveConfig()}
                 disabled={actionLoading}
-                className="rounded-xl bg-neutral-900 px-4 py-2 text-sm font-bold text-white hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+                className="rounded-xl bg-brand-solid px-4 py-2 text-sm font-bold text-white hover:bg-brand-solid-hover disabled:opacity-50 transition-colors"
               >
                 {actionLoading ? '保存中…' : '保存配置'}
               </button>
@@ -422,7 +422,7 @@ export default function APIGatewayPage() {
 
       {/* 新建 Key 弹窗 */}
       {keyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-solid/40 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             {createdKey ? (
               <>
@@ -430,14 +430,14 @@ export default function APIGatewayPage() {
                   <CheckCircle className="w-5 h-5 text-blue-500" />
                   <h3 className="text-base font-bold text-neutral-900">Key 已生成</h3>
                 </div>
-                <div className="rounded-xl bg-neutral-900 p-4 break-all">
+                <div className="rounded-xl bg-brand-solid p-4 break-all">
                   <p className="text-xs text-neutral-400 mb-1">API Key（请妥善保管，仅显示一次）</p>
                   <p className="text-sm font-mono text-blue-400">{createdKey}</p>
                 </div>
                 <div className="flex justify-end mt-5">
                   <button
                     onClick={() => { setKeyModal(false); setCreatedKey(null); setNewKeyName(''); }}
-                    className="rounded-xl bg-neutral-900 px-4 py-2 text-sm font-bold text-white hover:bg-neutral-800 transition-colors"
+                    className="rounded-xl bg-brand-solid px-4 py-2 text-sm font-bold text-white hover:bg-brand-solid-hover transition-colors"
                   >
                     完成
                   </button>

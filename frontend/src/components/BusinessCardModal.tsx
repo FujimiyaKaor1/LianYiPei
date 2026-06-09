@@ -134,13 +134,13 @@ function SingleCard({
   return (
     <div className="bg-white rounded-2xl border border-neutral-100 shadow-sm overflow-hidden flex flex-col">
       {/* 顶部色条 */}
-      <div className="h-1.5 bg-gradient-to-r from-neutral-900 to-neutral-700" />
+      <div className="h-1.5 bg-gradient-to-r from-brand-solid to-brand-deep" />
 
       <div className="p-5 flex flex-col gap-4 flex-1">
         {/* 企业标识 */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-neutral-900 flex items-center justify-center shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-brand-solid flex items-center justify-center shrink-0">
               <Building className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -246,7 +246,7 @@ export function BusinessCardModal({
   const hasBoth = Boolean(myCard) && Boolean(theirCard);
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-brand-solid/60 backdrop-blur-sm p-4">
       <div className="w-full max-w-2xl bg-neutral-50 rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
         {/* 标题栏 */}
         <div className="px-6 py-4 bg-white border-b border-neutral-100 flex items-center justify-between shrink-0">
@@ -290,7 +290,7 @@ export function BusinessCardModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-2.5 bg-neutral-900 text-white rounded-xl text-sm font-bold hover:bg-neutral-800 transition-colors"
+              className="px-6 py-2.5 bg-brand-solid text-white rounded-xl text-sm font-bold hover:bg-brand-solid-hover transition-colors"
             >
               完成
             </button>

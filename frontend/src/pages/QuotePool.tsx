@@ -230,7 +230,7 @@ export default function QuotePool() {
           </div>
         </div>
 
-        <div className="col-span-1 lg:col-span-4 bg-[#0f1115] text-white rounded-[2.5rem] p-8 lg:p-10 shadow-2xl flex flex-col">
+        <div className="col-span-1 lg:col-span-4 bg-brand-hero text-white rounded-[2.5rem] p-8 lg:p-10 shadow-2xl flex flex-col">
           <h4 className="text-lg font-bold mb-8">安全审计日志</h4>
           <div className="space-y-6 flex-1">
             {[
@@ -307,7 +307,7 @@ export default function QuotePool() {
                     <td className="px-8 py-5">
                       <span className={cn(
                         "px-2 py-1.5 rounded-[4px] text-[9px] font-black uppercase tracking-widest border",
-                        row.status === 'active' ? "bg-neutral-900 text-white border-neutral-900 shadow-sm" : "bg-neutral-100 text-neutral-600 border-neutral-200"
+                        row.status === 'active' ? "bg-brand-solid text-white border-brand-solid shadow-sm" : "bg-neutral-100 text-neutral-600 border-neutral-200"
                       )}>
                         {row.status === 'active' ? '已核验' : '待处理'}
                       </span>

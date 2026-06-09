@@ -40,7 +40,7 @@ function FilterTagRow({
               className={cn(
                 'px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-200 border',
                 selected
-                  ? 'bg-neutral-900 text-white border-neutral-900 shadow-sm'
+                  ? 'bg-brand-solid text-white border-brand-solid shadow-sm'
                   : 'bg-white text-neutral-600 border-neutral-100 hover:bg-neutral-50 hover:border-neutral-200',
               )}
             >
@@ -176,7 +176,7 @@ export default function EnterpriseDirectory() {
             className={cn(
               'w-full py-2.5 rounded-xl text-sm font-bold transition-colors',
               hasFilters
-                ? 'bg-neutral-900 text-white hover:bg-neutral-800 shadow-sm active:scale-[0.98]'
+                ? 'bg-brand-solid text-white hover:bg-brand-solid-hover shadow-sm active:scale-[0.98]'
                 : 'bg-neutral-100 text-neutral-400 cursor-not-allowed',
             )}
           >
@@ -214,7 +214,7 @@ export default function EnterpriseDirectory() {
               <button
                 type="button"
                 onClick={clearAll}
-                className="inline-flex items-center justify-center px-10 py-3.5 rounded-2xl bg-neutral-900 text-white text-sm font-bold hover:bg-neutral-800 transition-all active:scale-[0.98]"
+                className="inline-flex items-center justify-center px-10 py-3.5 rounded-2xl bg-brand-solid text-white text-sm font-bold hover:bg-brand-solid-hover transition-all active:scale-[0.98]"
               >
                 重置所有筛选
               </button>
@@ -229,7 +229,7 @@ export default function EnterpriseDirectory() {
                 className="group relative rounded-3xl border border-transparent bg-white p-6 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:-translate-y-1 transition-all duration-300"
               >
                 <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-neutral-50 text-neutral-400 group-hover:bg-neutral-900 group-hover:text-white flex items-center justify-center shrink-0 transition-colors duration-300">
+                  <div className="w-12 h-12 rounded-2xl bg-neutral-50 text-neutral-400 group-hover:bg-brand-solid group-hover:text-white flex items-center justify-center shrink-0 transition-colors duration-300">
                     <Building2 className="w-6 h-6" />
                   </div>
                   <div className="min-w-0 flex-1">

@@ -236,7 +236,7 @@ export default function DashboardPage() {
           </button>
           <button
             onClick={() => void handleClearDemo()}
-            className="flex items-center gap-2 rounded-xl bg-neutral-700 px-4 py-2 text-xs font-bold text-white hover:bg-neutral-800 transition-colors"
+            className="flex items-center gap-2 rounded-xl bg-brand-solid-hover px-4 py-2 text-xs font-bold text-white hover:bg-brand-solid-hover transition-colors"
           >
             <Trash2 className="w-3 h-3" />
             清理演示数据

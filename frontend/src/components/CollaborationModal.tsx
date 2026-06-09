@@ -140,7 +140,7 @@ export function CollaborationWorkspaceBody({
       <section className="flex flex-col lg:flex-row gap-10 lg:gap-12 items-center">
         <div className="flex-1 min-w-0">
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tighter text-neutral-900 mb-5">
-            合作闭环<span className="text-transparent bg-clip-text bg-gradient-to-r from-black to-neutral-400">与验证</span>
+            合作闭环<span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-solid to-neutral-400">与验证</span>
           </h1>
           <p className="text-neutral-500 text-lg sm:text-xl font-light mb-10 lg:mb-12">
             上传真实交易凭证，解锁信用分奖励，构建数字化商业信任
@@ -149,7 +149,7 @@ export function CollaborationWorkspaceBody({
             <button
               type="button"
               onClick={handleNewFlowClick}
-              className="bg-gradient-to-r from-neutral-900 to-neutral-600 text-white px-6 sm:px-10 py-3 sm:py-4 rounded-2xl font-bold hover:shadow-xl hover:shadow-neutral-500/30 hover:-translate-y-0.5 transition-all flex items-center gap-2 shadow-lg shadow-neutral-500/20 text-sm sm:text-base border border-neutral-600/20"
+              className="bg-gradient-to-r from-brand-solid to-brand-deep text-white px-6 sm:px-10 py-3 sm:py-4 rounded-2xl font-bold hover:shadow-xl hover:shadow-neutral-500/30 hover:-translate-y-0.5 transition-all flex items-center gap-2 shadow-lg shadow-neutral-500/20 text-sm sm:text-base border border-neutral-600/20"
             >
               <Plus className="w-5 h-5 shrink-0" />
               新建闭环流程
@@ -304,7 +304,7 @@ export function CollaborationWorkspaceBody({
                     className={cn(
                       'pb-2.5 transition-colors border-b-2 -mb-px',
                       active
-                        ? 'text-black font-bold border-black'
+                        ? 'text-black font-bold border-brand-solid'
                         : 'text-gray-400 font-medium border-transparent cursor-pointer hover:text-gray-600',
                     )}
                   >
@@ -347,8 +347,8 @@ export function CollaborationWorkspaceBody({
                         className={cn(
                           'px-2.5 sm:px-3 py-1 text-[9px] sm:text-[10px] font-black rounded uppercase tracking-tighter',
                           _historyStatus(item) === '已闭环'
-                            ? 'bg-black text-white'
-                            : 'bg-white border border-black/10 text-neutral-400',
+                            ? 'bg-brand-solid text-white'
+                            : 'bg-white border border-brand-solid/10 text-neutral-400',
                         )}
                       >
                         {_historyStatus(item)}
@@ -390,7 +390,7 @@ export function CollaborationWorkspaceBody({
         </div>
 
         <div className="col-span-12 lg:col-span-4">
-          <div className="bg-[#0A0A0B] text-white rounded-2xl p-8 sm:p-10 h-fit relative flex flex-col shadow-xl shadow-neutral-900/20 overflow-hidden border border-neutral-800">
+          <div className="bg-brand-deep text-white rounded-2xl p-8 sm:p-10 h-fit relative flex flex-col shadow-xl shadow-neutral-900/20 overflow-hidden border border-brand-solid">
             <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl rounded-full pointer-events-none" />
             <div className="mb-8 lg:mb-12 relative">
               <div className="flex items-center gap-2 mb-3">
@@ -625,7 +625,7 @@ export function CollaborationModal({
   // 挂到 body：避免 Layout 内容区 overflow 裁剪，并盖住全局侧栏/顶栏；内容仅 CollaborationWorkspaceBody
   return createPortal(
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 md:p-8"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-brand-solid/40 backdrop-blur-sm p-4 md:p-8"
       role="dialog"
       aria-modal="true"
       aria-labelledby="collaboration-modal-title"
@@ -637,7 +637,7 @@ export function CollaborationModal({
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-6 right-6 z-20 bg-white/80 backdrop-blur rounded-full p-2 hover:bg-gray-200 cursor-pointer border border-black/5 shadow-sm text-neutral-700"
+          className="absolute top-6 right-6 z-20 bg-white/80 backdrop-blur rounded-full p-2 hover:bg-gray-200 cursor-pointer border border-brand-solid/5 shadow-sm text-neutral-700"
           aria-label="关闭"
         >
           <X className="w-5 h-5" />

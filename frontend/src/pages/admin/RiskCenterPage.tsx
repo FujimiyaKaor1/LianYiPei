@@ -305,7 +305,7 @@ export default function RiskCenterPage() {
 
       {/* 恢复弹窗 */}
       {restoreTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-solid/40 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <h3 className="text-base font-bold text-neutral-900 mb-4">恢复企业状态</h3>
             <p className="text-sm text-neutral-600 mb-3">

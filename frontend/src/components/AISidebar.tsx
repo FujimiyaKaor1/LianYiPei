@@ -320,7 +320,7 @@ export function AISidebar() {
             实时产业协作大脑
           </p>
         </div>
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-sidebar-bg text-white">
+        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-solid text-white">
           <Sparkles className="w-4 h-4" />
         </div>
       </div>

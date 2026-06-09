@@ -137,7 +137,7 @@ export function IntentQuoteModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-[2px] p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-brand-solid/50 backdrop-blur-[2px] p-4">
       <div className="w-full max-w-lg rounded-2xl border border-neutral-200/80 bg-white shadow-[0_24px_64px_rgba(0,0,0,0.14)] max-h-[90vh] overflow-y-auto">
         {/* 头部 */}
         <div className="sticky top-0 bg-white flex items-start justify-between gap-3 border-b border-neutral-100 px-6 py-5">
@@ -173,7 +173,7 @@ export function IntentQuoteModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-6 py-2.5 bg-neutral-900 text-white rounded-xl text-sm font-semibold hover:bg-neutral-800 transition-colors"
+                className="px-6 py-2.5 bg-brand-solid text-white rounded-xl text-sm font-semibold hover:bg-brand-solid-hover transition-colors"
               >
                 完成
               </button>
@@ -253,13 +253,13 @@ export function IntentQuoteModal({
                         type="number"
                         value={quantity}
                         onChange={(e) => setQuantity(e.target.value)}
-                        className="flex-1 rounded-xl border border-neutral-200 px-3 py-2.5 text-sm outline-none focus:border-neutral-900"
+                        className="flex-1 rounded-xl border border-neutral-200 px-3 py-2.5 text-sm outline-none focus:border-brand-solid"
                         placeholder="数量"
                       />
                       <select
                         value={unit}
                         onChange={(e) => setUnit(e.target.value)}
-                        className="rounded-xl border border-neutral-200 px-2 py-2.5 text-sm outline-none focus:border-neutral-900 bg-white"
+                        className="rounded-xl border border-neutral-200 px-2 py-2.5 text-sm outline-none focus:border-brand-solid bg-white"
                       >
                         <option>件</option>
                         <option>套</option>
@@ -281,7 +281,7 @@ export function IntentQuoteModal({
                       step="0.01"
                       value={targetPrice}
                       onChange={(e) => setTargetPrice(e.target.value)}
-                      className="w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-sm outline-none focus:border-neutral-900"
+                      className="w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-sm outline-none focus:border-brand-solid"
                       placeholder="¥0.00"
                     />
                   </div>
@@ -295,7 +295,7 @@ export function IntentQuoteModal({
                     type="text"
                     value={budgetRange}
                     onChange={(e) => setBudgetRange(e.target.value)}
-                    className="w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-sm outline-none focus:border-neutral-900"
+                    className="w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-sm outline-none focus:border-brand-solid"
                     placeholder="如：45-55"
                   />
                 </div>
@@ -308,7 +308,7 @@ export function IntentQuoteModal({
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
                     rows={3}
-                    className="w-full resize-none rounded-xl border border-neutral-200 px-3 py-2.5 text-sm outline-none focus:border-neutral-900"
+                    className="w-full resize-none rounded-xl border border-neutral-200 px-3 py-2.5 text-sm outline-none focus:border-brand-solid"
                     placeholder="质量要求、交期要求、付款方式等..."
                   />
                 </div>

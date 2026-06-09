@@ -60,13 +60,13 @@ function DeepThinkingOverlay() {
       >
         {/* Animated brain icon */}
         <div className="relative mb-6">
-          <div className="w-16 h-16 rounded-2xl bg-black flex items-center justify-center shadow-[0_8px_30px_rgb(0,0,0,0.15)]">
+          <div className="w-16 h-16 rounded-2xl bg-brand-solid flex items-center justify-center shadow-[0_8px_30px_rgb(0,0,0,0.15)]">
             <Brain className="w-7 h-7 text-white" />
           </div>
           <motion.div
             animate={{ scale: [1, 1.4, 1], opacity: [0.3, 0, 0.3] }}
             transition={{ repeat: Infinity, duration: 2, ease: 'easeInOut' }}
-            className="absolute inset-0 rounded-2xl border-2 border-black/20"
+            className="absolute inset-0 rounded-2xl border-2 border-brand-solid/20"
           />
         </div>
 
@@ -94,7 +94,7 @@ function DeepThinkingOverlay() {
             <motion.div
               key={i}
               animate={{
-                backgroundColor: i <= phase ? '#000' : '#e5e5e5',
+                backgroundColor: i <= phase ? '#1D4ED8' : '#e5e5e5',
                 scale: i === phase ? 1.3 : 1,
               }}
               className="w-1.5 h-1.5 rounded-full"
@@ -473,7 +473,7 @@ export default function Matching() {
                     className={cn(
                       "flex cursor-pointer flex-col gap-2 rounded-md border p-3.5 transition-all duration-200",
                       isActive
-                        ? "border-sidebar-bg bg-sidebar-bg text-white shadow-elevation-2"
+                        ? "border-brand-solid bg-brand-solid text-white shadow-elevation-2"
                         : "border-border bg-white text-ink hover:border-border-hover hover:shadow-elevation-1"
                     )}
                   >
@@ -555,7 +555,7 @@ export default function Matching() {
                      <div>
                        <div className="flex items-center gap-2 mb-1">
                          <h2 className="text-lg font-bold text-ink">{activeSupplier.name}</h2>
-                         <div className="flex items-center gap-1 rounded-sm bg-sidebar-bg px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
+                         <div className="flex items-center gap-1 rounded-sm bg-brand-solid px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
                            <Target className="w-2.5 h-2.5" /> 匹配度 {activeSupplier.score || activeSupplier.confidence_index || activeSupplier.match || '—'}
                          </div>
                          {activeSupplier.match_basis && (
@@ -649,7 +649,7 @@ export default function Matching() {
                           transition={{ delay: idx * 0.01 }}
                           className={cn(
                             "aspect-square cursor-crosshair rounded-[4px] border transition-all hover:scale-105",
-                            status === 0 ? "border-sidebar-bg bg-sidebar-bg" :
+                            status === 0 ? "border-brand-solid bg-brand-solid" :
                             status === 1 ? "border-risk bg-risk" :
                             status === 2 ? "border-trust/30 bg-trust-soft" :
                             "border-border bg-white"
@@ -661,7 +661,7 @@ export default function Matching() {
                     <div className="flex items-center justify-end gap-1.5 mt-3 text-[9px] font-medium text-neutral-400">
                       <span>排满</span>
                       <div className="flex gap-0.5">
-                        <div className="w-2.5 h-2.5 rounded-[2px] bg-sidebar-bg"></div>
+                        <div className="w-2.5 h-2.5 rounded-[2px] bg-brand-solid"></div>
                         <div className="w-2.5 h-2.5 rounded-[2px] bg-risk"></div>
                         <div className="w-2.5 h-2.5 rounded-[2px] bg-trust-soft"></div>
                         <div className="w-2.5 h-2.5 rounded-[2px] border border-border bg-white"></div>

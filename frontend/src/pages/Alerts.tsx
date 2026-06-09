@@ -75,7 +75,7 @@ function MiniBarChart({ data }: { data: number[] }) {
             transition={{ delay: idx * 0.05, duration: 0.4, ease: 'easeOut' }}
             className={cn(
               'flex-1 rounded-[2px]',
-              isLast2 ? 'bg-black' : 'bg-neutral-300',
+              isLast2 ? 'bg-brand-solid' : 'bg-neutral-300',
             )}
             style={{ minHeight: 3 }}
           />
@@ -191,7 +191,7 @@ export default function Alerts() {
                 className={cn(
                   'px-2.5 py-1 rounded-md text-[10px] font-bold transition-all',
                   filterTab === tab.key
-                    ? 'bg-black text-white'
+                    ? 'bg-brand-solid text-white'
                     : 'text-neutral-500 hover:text-black hover:bg-neutral-100'
                 )}
               >
@@ -248,7 +248,7 @@ export default function Alerts() {
                   className={cn(
                     'cursor-pointer p-3.5 rounded-xl border transition-all duration-200',
                     isActive
-                      ? 'bg-black border-black text-white shadow-[0_4px_20px_rgb(0,0,0,0.15)]'
+                      ? 'bg-brand-solid border-brand-solid text-white shadow-[0_4px_20px_rgb(0,0,0,0.15)]'
                       : 'bg-white border-neutral-100 text-neutral-900 hover:border-neutral-200 hover:shadow-sm'
                   )}
                 >
@@ -353,7 +353,7 @@ export default function Alerts() {
                 <div className="bg-white rounded-xl border border-neutral-100 p-4">
                   <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-3">数据源明细</h3>
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-neutral-900 flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-lg bg-brand-solid flex items-center justify-center shrink-0">
                       <Cpu className="w-4 h-4 text-white/80" />
                     </div>
                     <div>
@@ -406,7 +406,7 @@ export default function Alerts() {
               </div>
               <button
                 onClick={() => navigate('/quote-pool')}
-                className="flex items-center gap-2 px-5 py-2 bg-black text-white text-xs font-bold rounded-lg hover:bg-neutral-800 transition-all shadow-[0_4px_14px_0_rgb(0,0,0,0.1)]"
+                className="flex items-center gap-2 px-5 py-2 bg-brand-solid text-white text-xs font-bold rounded-lg hover:bg-brand-solid-hover transition-all shadow-[0_4px_14px_0_rgb(0,0,0,0.1)]"
               >
                 <Zap className="w-3.5 h-3.5 fill-white" />
                 一键生成意向报价去接单

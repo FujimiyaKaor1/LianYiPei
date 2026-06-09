@@ -63,7 +63,7 @@ export default function Assets() {
   return (
     <div className="space-y-12">
       {/* Identity Banner */}
-      <section className="bg-black text-white rounded-[3rem] p-12 relative overflow-hidden shadow-2xl">
+      <section className="bg-brand-solid text-white rounded-[3rem] p-12 relative overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-gradient-to-br from-white/10 to-transparent blur-3xl rounded-full -mr-64 -mt-64"></div>
         
         <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-12">
@@ -190,7 +190,7 @@ export default function Assets() {
                   </div>
                   <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
                     <div 
-                      className={cn("h-full transition-all duration-1000", item.score > 80 ? 'bg-black' : 'bg-neutral-400')} 
+                      className={cn("h-full transition-all duration-1000", item.score > 80 ? 'bg-brand-solid' : 'bg-neutral-400')}
                       style={{ width: `${Math.max(0, Math.min(100, item.score))}%` }}>
                     </div>
                   </div>
@@ -212,7 +212,7 @@ export default function Assets() {
               {data.team_members.map((member, i) => (
                 <div key={i} className="p-4 bg-white rounded-2xl border border-neutral-100 shadow-sm flex items-center justify-between group cursor-pointer hover:bg-neutral-50 transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-neutral-900 text-white rounded-full flex items-center justify-center font-bold text-xs shrink-0">{member.avatar}</div>
+                    <div className="w-10 h-10 bg-brand-solid text-white rounded-full flex items-center justify-center font-bold text-xs shrink-0">{member.avatar}</div>
                     <div>
                       <h4 className="text-sm font-bold truncate max-w-[120px]">{member.name}</h4>
                       <p className="text-[10px] text-neutral-400 truncate max-w-[120px]">{member.role}</p>
@@ -221,7 +221,7 @@ export default function Assets() {
                   <ChevronRight className="w-4 h-4 text-neutral-300 group-hover:text-black shrink-0" />
                 </div>
               ))}
-              <button className="w-full py-4 border-2 border-dashed border-neutral-200 rounded-2xl text-xs font-bold text-neutral-500 hover:border-black hover:text-black transition-all flex items-center justify-center gap-2">
+              <button className="w-full py-4 border-2 border-dashed border-neutral-200 rounded-2xl text-xs font-bold text-neutral-500 hover:border-brand-solid hover:text-black transition-all flex items-center justify-center gap-2">
                 <Plus className="w-4 h-4" /> 邀请新成员
               </button>
             </div>

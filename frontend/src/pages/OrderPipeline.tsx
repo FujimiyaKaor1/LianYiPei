@@ -348,7 +348,7 @@ export default function OrderPipeline() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            className="fixed bottom-24 left-1/2 z-[100] max-w-[min(92vw,420px)] -translate-x-1/2 rounded-md bg-sidebar-bg px-5 py-3 text-center text-sm font-medium text-white shadow-elevation-3"
+            className="fixed bottom-24 left-1/2 z-[100] max-w-[min(92vw,420px)] -translate-x-1/2 rounded-md bg-brand-solid px-5 py-3 text-center text-sm font-medium text-white shadow-elevation-3"
           >
             {toastMsg}
           </motion.div>

@@ -107,7 +107,7 @@ export default function GovQualityLabels() {
   };
 
   const STATUS_STYLE: Record<string, string> = {
-    active: 'bg-neutral-900 text-white border-neutral-900 shadow-sm',
+    active: 'bg-brand-solid text-white border-brand-solid shadow-sm',
     expired: 'bg-neutral-100 text-neutral-400 border-neutral-200',
     revoked: 'bg-neutral-50 text-neutral-500 border-neutral-300',
   };
@@ -118,7 +118,7 @@ export default function GovQualityLabels() {
 
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-br from-[#1C1C1E] to-black text-white p-7 rounded-[2rem] relative overflow-hidden"
+        className="bg-gradient-to-br from-brand-solid to-brand-deep text-white p-7 rounded-[2rem] relative overflow-hidden"
       >
         <div className="absolute top-0 right-0 p-8 opacity-5"><Award className="w-40 h-40" /></div>
         <div className="flex items-center gap-2 mb-2">
@@ -144,13 +144,13 @@ export default function GovQualityLabels() {
               onChange={e => setQueryId(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && void handleSearch()}
               placeholder="输入企业 ID 查询标签..."
-              className="w-full pl-10 pr-4 py-3 bg-neutral-50 border border-neutral-100 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition-all"
+              className="w-full pl-10 pr-4 py-3 bg-neutral-50 border border-neutral-100 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-black focus:border-brand-solid transition-all"
             />
           </div>
           <button
             onClick={() => void handleSearch()}
             disabled={!queryId || loading}
-            className="px-5 py-3 bg-black text-white rounded-xl text-sm font-bold hover:bg-neutral-800 transition-all disabled:opacity-50 flex items-center gap-2"
+            className="px-5 py-3 bg-brand-solid text-white rounded-xl text-sm font-bold hover:bg-brand-solid-hover transition-all disabled:opacity-50 flex items-center gap-2"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
             查询
@@ -158,7 +158,7 @@ export default function GovQualityLabels() {
           <button
             onClick={() => void handleSync()}
             disabled={!queryId || syncLoading}
-            className="px-5 py-3 bg-white border border-neutral-200 rounded-xl text-sm font-bold hover:border-black transition-all disabled:opacity-50 flex items-center gap-2"
+            className="px-5 py-3 bg-white border border-neutral-200 rounded-xl text-sm font-bold hover:border-brand-solid transition-all disabled:opacity-50 flex items-center gap-2"
           >
             {syncLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             同步第三方
@@ -220,13 +220,13 @@ export default function GovQualityLabels() {
       >
         <button
           onClick={() => { setForm({ ...defaultForm, type: 'green' }); setShowModal(true); setGrantResult(null); }}
-          className="flex items-center gap-2 px-5 py-3 bg-black text-white rounded-xl text-sm font-bold hover:bg-neutral-800 transition-all shadow-lg shadow-black/10"
+          className="flex items-center gap-2 px-5 py-3 bg-brand-solid text-white rounded-xl text-sm font-bold hover:bg-brand-solid-hover transition-all shadow-lg shadow-brand-solid/10"
         >
           <BadgeCheck className="w-4 h-4" /> 颁发政府绿标
         </button>
         <button
           onClick={() => { setForm({ ...defaultForm, type: 'inspection' }); setShowModal(true); setGrantResult(null); }}
-          className="flex items-center gap-2 px-5 py-3 bg-white border border-neutral-200 rounded-xl text-sm font-bold hover:border-black transition-all"
+          className="flex items-center gap-2 px-5 py-3 bg-white border border-neutral-200 rounded-xl text-sm font-bold hover:border-brand-solid transition-all"
         >
           <ShieldCheck className="w-4 h-4" /> 颁发验厂标签
         </button>
@@ -236,7 +236,7 @@ export default function GovQualityLabels() {
       <AnimatePresence>
         {showModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-brand-solid/50 z-50 flex items-center justify-center p-4"
             onClick={e => e.target === e.currentTarget && setShowModal(false)}
           >
             <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
@@ -265,7 +265,7 @@ export default function GovQualityLabels() {
                         value={(form as any)[f.key]}
                         onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
                         placeholder={f.placeholder}
-                        className="w-full pl-10 pr-4 py-3 bg-neutral-50 border border-neutral-100 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition-all"
+                        className="w-full pl-10 pr-4 py-3 bg-neutral-50 border border-neutral-100 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-black focus:border-brand-solid transition-all"
                       />
                     </div>
                   </div>
@@ -278,7 +278,7 @@ export default function GovQualityLabels() {
                       onChange={e => setForm(prev => ({ ...prev, inspection_notes: e.target.value }))}
                       placeholder="验厂情况说明..."
                       rows={3}
-                      className="w-full px-4 py-3 bg-neutral-50 border border-neutral-100 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition-all resize-none"
+                      className="w-full px-4 py-3 bg-neutral-50 border border-neutral-100 rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-black focus:border-brand-solid transition-all resize-none"
                     />
                   </div>
                 )}
@@ -299,7 +299,7 @@ export default function GovQualityLabels() {
               <button
                 onClick={() => void handleGrant()}
                 disabled={!form.enterprise_id || grantLoading}
-                className="w-full py-3 bg-black text-white rounded-xl text-sm font-bold hover:bg-neutral-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3 bg-brand-solid text-white rounded-xl text-sm font-bold hover:bg-brand-solid-hover transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {grantLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4" />}
                 确认颁发

@@ -35,7 +35,7 @@ export default function GovSupplyChain() {
 
       <section className="panel overflow-hidden">
         <div className="grid grid-cols-1 lg:grid-cols-[1.25fr_0.75fr]">
-          <div className="relative overflow-hidden bg-sidebar-bg p-7 text-sidebar-text-active">
+          <div className="relative overflow-hidden bg-brand-hero p-7 text-sidebar-text-active">
             <div className="absolute inset-0 bg-grid-fade opacity-20" />
             <div className="relative max-w-3xl">
               <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-md border border-white/10 bg-brand text-white shadow-elevation-2">
