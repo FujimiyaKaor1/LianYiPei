@@ -6,7 +6,6 @@ import { TopBar } from './TopBar';
 
 export function Layout() {
   const location = useLocation();
-  const isHomePage = location.pathname === '/';
 
   const getTitle = (path: string) => {
     switch (path) {
@@ -18,7 +17,6 @@ export function Layout() {
         return '销售控制台';
       case '/risk': return '风险监测';
       case '/orders': return '订单工作流';
-      case '/favorites': return '优质客商';
       case '/assets': return '资产管理';
       case '/settings': return '系统设置';
       case '/group-purchase': return '集采拼单大厅';
@@ -38,7 +36,7 @@ export function Layout() {
           <Outlet />
         </div>
       </main>
-      {isHomePage && <AISidebar />}
+      <AISidebar />
     </div>
   );
 }

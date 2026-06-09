@@ -24,7 +24,6 @@ import {
   IdCard,
   Building,
   MapPin,
-  Star,
   Sparkles,
   DollarSign,
   Package,
@@ -45,7 +44,6 @@ import { useAuth } from '@/src/context/AuthContext';
 import { useToast } from '@/src/components/ToastProvider';
 import { motion, AnimatePresence } from 'motion/react';
 import { BusinessCardModal, type BusinessCardData } from '@/src/components/BusinessCardModal';
-import { FavoritesContent } from '@/src/pages/Favorites';
 import { IntentQuoteModal } from '@/src/components/IntentQuoteModal';
 import { AnalysisReportModal } from '@/src/components/AnalysisReportModal';
 
@@ -499,33 +497,6 @@ export default function SalesConsole() {
   const [savedMyCard, setSavedMyCard] = useState<BusinessCardData | undefined>();
   const [savedTheirCard, setSavedTheirCard] = useState<BusinessCardData | undefined>();
 
-  // ── 优质客商（嵌入面板 + 收藏企业）────────────────────────────────────────
-  const [showFavoritesPanel, setShowFavoritesPanel] = useState(false);
-  const [favoritesListVersion, setFavoritesListVersion] = useState(0);
-  const [favoriteIds, setFavoriteIds] = useState<Set<number>>(() => new Set());
-  const [favoriteBusy, setFavoriteBusy] = useState(false);
-  const [favoriteActionMessage, setFavoriteActionMessage] = useState('');
-
-  const refreshFavoriteIds = useCallback(async () => {
-    try {
-      // 优先使用新API
-      const r = await api.getFavorites();
-      setFavoriteIds(new Set((r.favorites || []).map((f) => f.supplier_id)));
-    } catch {
-      // 降级到旧API
-      try {
-        const legacy = await api.getFavoritesLegacy();
-        setFavoriteIds(new Set((legacy.favorites || []).map((f: any) => f.supplier_id || f.id)));
-      } catch {
-        setFavoriteIds(new Set());
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    void refreshFavoriteIds();
-  }, [refreshFavoriteIds]);
-
   // ═══════════════════════════════════════════════════════════════════════════
   // 引导逻辑：支持 ?chat_id= 和 location.state 两种激活方式
   // ═══════════════════════════════════════════════════════════════════════════
@@ -549,9 +520,6 @@ export default function SalesConsole() {
     const desk = searchParams.get('desk');
     if (desk === 'procurement' || desk === 'sales') {
       setMode(desk);
-    }
-    if (searchParams.get('panel') === 'favorites') {
-      setShowFavoritesPanel(true);
     }
     // 自动打开意向报价单（从匹配页发起匿名询价后跳转过来）
     if (searchParams.get('auto_quote') === '1') {
@@ -1048,33 +1016,6 @@ export default function SalesConsole() {
     return null;
   }, [user?.id, activeInquiryChatId, activeInquiryChat, activeChatId, selectedMessage]);
 
-  const handleToggleFavoriteEnterprise = async () => {
-    if (!counterpartyEnterpriseId || favoriteBusy) return;
-    setFavoriteBusy(true);
-    setFavoriteActionMessage('');
-    const id = counterpartyEnterpriseId;
-    const was = favoriteIds.has(id);
-    try {
-      if (was) {
-        await api.removeFavoriteById(id);
-      } else {
-        await api.addFavorite({
-          supplier_id: id,
-          product_name: activeInquiryChat?.product_name || extractProductName(selectedMessage || { id: 0, type: '', title: '', content: '', is_read: true }),
-          match_score: matchScore || undefined,
-        });
-      }
-      await refreshFavoriteIds();
-      setFavoritesListVersion((v) => v + 1);
-      setFavoriteActionMessage(was ? '已取消收藏' : '已收藏该企业');
-      window.setTimeout(() => setFavoriteActionMessage(''), 2800);
-    } catch (err) {
-      setFavoriteActionMessage(err instanceof Error ? err.message : '收藏操作失败');
-    } finally {
-      setFavoriteBusy(false);
-    }
-  };
-
   // ═══════════════════════════════════════════════════════════════════════════
   // 渲染：判断当前选中的是哪种会话
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1207,20 +1148,6 @@ export default function SalesConsole() {
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowFavoritesPanel((v) => !v)}
-            className={cn(
-              'shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold transition-colors',
-              showFavoritesPanel
-                ? 'border-amber-300 bg-amber-50 text-amber-900'
-                : 'border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50',
-            )}
-          >
-            <Star className={cn('w-3.5 h-3.5', showFavoritesPanel && 'fill-amber-400 text-amber-500')} />
-            优质客商
-          </button>
-
           {/* 采购/销售模式切换 Toggle */}
           <div className="flex flex-col items-end gap-1 shrink-0">
             <div className="flex items-center gap-1 rounded-full bg-neutral-100 p-1">
@@ -1247,15 +1174,6 @@ export default function SalesConsole() {
             </span>
           </div>
         </div>
-
-        {showFavoritesPanel ? (
-          <div
-            key={favoritesListVersion}
-            className="border-b border-neutral-100 bg-neutral-50/80 px-4 py-4 max-h-[min(70vh,560px)] overflow-y-auto no-scrollbar"
-          >
-            <FavoritesContent embedded onClose={() => setShowFavoritesPanel(false)} />
-          </div>
-        ) : null}
 
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* ── 左侧：会话列表（双来源：旧 API 消息 + InquiryChat）──────── */}

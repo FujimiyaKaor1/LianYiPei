@@ -463,7 +463,7 @@ export default function Dashboard() {
                           {item.name}
                         </h4>
                         <span className="shrink-0 rounded-md border border-border bg-surface-subtle px-1.5 py-0.5 text-[10px] font-bold text-ink-muted">
-                          {(item.tags && item.tags[0]) || '优质客商'}
+                          {(item.tags && item.tags[0]) || '高信用企业'}
                         </span>
                       </div>
                       <div className="mt-4 flex min-w-0 flex-wrap items-center gap-3 text-xs font-medium text-ink-muted">

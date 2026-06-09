@@ -21,7 +21,6 @@ import QuotePool from './pages/QuotePool';
 import OrderPipeline from './pages/OrderPipeline';
 import Alerts from './pages/Alerts';
 import Assets from './pages/Assets';
-import Favorites from './pages/Favorites';
 import GroupPurchase from './pages/GroupPurchase';
 import Settings from './pages/Settings';
 import FulfillmentDashboard from './pages/FulfillmentDashboard';
@@ -108,7 +107,7 @@ export default function App() {
           <Route path="risk" element={<Alerts />} />
           <Route path="alerts" element={<Navigate to="/risk" replace />} />
           <Route path="orders" element={<OrderPipeline />} />
-          <Route path="favorites" element={<Favorites />} />
+          <Route path="favorites" element={<Navigate to="/sales-console" replace />} />
           <Route path="assets" element={<Assets />} />
           <Route path="settings" element={<Settings />} />
           <Route path="group-purchase" element={<GroupPurchase />} />

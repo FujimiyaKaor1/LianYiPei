@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Download, Send, Sparkles, Trash2, Upload } from 'lucide-react';
+import { Download, MessageCircle, Minus, Send, Sparkles, Trash2, Upload } from 'lucide-react';
 import { notifyIfUnauthorized } from '@/src/lib/authEvents';
 import { api, ApiError } from '@/src/services/api';
 import { getStoredModelChoice, setStoredModelChoice, type ModelChoice } from '@/src/lib/modelChoice';
@@ -89,13 +89,28 @@ export function AISidebar() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [modelChoice, setModelChoice] = useState<ModelChoice>(getStoredModelChoice());
   const [useRag, setUseRag] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesListRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!messages.length) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      const messageList = messagesListRef.current;
+      if (!messageList) {
+        return;
+      }
+
+      messageList.scrollTo({
+        top: messageList.scrollHeight,
+        behavior: 'smooth',
+      });
+    });
   }, [messages]);
 
   const updateAssistantMessage = (messageId: string, content: string) => {
@@ -312,7 +327,13 @@ export function AISidebar() {
   const canSend = inputValue.trim().length > 0 && !isStreaming;
 
   return (
-    <aside className="sticky top-0 flex h-screen w-84 shrink-0 flex-col border-l border-border bg-white/86 backdrop-blur-xl">
+    <div data-ai-floating-root className="pointer-events-none fixed bottom-5 right-5 z-[120] flex flex-col items-end gap-3">
+      {isOpen ? (
+        <section
+          data-ai-floating-window
+          className="pointer-events-auto flex h-[min(78dvh,680px)] w-[min(calc(100vw-2rem),380px)] flex-col overflow-hidden rounded-md border border-border bg-white/94 shadow-elevation-3 backdrop-blur-xl"
+          aria-label="链小易 AI 悬浮窗口"
+        >
       <div className="flex items-center justify-between border-b border-border px-5 py-4">
         <div>
           <h3 className="text-base font-bold text-ink">链小易 AI</h3>
@@ -320,12 +341,23 @@ export function AISidebar() {
             实时产业协作大脑
           </p>
         </div>
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-solid text-white">
-          <Sparkles className="w-4 h-4" />
+        <div className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-solid text-white">
+            <Sparkles className="w-4 h-4" />
+          </div>
+          <button
+            type="button"
+            className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-surface text-ink-muted transition-colors hover:border-brand/30 hover:text-brand"
+            onClick={() => setIsOpen(false)}
+            title="收起链小易 AI"
+            aria-label="收起链小易 AI"
+          >
+            <Minus className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
-      <div className="scrollbar-thin flex-1 space-y-5 overflow-y-auto p-5">
+      <div ref={messagesListRef} className="scrollbar-thin flex-1 space-y-5 overflow-y-auto p-5">
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <div className="rounded-md border border-border bg-surface-subtle px-4 py-3 text-center text-xs leading-relaxed text-ink-muted">
@@ -365,7 +397,6 @@ export function AISidebar() {
             );
           })
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       <div className="border-t border-border p-5">
@@ -480,6 +511,20 @@ export function AISidebar() {
           </button>
         </div>
       </div>
-    </aside>
+        </section>
+      ) : null}
+
+      <button
+        type="button"
+        className="pointer-events-auto flex items-center gap-2 rounded-md border border-brand/25 bg-brand-solid px-4 py-3 text-sm font-bold text-white shadow-elevation-3 transition-transform hover:-translate-y-0.5 hover:bg-brand-solid-hover"
+        onClick={() => setIsOpen((current) => !current)}
+        title={isOpen ? '收起链小易 AI' : '打开链小易 AI'}
+        aria-label={isOpen ? '收起链小易 AI' : '打开链小易 AI'}
+        aria-expanded={isOpen}
+      >
+        <MessageCircle className="h-4 w-4" />
+        链小易 AI
+      </button>
+    </div>
   );
 }

@@ -5,6 +5,12 @@ import {defineConfig, loadEnv} from 'vite';
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
+  const deployTarget = env.VITE_DEPLOY_TARGET || '';
+  const isGithubPages = deployTarget === 'github-pages';
+  const githubRepoName =
+    env.GITHUB_REPOSITORY?.split('/')[1] ||
+    env.VITE_GITHUB_REPO_NAME ||
+    'LianYiPei';
   const flaskProxyTarget =
     env.VITE_FLASK_PROXY_TARGET ||
     env.FLASK_PROXY_TARGET ||
@@ -12,7 +18,9 @@ export default defineConfig(({mode}) => {
 
   // 生产构建输出到 Flask static 目录（便于 Flask 直接服务）
   const isProd = mode === 'production';
-  const outDir = isProd
+  const outDir = isGithubPages
+    ? 'dist'
+    : isProd
     ? path.resolve(__dirname, '../app/static/frontend')
     : 'dist';
   const flaskProxy = () => ({
@@ -25,7 +33,7 @@ export default defineConfig(({mode}) => {
 
   return {
     plugins: [react(), tailwindcss()],
-    base: isProd ? '/static/frontend/' : '/',
+    base: isGithubPages ? `/${githubRepoName}/` : isProd ? '/static/frontend/' : '/',
     build: {
       outDir,
       emptyOutDir: true,

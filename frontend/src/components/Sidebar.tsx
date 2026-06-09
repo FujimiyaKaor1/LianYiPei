@@ -36,7 +36,6 @@ const navGroups = [
       { icon: Network, label: '供需匹配', path: '/matching' },
       { icon: Users, label: '集采拼单', path: '/group-purchase' },
       { icon: Receipt, label: '报价池', path: '/quote-pool' },
-      { icon: Wallet, label: '优质客商', path: '/favorites' },
     ],
   },
   {
