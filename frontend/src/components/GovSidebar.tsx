@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '@/src/context/AuthContext';
+import { BrandLogo } from './BrandLogo';
 
 /** 顺序突出「质量把关 → 风险预警 → 产业链视图 → 招商」 */
 const govNavItems = [
@@ -26,16 +27,12 @@ export function GovSidebar() {
   const initial = displayName !== '未登录' ? displayName.slice(0, 1) : '?';
 
   return (
-    <aside className="sidebar-width h-screen sticky top-0 flex-shrink-0 flex flex-col border-r border-border bg-canvas">
-      <div className="h-16 flex-shrink-0 flex items-center px-5 border-b border-border">
-        <ShieldCheck className="w-5 h-5 mr-2 text-ink-soft" />
-        <h1 className="text-lg font-bold tracking-tighter text-brand">链易配</h1>
-        <span className="ml-2 text-[9px] text-ink-muted font-medium tracking-widest uppercase">
-          产业监管
-        </span>
+    <aside className="sidebar-width sticky top-0 flex h-screen flex-shrink-0 flex-col border-r border-white/10 bg-sidebar-bg text-sidebar-text">
+      <div className="sidebar-logo-row flex h-[72px] flex-shrink-0 items-center gap-3 border-b border-sidebar-divider px-5">
+        <BrandLogo sidebar subtitle="产业监管驾驶舱" />
       </div>
 
-      <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
+      <nav className="scrollbar-thin flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {govNavItems.map((item) => (
           <NavLink
             key={item.path}
@@ -43,35 +40,35 @@ export function GovSidebar() {
             end={item.path === '/gov'}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-150 text-sm',
+                'relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-all duration-150',
                 isActive
-                  ? 'bg-ink text-on-brand font-semibold shadow-elevation-1'
-                  : 'text-ink-soft hover:bg-canvas-muted hover:text-ink',
+                  ? 'bg-sidebar-item-active text-sidebar-text-active font-semibold shadow-elevation-1'
+                  : 'text-sidebar-text hover:bg-sidebar-item-hover hover:text-sidebar-text-active',
               )
             }
           >
-            <item.icon className="w-5 h-5" />
-            <span className="text-sm">{item.label}</span>
+            <item.icon className="h-4.5 w-4.5" />
+            <span className="sidebar-nav-label text-sm">{item.label}</span>
           </NavLink>
         ))}
       </nav>
 
-      <div className="flex-shrink-0 p-4 border-t border-gray-100">
+      <div className="flex-shrink-0 border-t border-sidebar-divider p-3">
         <button
           type="button"
           onClick={() => !user && !loading && setIsLoginModalOpen(true)}
-          className="w-full text-left flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100/80 transition-colors disabled:opacity-70"
+          className="sidebar-account-button flex w-full items-center gap-3 rounded-md border border-sidebar-divider bg-sidebar-panel/70 px-3 py-2.5 text-left transition-colors hover:bg-sidebar-panel disabled:opacity-70"
           disabled={loading}
         >
-          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold text-neutral-600 shrink-0">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand text-sm font-bold text-white">
             {initial}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold truncate" title={displayName}>
+          <div className="sidebar-user-copy flex-1 min-w-0">
+            <p className="truncate text-xs font-bold text-sidebar-text-active" title={displayName}>
               {loading ? '…' : displayName}
             </p>
-            <div className="flex items-center gap-1 text-[10px] text-neutral-500">
-              <ShieldCheck className="w-3 h-3 text-neutral-600 shrink-0" />
+            <div className="flex items-center gap-1 text-[10px] text-sidebar-text">
+              <ShieldCheck className="h-3 w-3 shrink-0 text-brand-muted" />
               <span>{user ? '政府监管' : '点击登录'}</span>
             </div>
           </div>

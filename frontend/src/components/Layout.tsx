@@ -30,11 +30,11 @@ export function Layout() {
   };
 
   return (
-    <div className="flex min-h-screen w-full bg-canvas-soft">
+    <div className="app-shell flex min-h-screen w-full">
       <Sidebar />
-      <main className="flex flex-1 flex-col min-w-0 min-h-screen">
+      <main className="flex min-h-screen min-w-0 flex-1 flex-col">
         <TopBar title={getTitle(location.pathname)} />
-        <div className="w-full p-4 md:p-6 pb-12 min-h-0">
+        <div data-scroll-root className="min-h-0 w-full flex-1 p-4 pb-12 md:p-6">
           <Outlet />
         </div>
       </main>

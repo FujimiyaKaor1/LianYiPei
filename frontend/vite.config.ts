@@ -15,6 +15,13 @@ export default defineConfig(({mode}) => {
   const outDir = isProd
     ? path.resolve(__dirname, '../app/static/frontend')
     : 'dist';
+  const flaskProxy = () => ({
+    target: flaskProxyTarget,
+    changeOrigin: true,
+    secure: false,
+    timeout: 180_000,
+    proxyTimeout: 180_000,
+  });
 
   return {
     plugins: [react(), tailwindcss()],
@@ -46,47 +53,14 @@ export default defineConfig(({mode}) => {
       // 设置 DISABLE_HMR=true 可关闭 HMR（例如远程/代理环境）
       hmr: process.env.DISABLE_HMR !== 'true',
       proxy: {
-        '/api': {
-          target: flaskProxyTarget,
-          changeOrigin: true,
-          secure: false,
-          rewrite: (path) => path,
-          // 本地匹配/大模型冷启动可能超过默认代理超时，避免 Dev Server 提前断连
-          timeout: 180_000,
-          proxyTimeout: 180_000,
-        },
+        // 本地匹配/大模型冷启动可能超过默认代理超时，避免 Dev Server 提前断连
+        '/api': flaskProxy(),
         // Flask-Login：登录 / 注销须与 SPA 同域（5173），浏览器才会在后续 /api 请求里带上 session Cookie
-        '/auth': {
-          target: flaskProxyTarget,
-          changeOrigin: true,
-          secure: false,
-          timeout: 180_000,
-          proxyTimeout: 180_000,
-        },
-        // 管理员后台 API（/admin/* 由 admin_panel_bp 提供）
-        '/admin': {
-          target: flaskProxyTarget,
-          changeOrigin: true,
-          secure: false,
-          timeout: 180_000,
-          proxyTimeout: 180_000,
-        },
-        // 政府大屏 / 管理端：Flask dashboard 蓝图下的 JSON（stats、graph-data、alerts 等）
-        '/dashboard': {
-          target: flaskProxyTarget,
-          changeOrigin: true,
-          secure: false,
-          timeout: 180_000,
-          proxyTimeout: 180_000,
-        },
-        // 政府监管路由（/gov/* 由 SPA 内部处理，前端路由无 /gov 后端路径）
-        '/gov': {
-          target: flaskProxyTarget,
-          changeOrigin: true,
-          secure: false,
-          timeout: 180_000,
-          proxyTimeout: 180_000,
-        },
+        '/auth': flaskProxy(),
+        // 管理员后台 API；/admin/dashboard 页面深链必须交给 React Router。
+        '^/admin/(api|dashboard/api|external-interfaces/api)(/|$)': flaskProxy(),
+        // 政府监管 JSON API；/gov 与 /dashboard 页面深链由 SPA 自己处理。
+        '^/dashboard/api(/|$)': flaskProxy(),
       }
     },
   };

@@ -64,7 +64,7 @@ const FALLBACK_MOCK_ORDERS: OrderItem[] = [
   },
 ];
 
-const TOAST_MESSAGE = '✅ 订单状态已更新，产能日历已同步。';
+const TOAST_MESSAGE = '订单状态已更新，产能日历已同步。';
 
 function getInitials(name: string): string {
   if (!name) return '??';
@@ -106,7 +106,7 @@ function estimateProgress(order: OrderItem): number {
 
 function SkeletonCard() {
   return (
-    <div className="bg-white rounded-2xl border border-neutral-100/90 p-4 animate-pulse space-y-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+    <div className="card animate-pulse space-y-2.5 p-4">
       <div className="flex justify-between">
         <div className="h-3 bg-neutral-100 rounded w-20" />
         <div className="h-4 bg-neutral-100 rounded w-16" />
@@ -124,7 +124,7 @@ function SkeletonCard() {
 const Avatar = ({ initials, bg = 'bg-slate-800' }: { initials: string; bg?: string }) => (
   <div
     className={cn(
-      'w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white border-2 border-white shrink-0',
+      'flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-white text-[9px] font-bold text-white',
       bg,
     )}
   >
@@ -341,26 +341,26 @@ export default function OrderPipeline() {
   const totalActive = (stats?.pending || 0) + (stats?.in_progress || 0);
 
   return (
-    <div className="relative h-[calc(100vh-5rem)] max-h-[860px] flex flex-col bg-[#FAFAFA] rounded-2xl overflow-hidden font-sans antialiased">
+    <div className="panel relative mx-auto flex h-[calc(100vh-6rem)] max-h-[900px] w-full max-w-[1440px] flex-col overflow-hidden font-sans antialiased">
       <AnimatePresence>
         {toastMsg ? (
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            className="fixed bottom-24 left-1/2 z-[100] -translate-x-1/2 px-5 py-3 rounded-full bg-neutral-900 text-white text-sm font-medium shadow-[0_12px_40px_rgba(0,0,0,0.18)] max-w-[min(92vw,420px)] text-center"
+            className="fixed bottom-24 left-1/2 z-[100] max-w-[min(92vw,420px)] -translate-x-1/2 rounded-md bg-sidebar-bg px-5 py-3 text-center text-sm font-medium text-white shadow-elevation-3"
           >
             {toastMsg}
           </motion.div>
         ) : null}
       </AnimatePresence>
 
-      <div className="flex justify-between items-start px-8 pt-6 pb-4 shrink-0">
+      <div className="panel-header flex shrink-0 items-start justify-between px-6 py-5 md:px-8">
         <div>
-          <h1 className="text-lg font-black tracking-tight text-neutral-900 leading-tight">
+          <h1 className="text-xl font-black leading-tight text-ink">
             订单工作流与产能联动
           </h1>
-          <p className="text-[11px] text-neutral-400 font-medium mt-0.5 tracking-wide">
+          <p className="mt-1 text-[11px] font-semibold text-ink-muted">
             三列看板对接 /api/orders · 推进状态同步产能日历
           </p>
         </div>
@@ -369,7 +369,8 @@ export default function OrderPipeline() {
             type="button"
             onClick={() => void loadData()}
             disabled={isLoading}
-            className="p-1.5 hover:bg-neutral-200 rounded-lg transition-colors text-neutral-400 disabled:opacity-40"
+            className="rounded-md border border-border bg-surface p-1.5 text-ink-muted transition-colors hover:border-border-hover hover:text-ink disabled:opacity-40"
+            title="刷新订单"
           >
             <RefreshCw className={cn('w-3.5 h-3.5', isLoading && 'animate-spin')} />
           </button>
@@ -377,13 +378,13 @@ export default function OrderPipeline() {
             <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-0.5">
               当前在制订单
             </div>
-            <div className="text-3xl font-black text-neutral-900 leading-none flex items-baseline gap-1">
+            <div className="metric-number flex items-baseline gap-1 text-3xl font-black leading-none text-ink">
               {isLoading ? (
                 <Loader2 className="w-6 h-6 animate-spin text-neutral-300" />
               ) : (
                 <>
                   {totalActive}
-                  <span className="text-sm font-bold text-neutral-400">笔</span>
+                  <span className="text-sm font-bold text-ink-muted">笔</span>
                 </>
               )}
             </div>
@@ -392,13 +393,13 @@ export default function OrderPipeline() {
       </div>
 
       {errorText ? (
-        <div className="mx-8 mb-3 bg-red-50 border border-red-100 rounded-xl px-4 py-2.5 text-xs text-red-600 font-medium flex items-center gap-2 shrink-0">
+        <div className="mx-6 mb-3 flex shrink-0 items-center gap-2 rounded-md border border-critical/20 bg-critical-soft px-4 py-2.5 text-xs font-semibold text-critical md:mx-8">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
           {errorText}
           <button
             type="button"
             onClick={() => void loadData()}
-            className="ml-auto text-red-500 hover:text-red-700 underline text-[10px] font-bold"
+            className="ml-auto text-[10px] font-bold underline hover:text-critical"
           >
             重试
           </button>
@@ -406,7 +407,7 @@ export default function OrderPipeline() {
       ) : null}
 
       {fallbackMode ? (
-        <div className="mx-8 mb-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-2.5 text-xs text-amber-700 font-medium flex items-center gap-2 shrink-0">
+        <div className="mx-6 mb-3 flex shrink-0 items-center gap-2 rounded-md border border-risk/20 bg-risk-soft px-4 py-2.5 text-xs font-semibold text-risk md:mx-8">
           <Zap className="w-3.5 h-3.5 shrink-0" />
           {usingClientMock && orders.some(isDemoOrder)
             ? '接口无数据或演示模式：已加载高质量 Mock 订单，仍可体验状态流转。'
@@ -414,37 +415,37 @@ export default function OrderPipeline() {
           <button
             type="button"
             onClick={() => void loadData()}
-            className="ml-auto text-amber-700 hover:text-amber-900 underline text-[10px] font-bold"
+            className="ml-auto text-[10px] font-bold underline hover:text-risk"
           >
             重试连接
           </button>
         </div>
       ) : null}
 
-      <div className="flex-1 min-h-0 flex gap-5 px-8 pb-20 overflow-x-auto overflow-y-hidden">
+      <div className="scrollbar-thin flex min-h-0 flex-1 gap-4 overflow-x-auto overflow-y-hidden px-4 pb-20 md:px-8">
         {COLUMNS.map((col) => {
           const cards = groupedOrders[col.id];
           return (
-            <div key={col.id} className="flex-1 min-w-[220px] max-w-[340px] flex flex-col gap-3">
+            <div key={col.id} className="flex min-w-[240px] flex-1 flex-col gap-3 md:max-w-[360px]">
               <div className="flex items-center justify-between shrink-0 pt-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold text-neutral-500 tracking-wide uppercase">
+                  <span className="text-[11px] font-bold uppercase text-ink-muted">
                     {col.title}
                   </span>
-                  <span className="bg-neutral-200/80 text-neutral-500 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                  <span className="rounded bg-surface-container px-1.5 py-0.5 text-[9px] font-bold text-ink-muted">
                     {isLoading ? '·' : cards.length}
                   </span>
                 </div>
                 <button
                   type="button"
-                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-neutral-200 transition-colors text-neutral-400"
+                  className="flex h-5 w-5 items-center justify-center rounded text-ink-muted transition-colors hover:bg-surface-container hover:text-ink"
                   aria-label="列操作"
                 >
                   <Plus className="w-3 h-3" />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-2.5 no-scrollbar pr-1">
+              <div className="scrollbar-thin flex-1 space-y-2.5 overflow-y-auto pr-1">
                 {isLoading ? (
                   Array.from({ length: col.id === 'pending' ? 3 : col.id === 'in_progress' ? 2 : 1 }).map((_, i) => (
                     <SkeletonCard key={i} />
@@ -466,30 +467,30 @@ export default function OrderPipeline() {
                           exit={{ opacity: 0, y: -8 }}
                           transition={{ delay: i * 0.04 }}
                           className={cn(
-                            'bg-white rounded-2xl border border-neutral-100/90 shadow-[0_1px_3px_rgba(0,0,0,0.06)]',
-                            'hover:shadow-[0_8px_24px_rgba(0,0,0,0.07)] hover:border-neutral-200/90 transition-all p-4',
+                            'card p-4',
+                            'transition-all hover:border-border-hover hover:shadow-elevation-2',
                             card.status === 'completed' && 'opacity-[0.72]',
                           )}
                         >
                           <div className="flex justify-between items-start mb-2.5">
-                            <span className="text-[10px] text-neutral-400 font-mono tracking-tight">
+                            <span className="font-mono text-[10px] text-ink-muted">
                               {card.order_no}
                             </span>
                             {card.status === 'in_progress' ? (
-                              <span className="text-[9px] font-bold text-neutral-500 bg-neutral-100 px-1.5 py-0.5 rounded-[4px]">
+                              <span className="rounded-[4px] bg-brand-soft px-1.5 py-0.5 text-[9px] font-bold text-brand">
                                 进度 {progress}%
                               </span>
                             ) : null}
                             {card.status === 'completed' ? (
-                              <CheckCircle className="w-3.5 h-3.5 text-blue-500" />
+                              <CheckCircle className="h-3.5 w-3.5 text-trust" />
                             ) : null}
                           </div>
 
                           <div className="mb-3">
                             <h4
                               className={cn(
-                                'text-sm font-bold text-neutral-900 leading-snug tracking-tight',
-                                card.status === 'completed' && 'line-through text-neutral-400',
+                                'text-sm font-bold leading-snug text-ink',
+                                card.status === 'completed' && 'line-through text-ink-muted',
                               )}
                             >
                               {card.product_name}{' '}
@@ -501,24 +502,24 @@ export default function OrderPipeline() {
 
                           {card.status === 'in_progress' ? (
                             <div className="mb-3">
-                              <div className="w-full h-0.5 bg-neutral-100 rounded-full overflow-hidden">
+                              <div className="h-1 w-full overflow-hidden rounded-full bg-surface-container">
                                 <motion.div
                                   initial={{ width: 0 }}
                                   animate={{ width: `${progress}%` }}
                                   transition={{ duration: 0.6, ease: 'easeOut' }}
-                                  className="h-full bg-neutral-900 rounded-full"
+                                  className="h-full rounded-full bg-brand"
                                 />
                               </div>
                             </div>
                           ) : null}
 
-                          <div className="flex items-center justify-between pt-2.5 border-t border-neutral-50 gap-2">
+                          <div className="flex items-center justify-between gap-2 border-t border-border pt-2.5">
                             <div className="flex items-center -space-x-1.5 min-w-0">
                               <Avatar initials={getInitials(card.customer_name)} bg={getBgForId(card.id)} />
                               <span
                                 className={cn(
                                   'text-[10px] font-bold truncate ml-1',
-                                  deadline.overdue ? 'text-red-500' : 'text-neutral-500',
+                                  deadline.overdue ? 'text-critical' : 'text-ink-muted',
                                 )}
                               >
                                 {deadline.text}
@@ -530,7 +531,7 @@ export default function OrderPipeline() {
                                   type="button"
                                   disabled={movingId === card.id}
                                   onClick={() => void moveOrderToStatus(card, prv)}
-                                  className="p-1.5 rounded-lg border border-neutral-200 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900 disabled:opacity-40"
+                                  className="rounded-md border border-border p-1.5 text-ink-muted hover:bg-surface-subtle hover:text-ink disabled:opacity-40"
                                   title="回退一列"
                                 >
                                   <ChevronLeft className="w-3.5 h-3.5" />
@@ -541,7 +542,7 @@ export default function OrderPipeline() {
                                   type="button"
                                   disabled={movingId === card.id}
                                   onClick={() => void moveOrderToStatus(card, nxt)}
-                                  className="p-1.5 rounded-lg border border-neutral-900 bg-neutral-900 text-white hover:bg-neutral-800 disabled:opacity-40"
+                                  className="rounded-md border border-brand bg-brand p-1.5 text-white hover:bg-brand-hover disabled:opacity-40"
                                   title="推进一列"
                                 >
                                   {movingId === card.id ? (
@@ -564,32 +565,32 @@ export default function OrderPipeline() {
         })}
       </div>
 
-      <div className="absolute bottom-6 inset-x-0 flex justify-center pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-0.5 bg-white rounded-full shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-neutral-100 px-6 py-3">
+      <div className="absolute bottom-4 inset-x-0 flex justify-center pointer-events-none md:bottom-6">
+        <div className="pointer-events-auto flex max-w-[calc(100%-1rem)] items-center gap-0.5 rounded-md border border-border bg-white px-2 py-2 shadow-elevation-3 sm:px-5 sm:py-3">
           <button
             type="button"
             onClick={() => void handleCreateOrder()}
             disabled={isLoading || isSubmitting}
-            className="flex items-center gap-1.5 px-4 py-1.5 text-[11px] font-bold text-neutral-700 hover:text-black hover:bg-neutral-50 rounded-full transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[11px] font-bold text-ink-muted transition-all hover:bg-surface-subtle hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 sm:px-4"
           >
             <Plus className="w-3 h-3" />
             新建订单
           </button>
-          <div className="w-px h-4 bg-neutral-200 mx-1" />
+          <div className="mx-1 h-4 w-px bg-border" />
           <button
             type="button"
             onClick={() => void handleAutoSchedule()}
             disabled={isLoading || isSubmitting}
-            className="flex items-center gap-1.5 px-4 py-1.5 text-[11px] font-bold text-neutral-700 hover:text-black hover:bg-neutral-50 rounded-full transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[11px] font-bold text-ink-muted transition-all hover:bg-surface-subtle hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 sm:px-4"
           >
             <Zap className="w-3 h-3" />
             智能排产
           </button>
-          <div className="w-px h-4 bg-neutral-200 mx-1" />
+          <div className="mx-1 h-4 w-px bg-border" />
           <button
             type="button"
             onClick={handleExportReport}
-            className="flex items-center gap-1.5 px-4 py-1.5 text-[11px] font-bold text-neutral-700 hover:text-black hover:bg-neutral-50 rounded-full transition-all"
+            className="flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[11px] font-bold text-ink-muted transition-all hover:bg-surface-subtle hover:text-ink sm:px-4"
           >
             <FileText className="w-3 h-3" />
             导出报表

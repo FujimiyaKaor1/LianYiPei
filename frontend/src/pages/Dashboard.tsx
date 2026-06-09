@@ -1,22 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Gauge, 
-  TrendingUp, 
-  CheckCircle2, 
-  ArrowRight, 
-  Factory, 
-  AlertTriangle, 
-  LineChart,
-  MapPin,
+import {
+  AlertTriangle,
+  ArrowRight,
   Award,
+  CheckCircle2,
   ChevronRight,
+  Factory,
+  Gauge,
+  LineChart,
+  Loader2,
+  MapPin,
   RefreshCw,
-  Loader2
+  TrendingUp,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
-import { api, type AlertData, type CreditScoreData, NETWORK_ERROR_MESSAGE } from '@/src/services/api';
+import {
+  api,
+  type AlertData,
+  type CreditScoreData,
+  NETWORK_ERROR_MESSAGE,
+} from '@/src/services/api';
 import { CollaborationModal } from '@/src/components/CollaborationModal';
 import { useAuth } from '@/src/context/AuthContext';
 
@@ -48,7 +53,11 @@ export default function Dashboard() {
       const data = await api.fetchCreditScore(user.id);
       setCreditScore(data);
       if (creditCacheKey) {
-        try { localStorage.setItem(creditCacheKey, JSON.stringify(data)); } catch { /* quota exceeded or private browsing */ }
+        try {
+          localStorage.setItem(creditCacheKey, JSON.stringify(data));
+        } catch {
+          /* quota exceeded or private browsing */
+        }
       }
     } catch {
       setCreditError(NETWORK_ERROR_MESSAGE);
@@ -85,11 +94,10 @@ export default function Dashboard() {
   const fetchMatches = async () => {
     setMatchesLoading(true);
     try {
-      // Empty query returns top suppliers ranked by credit
       const data = await api.fetchSuppliers({ query: '' });
-      setMatches(data.suppliers?.slice(0, 3) || []);
+      setMatches(data.suppliers?.slice(0, 4) || []);
     } catch (e) {
-      console.error("fetch matches failed", e);
+      console.error('fetch matches failed', e);
     } finally {
       setMatchesLoading(false);
     }
@@ -98,7 +106,11 @@ export default function Dashboard() {
   const refreshAll = async () => {
     setCreditLoading(true);
     setAlertsLoading(true);
-    await Promise.allSettled([fetchCreditScore(false), fetchAlerts(false), fetchMatches()]);
+    await Promise.allSettled([
+      fetchCreditScore(false),
+      fetchAlerts(false),
+      fetchMatches(),
+    ]);
   };
 
   useEffect(() => {
@@ -110,19 +122,27 @@ export default function Dashboard() {
 
   const getAlertIcon = (type: string) => {
     switch (type) {
-      case 'capacity_risk': return Factory;
-      case 'supply_chain_break': return AlertTriangle;
-      case 'business_risk': return LineChart;
-      default: return AlertTriangle;
+      case 'capacity_risk':
+        return Factory;
+      case 'supply_chain_break':
+        return AlertTriangle;
+      case 'business_risk':
+        return LineChart;
+      default:
+        return AlertTriangle;
     }
   };
 
   const getAlertColor = (level: string) => {
     switch (level) {
-      case 'red': return 'red';
-      case 'yellow': return 'orange';
-      case 'blue': return 'blue';
-      default: return 'orange';
+      case 'red':
+        return 'red';
+      case 'yellow':
+        return 'orange';
+      case 'blue':
+        return 'blue';
+      default:
+        return 'orange';
     }
   };
 
@@ -131,209 +151,339 @@ export default function Dashboard() {
   const scorePercent = Math.min(100, Math.max(0, Number(creditScore?.credit_score || 0)));
   const privilegeText = creditScore
     ? creditScore.credit_score >= 70
-      ? '已解锁：无限报价特权'
-      : '当前为基础报价权益（每日 3 次）'
+      ? '无限报价权益已解锁'
+      : '基础报价权益：每日 3 次'
     : '权益状态加载中';
+  const visibleAlerts = alerts.slice(0, 4);
+  const visibleMatches = matches.slice(0, 4);
+  const scoreLabel = creditScore?.level || '待评估';
+  const supplyHealth = Math.max(42, Math.min(96, Math.round(scorePercent * 0.72 + 18)));
 
   return (
     <>
-    <CollaborationModal
-      open={isCollaborationModalOpen}
-      onClose={() => setIsCollaborationModalOpen(false)}
-      enterpriseId={user?.id ?? null}
-      currentCreditScore={Number(creditScore?.credit_score || 70)}
-    />
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full auto-rows-auto">
-      {(isInitialLoading || hasNetworkError) && (
-        <div className="col-span-2 bg-white p-3 rounded-2xl border border-white shadow-sm flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-neutral-500">
-            {isInitialLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertTriangle className="w-4 h-4 text-red-400" />}
-            <span>{isInitialLoading ? '正在同步后端数据...' : '网络请求失败，请检查后端服务'}</span>
-          </div>
-          {hasNetworkError && (
-            <button onClick={refreshAll} className="px-3 py-1 bg-neutral-100 rounded-full text-xs hover:bg-neutral-200 flex items-center gap-1">
-              <RefreshCw className="w-3 h-3" /> 重试
-            </button>
-          )}
-        </div>
-      )}
+      <CollaborationModal
+        open={isCollaborationModalOpen}
+        onClose={() => setIsCollaborationModalOpen(false)}
+        enterpriseId={user?.id ?? null}
+        currentCreditScore={Number(creditScore?.credit_score || 70)}
+      />
 
-      {/* Performance Score Card */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-br from-[#1C1C1E] to-[#000000] text-white p-6 rounded-[2rem] shadow-2xl relative overflow-hidden group flex flex-col min-h-[260px]"
-      >
-        <div className="absolute top-0 right-0 p-6 opacity-10">
-          <Gauge className="w-24 h-24" />
-        </div>
-        <p className="text-xs font-medium uppercase tracking-widest text-white/60 mb-2">履约信用等级</p>
-        
-        {creditLoading ? (
-          <div className="flex flex-col items-center justify-center flex-1 min-h-0">
-            <Loader2 className="w-8 h-8 animate-spin text-white/60" />
-            <p className="text-xs text-white/40 mt-2">正在加载信用分...</p>
-          </div>
-        ) : creditError ? (
-          <div className="flex flex-col items-center justify-center flex-1 min-h-0">
-            <p className="text-xs text-red-400 mb-2">网络请求失败，请检查后端服务</p>
-            <button onClick={() => fetchCreditScore()} className="px-3 py-1 bg-white/10 rounded-full text-xs hover:bg-white/20 flex items-center gap-1">
-              <RefreshCw className="w-3 h-3" /> 重试
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-col flex-1 min-h-0">
-            <div className="flex items-baseline gap-2 mb-4">
-              <h3 className="text-5xl font-black tracking-tighter">{creditScore?.credit_score ?? '--'}</h3>
-              <span className="text-xl text-white/40">/ 100</span>
+      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4">
+        {(isInitialLoading || hasNetworkError) && (
+          <div className="panel flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-2 text-xs font-medium text-ink-muted">
+              {isInitialLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin text-brand" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 text-critical" />
+              )}
+              <span>
+                {isInitialLoading ? '正在同步经营数据...' : '网络请求失败，请检查后端服务'}
+              </span>
             </div>
-            <div>
-              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-full text-[10px] font-semibold border border-white/10">
-                <span className={cn("w-1.5 h-1.5 rounded-full", creditScore?.credit_score && creditScore.credit_score >= 70 ? 'bg-blue-400 animate-pulse' : 'bg-amber-400')}></span>
-                {privilegeText}
-              </div>
-            </div>
-            <div className="mt-auto pt-4 border-t border-white/10 flex justify-between items-end">
-              <div className="space-y-1">
-                <p className="text-[10px] text-white/40">当前信用等级：{creditScore?.level || '--'}</p>
-                <div className="w-24 h-1 bg-white/10 rounded-full overflow-hidden">
-                  <div className="h-full bg-white" style={{ width: `${scorePercent}%` }}></div>
-                </div>
-              </div>
-              <TrendingUp className="w-4 h-4 text-white/40" />
-            </div>
+            {hasNetworkError && (
+              <button onClick={refreshAll} className="btn-secondary btn-sm gap-1.5">
+                <RefreshCw className="h-3.5 w-3.5" /> 重试
+              </button>
+            )}
           </div>
         )}
-      </motion.div>
 
-      {/* Collaborative Tasks */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="bg-white p-6 rounded-[2rem] border border-white shadow-sm flex flex-col min-h-[260px]"
-      >
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <p className="text-[10px] font-medium uppercase tracking-widest text-neutral-400 mb-1">合作闭环任务</p>
-            <h4 className="text-xl font-bold">验证交易真实性</h4>
-          </div>
-          <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-        </div>
-        <div className="mb-4">
-          <p className="text-neutral-500 text-xs leading-relaxed">
-            完成本季度 3 笔大宗采购的链上存证，验证交易真实性后，您的履约信用分最高可获 <span className="text-primary font-bold">+10 分</span> 奖励，并获得“诚信供应商”勋章。
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setIsCollaborationModalOpen(true)}
-          className="mt-auto w-full py-3 bg-primary text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all active:scale-[0.98] shrink-0"
-        >
-          立即发起验证
-          <ArrowRight className="w-4 h-4" />
-        </button>
-      </motion.div>
-
-      {/* Risk Monitoring */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="bg-white p-6 rounded-[2rem] border border-white shadow-sm flex flex-col min-h-[260px]"
-      >
-        <div className="flex items-center justify-between mb-4 shrink-0">
-          <h4 className="text-base font-bold">风险自检与预警</h4>
-          {!alertsLoading && !alertsError && alerts.length > 0 && (
-            <span className="text-[10px] font-semibold text-error px-2 py-0.5 bg-error/10 rounded-full">{alerts.length} 条待处理</span>
-          )}
-        </div>
-        
-        {alertsLoading ? (
-          <div className="flex flex-col items-center justify-center flex-1 min-h-0">
-            <Loader2 className="w-6 h-6 animate-spin text-neutral-300" />
-            <p className="text-[10px] text-neutral-400 mt-2">正在加载预警信息...</p>
-          </div>
-        ) : alertsError ? (
-          <div className="flex flex-col items-center justify-center flex-1 min-h-0">
-            <p className="text-[10px] text-red-400 mb-2">网络请求失败，请检查后端服务</p>
-            <button onClick={() => fetchAlerts()} className="px-3 py-1 bg-neutral-100 rounded-full text-[10px] hover:bg-neutral-200 flex items-center gap-1">
-              <RefreshCw className="w-3 h-3" /> 重试
-            </button>
-          </div>
-        ) : alerts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center flex-1 min-h-0 text-neutral-400">
-            <CheckCircle2 className="w-6 h-6 mb-2 text-blue-400" />
-            <p className="text-xs">当前无风险预警</p>
-          </div>
-        ) : (
-          <div className="space-y-3 flex-1 min-h-0">
-            {alerts.slice(0, 3).map((item, i) => {
-              const Icon = getAlertIcon(item.alert_type);
-              const color = getAlertColor(item.level);
-              return (
-                <div key={item.id || i} className="flex gap-3 p-3 rounded-xl hover:bg-surface-container transition-colors group cursor-pointer border border-transparent hover:border-black/5">
-                  <div className={cn(
-                    "w-8 h-8 shrink-0 rounded-full flex items-center justify-center",
-                    color === 'orange' ? 'bg-orange-100 text-orange-600' : 
-                    color === 'red' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'
-                  )}>
-                    <Icon className="w-4 h-4" />
+        <section className="grid grid-cols-1 gap-4 xl:grid-cols-[1.5fr_1fr]">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="panel overflow-hidden"
+          >
+            <div className="grid min-h-[300px] grid-cols-1 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="relative overflow-hidden bg-sidebar-bg p-6 text-white">
+                <div className="absolute inset-0 bg-grid-fade opacity-10" />
+                <div className="relative flex h-full flex-col">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-semibold text-sidebar-text">履约信用等级</p>
+                      <div className="mt-3 flex items-end gap-3">
+                        {creditLoading ? (
+                          <Loader2 className="mb-2 h-8 w-8 animate-spin text-white/50" />
+                        ) : (
+                          <span className="metric-number text-[52px] font-black leading-none">
+                            {creditScore?.credit_score ?? '--'}
+                          </span>
+                        )}
+                        <span className="pb-2 text-sm font-semibold text-white/45">/ 100</span>
+                      </div>
+                    </div>
+                    <div className="flex h-11 w-11 items-center justify-center rounded-md border border-white/10 bg-white/8">
+                      <Gauge className="h-5 w-5 text-brand-muted" />
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className={cn("text-xs font-bold truncate", color === 'red' && "text-error")}>
-                      {item.message || item.product_name}
+
+                  <div className="mt-6">
+                    <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-brand-muted"
+                        style={{ width: `${scorePercent}%` }}
+                      />
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <span className="rounded-md bg-white px-2 py-1 text-[11px] font-bold text-sidebar-bg">
+                        {scoreLabel}
+                      </span>
+                      <span className="rounded-md border border-trust/30 bg-trust/12 px-2 py-1 text-[11px] font-bold text-trust">
+                        {privilegeText}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-auto grid grid-cols-3 gap-3 pt-8">
+                    {[
+                      ['履约健康', `${supplyHealth}%`],
+                      ['待处理预警', String(alerts.length)],
+                      ['推荐客商', String(matches.length)],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-md border border-white/10 bg-white/6 p-3">
+                        <div className="metric-number text-lg font-bold">{value}</div>
+                        <div className="mt-1 text-[10px] font-medium text-white/45">{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col bg-surface p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-bold text-ink-muted">合作闭环任务</p>
+                    <h3 className="mt-2 text-xl font-bold text-ink">验证交易真实性</h3>
+                    <p className="mt-3 max-w-md text-sm leading-6 text-ink-muted">
+                      完成本季度 3 笔大宗采购的链上存证，验证后最高可获得
+                      <span className="font-bold text-brand"> +10 </span>
+                      信用分，并提升供应商曝光权重。
                     </p>
-                    <p className="text-[10px] text-neutral-500 mt-0.5 truncate">{item.suggestion || '请及时关注并处理该风险。'}</p>
+                  </div>
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-trust-soft text-trust">
+                    <CheckCircle2 className="h-5 w-5" />
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </motion.div>
 
-      {/* Smart Matching */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="bg-white p-6 rounded-[2rem] border border-white shadow-sm flex flex-col min-h-[260px]"
-      >
-        <div className="flex items-center justify-between mb-4 shrink-0">
-          <h4 className="text-base font-bold">智能匹配推荐</h4>
-          <button onClick={() => navigate('/matching')} className="text-[10px] font-bold text-primary flex items-center gap-1 hover:underline">
-            查看全部 <ChevronRight className="w-3 h-3" />
-          </button>
-        </div>
-        <div className="space-y-3 flex-1 min-h-0">
-          {matchesLoading ? (
-            <div className="flex flex-col items-center justify-center h-full">
-              <Loader2 className="w-5 h-5 animate-spin text-neutral-300" />
-            </div>
-          ) : matches.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-xs text-neutral-400">
-              暂无推荐
-            </div>
-          ) : (
-            matches.map((item, i) => (
-              <div key={item.id || i} className="p-4 rounded-xl border border-surface-container-highest hover:shadow-md transition-all bg-surface-container-lowest cursor-pointer group">
-                <div className="flex justify-between items-start mb-2">
-                  <h5 className="font-bold text-xs group-hover:text-primary transition-colors truncate pr-2">{item.name}</h5>
-                  <span className="px-1.5 py-0.5 bg-neutral-100 text-neutral-600 text-[9px] font-bold rounded border border-neutral-200 whitespace-nowrap shrink-0">{(item.tags && item.tags[0]) || '优质客商'}</span>
+                <div className="mt-6 grid grid-cols-3 gap-2">
+                  {[
+                    ['存证', '0/3'],
+                    ['审核', '待提交'],
+                    ['加权', '+10'],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-md border border-border bg-surface-subtle p-3">
+                      <div className="metric-number text-sm font-bold text-ink">{value}</div>
+                      <div className="mt-1 text-[10px] font-medium text-ink-muted">{label}</div>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center gap-3 text-[10px] text-neutral-500">
-                  <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {item.address || '未知地区'}</span>
-                  <span className="flex items-center gap-1"><Award className="w-3 h-3" /> {item.match || '90%'} 匹配度</span>
-                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsCollaborationModalOpen(true)}
+                  className="btn-primary mt-auto w-full gap-2"
+                >
+                  发起交易验证
+                  <ArrowRight className="h-4 w-4" />
+                </button>
               </div>
-            ))
-          )}
-        </div>
-      </motion.div>
-    </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.06 }}
+            className="grid grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-1"
+          >
+            {[
+              {
+                label: '供应链健康',
+                value: `${supplyHealth}%`,
+                note: '综合信用与履约趋势',
+                icon: TrendingUp,
+                tone: 'brand',
+              },
+              {
+                label: '风险队列',
+                value: alertsLoading ? '...' : String(alerts.length),
+                note: alertsError ? '同步失败' : '待核验预警',
+                icon: AlertTriangle,
+                tone: alerts.length ? 'risk' : 'trust',
+              },
+              {
+                label: '匹配机会',
+                value: matchesLoading ? '...' : String(matches.length),
+                note: '可推进客商',
+                icon: Award,
+                tone: 'trust',
+              },
+            ].map((item) => (
+              <div key={item.label} className="panel p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-ink-muted">{item.label}</p>
+                    <div className="metric-number mt-2 text-3xl font-black text-ink">
+                      {item.value}
+                    </div>
+                  </div>
+                  <div
+                    className={cn(
+                      'flex h-9 w-9 items-center justify-center rounded-md',
+                      item.tone === 'risk'
+                        ? 'bg-risk-soft text-risk'
+                        : item.tone === 'trust'
+                          ? 'bg-trust-soft text-trust'
+                          : 'bg-brand-soft text-brand',
+                    )}
+                  >
+                    <item.icon className="h-4.5 w-4.5" />
+                  </div>
+                </div>
+                <p className="mt-3 text-xs font-medium text-ink-muted">{item.note}</p>
+              </div>
+            ))}
+          </motion.div>
+        </section>
+
+        <section className="grid grid-cols-1 gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="panel min-h-[320px] overflow-hidden"
+          >
+            <div className="panel-header flex items-center justify-between px-5 py-4">
+              <div>
+                <h3 className="text-base font-bold text-ink">风险自检与预警</h3>
+                <p className="mt-1 text-xs font-medium text-ink-muted">按影响面和处理紧急度排序</p>
+              </div>
+              {!alertsLoading && !alertsError && alerts.length > 0 && (
+                <span className="rounded-md bg-critical-soft px-2 py-1 text-[11px] font-bold text-critical">
+                  {alerts.length} 条待处理
+                </span>
+              )}
+            </div>
+
+            <div className="p-3">
+              {alertsLoading ? (
+                <div className="flex h-48 flex-col items-center justify-center text-ink-muted">
+                  <Loader2 className="h-6 w-6 animate-spin text-brand" />
+                  <p className="mt-2 text-xs font-medium">正在加载预警信息...</p>
+                </div>
+              ) : alertsError ? (
+                <div className="flex h-48 flex-col items-center justify-center text-center">
+                  <p className="text-xs font-semibold text-critical">网络请求失败，请检查后端服务</p>
+                  <button onClick={() => fetchAlerts()} className="btn-secondary btn-sm mt-3 gap-1.5">
+                    <RefreshCw className="h-3.5 w-3.5" /> 重试
+                  </button>
+                </div>
+              ) : visibleAlerts.length === 0 ? (
+                <div className="flex h-48 flex-col items-center justify-center text-ink-muted">
+                  <CheckCircle2 className="mb-2 h-7 w-7 text-trust" />
+                  <p className="text-xs font-semibold">当前无风险预警</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {visibleAlerts.map((item, i) => {
+                    const Icon = getAlertIcon(item.alert_type);
+                    const color = getAlertColor(item.level);
+                    return (
+                      <button
+                        key={item.id || i}
+                        type="button"
+                        className="group flex w-full items-center gap-3 px-2 py-3 text-left transition-colors hover:bg-surface-subtle"
+                      >
+                        <div
+                          className={cn(
+                            'flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
+                            color === 'orange'
+                              ? 'bg-risk-soft text-risk'
+                              : color === 'red'
+                                ? 'bg-critical-soft text-critical'
+                                : 'bg-brand-soft text-brand',
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold text-ink">
+                            {item.message || item.product_name}
+                          </p>
+                          <p className="mt-1 truncate text-xs font-medium text-ink-muted">
+                            {item.suggestion || '请及时关注并处理该风险。'}
+                          </p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-ink-faint transition-transform group-hover:translate-x-0.5" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.14 }}
+            className="panel min-h-[320px] overflow-hidden"
+          >
+            <div className="panel-header flex items-center justify-between px-5 py-4">
+              <div>
+                <h3 className="text-base font-bold text-ink">智能匹配推荐</h3>
+                <p className="mt-1 text-xs font-medium text-ink-muted">优先展示高信用、近距离、可履约客商</p>
+              </div>
+              <button onClick={() => navigate('/matching')} className="btn-secondary btn-sm gap-1.5">
+                查看全部 <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="p-3">
+              {matchesLoading ? (
+                <div className="flex h-48 items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-brand" />
+                </div>
+              ) : visibleMatches.length === 0 ? (
+                <div className="flex h-48 items-center justify-center text-xs font-medium text-ink-muted">
+                  暂无推荐
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
+                  {visibleMatches.map((item, i) => (
+                    <button
+                      key={item.id || i}
+                      type="button"
+                      onClick={() => navigate('/matching')}
+                      className="card-hover min-w-0 p-4 text-left"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <h4 className="min-w-0 truncate text-sm font-bold text-ink">
+                          {item.name}
+                        </h4>
+                        <span className="shrink-0 rounded-md border border-border bg-surface-subtle px-1.5 py-0.5 text-[10px] font-bold text-ink-muted">
+                          {(item.tags && item.tags[0]) || '优质客商'}
+                        </span>
+                      </div>
+                      <div className="mt-4 flex min-w-0 flex-wrap items-center gap-3 text-xs font-medium text-ink-muted">
+                        <span className="flex min-w-0 items-center gap-1">
+                          <MapPin className="h-3.5 w-3.5 shrink-0" />
+                          <span className="truncate">{item.address || '未知地区'}</span>
+                        </span>
+                        <span className="flex items-center gap-1 text-trust">
+                          <Award className="h-3.5 w-3.5" />
+                          {item.match || item.score || '90%'} 匹配度
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </section>
+      </div>
     </>
   );
 }

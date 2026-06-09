@@ -312,23 +312,23 @@ export function AISidebar() {
   const canSend = inputValue.trim().length > 0 && !isStreaming;
 
   return (
-    <aside className="w-80 h-screen flex flex-col glass-panel border-l border-black/5 sticky top-0 shrink-0">
-      <div className="p-6 flex items-center justify-between border-b border-black/5">
+    <aside className="sticky top-0 flex h-screen w-84 shrink-0 flex-col border-l border-border bg-white/86 backdrop-blur-xl">
+      <div className="flex items-center justify-between border-b border-border px-5 py-4">
         <div>
-          <h3 className="font-bold text-lg">链小易 AI</h3>
-          <p className="text-[10px] text-neutral-500 font-medium tracking-tight">
+          <h3 className="text-base font-bold text-ink">链小易 AI</h3>
+          <p className="text-[10px] font-semibold text-ink-muted">
             实时产业协作大脑
           </p>
         </div>
-        <div className="w-8 h-8 rounded-full bg-black flex items-center justify-center text-white">
+        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-sidebar-bg text-white">
           <Sparkles className="w-4 h-4" />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
+      <div className="scrollbar-thin flex-1 space-y-5 overflow-y-auto p-5">
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
-            <div className="bg-surface-container-high px-4 py-3 rounded-2xl text-xs text-neutral-500 leading-relaxed text-center">
+            <div className="rounded-md border border-border bg-surface-subtle px-4 py-3 text-center text-xs leading-relaxed text-ink-muted">
               输入你的问题后，链小易 AI 会基于模型实时生成回复。
             </div>
           </div>
@@ -346,16 +346,16 @@ export function AISidebar() {
                 className={`flex flex-col ${isAssistant ? 'items-start' : 'items-end'}`}
               >
                 <div
-                  className={`px-4 py-3 rounded-2xl text-xs leading-relaxed max-w-[90%] whitespace-pre-wrap ${
+                  className={`max-w-[90%] whitespace-pre-wrap rounded-md px-4 py-3 text-xs leading-relaxed ${
                     isAssistant
-                      ? 'bg-surface-container-high text-primary rounded-tl-none'
-                      : 'bg-primary text-white rounded-tr-none'
+                      ? 'border border-border bg-surface-subtle text-ink-soft'
+                      : 'bg-brand text-white'
                   }`}
                 >
                   {displayContent}
                 </div>
                 <span
-                  className={`text-[9px] text-neutral-400 mt-1 ${
+                  className={`mt-1 text-[9px] text-ink-faint ${
                     isAssistant ? 'ml-1' : 'mr-1'
                   }`}
                 >
@@ -368,13 +368,13 @@ export function AISidebar() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-6">
+      <div className="border-t border-border p-5">
         <div className="mb-3 space-y-2">
           <div className="grid grid-cols-2 gap-2">
-            <label className="text-[10px] text-neutral-500 flex flex-col gap-1">
+            <label className="flex flex-col gap-1 text-[10px] font-semibold text-ink-muted">
               模型
               <select
-                className="bg-surface-container-low rounded-xl px-2 py-2 text-xs border border-black/5 focus:outline-none focus:ring-1 focus:ring-primary"
+                className="rounded-md border border-border bg-surface px-2 py-2 text-xs text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand-soft"
                 value={modelChoice}
                 onChange={(event) => {
                   const nextChoice = event.target.value as ModelChoice;
@@ -387,9 +387,9 @@ export function AISidebar() {
                 <option value="deepseek">deepseek（云端深度思考引擎）</option>
               </select>
             </label>
-            <div className="text-[10px] text-neutral-500 flex flex-col gap-1">
+            <div className="flex flex-col gap-1 text-[10px] font-semibold text-ink-muted">
               知识库模式
-              <label className="bg-surface-container-low rounded-xl px-2 py-2 text-xs border border-black/5 flex items-center justify-between">
+              <label className="flex items-center justify-between rounded-md border border-border bg-surface px-2 py-2 text-xs text-ink">
                 <span>启用 RAG</span>
                 <input
                   type="checkbox"
@@ -405,10 +405,10 @@ export function AISidebar() {
           <div className="flex items-center justify-between gap-2">
             <button
               type="button"
-              className={`text-[10px] px-3 py-2 rounded-xl border border-black/5 flex items-center gap-1 transition-colors ${
+              className={`flex items-center gap-1 rounded-md border px-3 py-2 text-[10px] font-semibold transition-colors ${
                 isUploadingPdf || isStreaming
-                  ? 'text-neutral-300 cursor-not-allowed bg-neutral-50'
-                  : 'text-neutral-500 hover:text-primary bg-surface-container-low'
+                  ? 'cursor-not-allowed border-border bg-surface-subtle text-ink-faint'
+                  : 'border-border bg-surface text-ink-muted hover:border-brand/30 hover:text-brand'
               }`}
               onClick={handlePickPdf}
               disabled={isUploadingPdf || isStreaming}
@@ -417,7 +417,7 @@ export function AISidebar() {
               {isUploadingPdf ? '上传中...' : '上传 PDF 到知识库'}
             </button>
             {uploadStatus ? (
-              <span className="text-[10px] text-neutral-500 text-right">
+              <span className="text-right text-[10px] text-ink-muted">
                 {uploadStatus}
               </span>
             ) : null}
@@ -433,7 +433,7 @@ export function AISidebar() {
 
         <div className="relative group">
           <textarea
-            className="w-full bg-surface-container-low border-none rounded-2xl p-4 pr-12 text-xs focus:ring-1 focus:ring-primary transition-all resize-none placeholder:text-neutral-400"
+            className="w-full resize-none rounded-md border border-border bg-surface p-4 pr-12 text-xs text-ink transition-all placeholder:text-ink-faint focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand-soft"
             placeholder="向链小易提问..."
             rows={2}
             value={inputValue}
@@ -442,10 +442,10 @@ export function AISidebar() {
           />
           <button
             type="button"
-            className={`absolute bottom-3 right-3 w-8 h-8 rounded-xl flex items-center justify-center transition-transform ${
+            className={`absolute bottom-3 right-3 flex h-8 w-8 items-center justify-center rounded-md transition-transform ${
               canSend
-                ? 'bg-primary text-white hover:scale-105'
-                : 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
+                ? 'bg-brand text-white hover:scale-105'
+                : 'cursor-not-allowed bg-surface-container text-ink-faint'
             }`}
             onClick={() => void sendMessage()}
             disabled={!canSend}
@@ -456,10 +456,10 @@ export function AISidebar() {
         <div className="mt-4 flex justify-between">
           <button
             type="button"
-            className={`text-[10px] flex items-center gap-1 transition-colors ${
-              isStreaming
-                ? 'text-neutral-300 cursor-not-allowed'
-                : 'text-neutral-500 hover:text-primary'
+              className={`flex items-center gap-1 text-[10px] font-semibold transition-colors ${
+                isStreaming
+                  ? 'cursor-not-allowed text-ink-faint'
+                  : 'text-ink-muted hover:text-brand'
             }`}
             onClick={handleClearMessages}
             disabled={isStreaming}
@@ -468,10 +468,10 @@ export function AISidebar() {
           </button>
           <button
             type="button"
-            className={`text-[10px] flex items-center gap-1 transition-colors ${
+              className={`flex items-center gap-1 text-[10px] font-semibold transition-colors ${
               messages.length
-                ? 'text-neutral-500 hover:text-primary'
-                : 'text-neutral-300 cursor-not-allowed'
+                ? 'text-ink-muted hover:text-brand'
+                : 'cursor-not-allowed text-ink-faint'
             }`}
             onClick={handleExportReport}
             disabled={!messages.length}

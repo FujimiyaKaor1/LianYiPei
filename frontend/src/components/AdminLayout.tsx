@@ -12,6 +12,7 @@ import {
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '@/src/context/AuthContext';
 import { TopBar } from './TopBar';
+import { BrandLogo } from './BrandLogo';
 
 const adminNavItems = [
   { icon: LayoutDashboard, label: '管理首页', path: '/admin/dashboard' },
@@ -43,17 +44,13 @@ export function AdminLayout() {
   };
 
   return (
-    <div className="flex min-h-screen w-full bg-canvas-soft">
-      <aside className="sidebar-width h-screen sticky top-0 flex-shrink-0 flex flex-col border-r border-border bg-canvas">
-        <div className="h-16 flex-shrink-0 flex items-center px-5 border-b border-border">
-          <LayoutDashboard className="w-5 h-5 mr-2 text-ink-soft" />
-          <h1 className="text-lg font-bold tracking-tighter text-brand">链易配</h1>
-          <span className="ml-2 text-[9px] text-ink-muted font-medium tracking-widest uppercase">
-            管理后台
-          </span>
+    <div className="app-shell flex min-h-screen w-full">
+      <aside className="sidebar-width sticky top-0 flex h-screen flex-shrink-0 flex-col border-r border-white/10 bg-sidebar-bg text-sidebar-text">
+        <div className="sidebar-logo-row flex h-[72px] flex-shrink-0 items-center gap-3 border-b border-sidebar-divider px-5">
+          <BrandLogo sidebar subtitle="平台管理控制台" />
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
+        <nav className="scrollbar-thin flex-1 space-y-1 overflow-y-auto px-3 py-4">
           {adminNavItems.map((item) => (
             <NavLink
               key={item.path + item.label}
@@ -61,40 +58,40 @@ export function AdminLayout() {
               end={item.path === '/admin/dashboard'}
               className={({ isActive }) =>
                 cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-md transition-all duration-150 text-sm',
+                  'relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-all duration-150',
                   isActive
-                    ? 'bg-ink text-on-brand font-semibold shadow-elevation-1'
-                    : 'text-ink-soft hover:bg-canvas-muted hover:text-ink',
+                    ? 'bg-sidebar-item-active text-sidebar-text-active font-semibold shadow-elevation-1'
+                    : 'text-sidebar-text hover:bg-sidebar-item-hover hover:text-sidebar-text-active',
                 )
               }
             >
-              <item.icon className="w-5 h-5" />
-              <span>{item.label}</span>
+              <item.icon className="h-4.5 w-4.5" />
+              <span className="sidebar-nav-label">{item.label}</span>
             </NavLink>
           ))}
         </nav>
 
-        <div className="flex-shrink-0 p-3 border-t border-border">
+        <div className="flex-shrink-0 border-t border-sidebar-divider p-3">
           <button
             type="button"
             onClick={() => !user && !loading && setIsLoginModalOpen(true)}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left hover:bg-canvas-muted transition-colors"
+            className="sidebar-account-button flex w-full items-center gap-3 rounded-md border border-sidebar-divider bg-sidebar-panel/70 px-3 py-2.5 text-left transition-colors hover:bg-sidebar-panel"
             disabled={loading}
           >
-            <div className="w-9 h-9 rounded-full bg-brand/10 text-brand flex items-center justify-center text-sm font-bold">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand text-sm font-bold text-white">
               {loading ? '…' : initial}
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold text-neutral-900 truncate">{loading ? '加载中…' : displayName}</div>
-              <div className="text-[10px] text-neutral-400">{roleLabel}</div>
+            <div className="sidebar-user-copy min-w-0 flex-1">
+              <div className="truncate text-sm font-semibold text-sidebar-text-active">{loading ? '加载中…' : displayName}</div>
+              <div className="text-[10px] text-sidebar-text">{roleLabel}</div>
             </div>
           </button>
         </div>
       </aside>
 
-      <main className="flex flex-1 flex-col min-w-0">
+      <main className="flex min-h-screen min-w-0 flex-1 flex-col">
         <TopBar title={getTitle(location.pathname)} />
-        <div className="w-full p-4 md:p-6 pb-12 min-h-0 flex-1 overflow-auto">
+        <div data-scroll-root className="min-h-0 w-full flex-1 overflow-auto p-4 pb-12 md:p-6">
           <Outlet />
         </div>
       </main>

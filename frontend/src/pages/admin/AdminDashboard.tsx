@@ -1,199 +1,193 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  UserCheck, 
-  ShieldAlert, 
-  KeyRound, 
-  Activity, 
+import {
+  Activity,
+  ArrowRight,
   Database,
+  KeyRound,
+  LayoutDashboard,
+  ScrollText,
   Settings2,
-  LayoutDashboard
+  ShieldAlert,
+  UserCheck,
 } from 'lucide-react';
+
+const stats = [
+  { icon: UserCheck, label: '待审核企业', value: '12', unit: '家', tone: 'risk' },
+  { icon: Activity, label: '系统健康度', value: '98', unit: '%', tone: 'trust' },
+  { icon: ShieldAlert, label: '今日拦截恶意报价', value: '45', unit: '次', tone: 'brand' },
+  { icon: Database, label: 'API 接口请求量', value: '2.4', unit: 'M', tone: 'brand' },
+] as const;
+
+const actions = [
+  { icon: UserCheck, label: '入驻审核', sub: '企业资质、角色与准入状态', path: '/admin/dashboard/onboarding' },
+  { icon: Settings2, label: '规则配置', sub: '信用、预警与匹配权重', path: '/admin/dashboard/rules' },
+  { icon: ShieldAlert, label: '风控中心', sub: '风险事件与处置闭环', path: '/admin/dashboard/risk' },
+  { icon: KeyRound, label: '接口管理', sub: '外部数据源与 API 权限', path: '/admin/dashboard/api-management' },
+] as const;
+
+const auditRows = [
+  ['10 分钟前', '系统管理员 Admin', '修改了企业信用分计算权重组合规则', '成功'],
+  ['2 小时前', '系统管理员 Admin', '封禁了违规企业「智造科技有限公司」', '成功'],
+  ['昨天 15:30', '系统管理员 Admin', '新增工商数据 API 数据源对接配置', '成功'],
+] as const;
+
+function toneClasses(tone: (typeof stats)[number]['tone']) {
+  if (tone === 'risk') return 'bg-risk-soft text-risk';
+  if (tone === 'trust') return 'bg-trust-soft text-trust';
+  return 'bg-brand-soft text-brand';
+}
 
 export default function AdminDashboard() {
   return (
-    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      
-      {/* 顶层 - 数据看板 (4列 Grid) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Card 1: 待审核企业 (使用反色/深灰强调重要性，或用红点) */}
-        <div className="bg-white rounded-3xl border border-neutral-200 shadow-sm p-6 relative group overflow-hidden transition-all hover:shadow-md">
-          <div className="flex items-center justify-between mb-4 relative z-10">
-            <div className="p-3 bg-neutral-100 rounded-2xl group-hover:bg-neutral-200 transition-colors">
-              <UserCheck className="w-5 h-5 text-neutral-900" />
-            </div>
-            <span className="flex h-3 w-3 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-[#CC0000]"></span>
-            </span>
-          </div>
-          <div className="text-neutral-500 text-sm font-medium mb-1 relative z-10">待审核企业</div>
-          <div className="text-3xl font-semibold text-neutral-900 relative z-10">12<span className="text-base font-normal text-neutral-400 ml-1">家</span></div>
-        </div>
-
-        {/* Card 2: 系统健康度 (纯灰阶) */}
-        <div className="bg-white rounded-3xl border border-neutral-200 shadow-sm p-6 group transition-all hover:shadow-md">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-neutral-100 rounded-2xl group-hover:bg-neutral-200 transition-colors">
-              <Activity className="w-5 h-5 text-neutral-900" />
-            </div>
-            <div className="px-2 py-1 bg-neutral-100 text-neutral-800 border border-neutral-200 rounded-full text-xs font-semibold flex items-center gap-1.5 shadow-sm">
-              <div className="w-1.5 h-1.5 rounded-full bg-neutral-900"></div> 运行中
+    <div className="mx-auto max-w-[1440px] space-y-5">
+      <section className="panel overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="relative overflow-hidden bg-sidebar-bg p-7 text-white">
+            <div className="absolute inset-0 bg-grid-fade opacity-10" />
+            <div className="relative">
+              <p className="mb-2 text-xs font-bold uppercase text-sidebar-text">平台管理后台</p>
+              <h1 className="mb-3 text-2xl font-black">运营控制中枢</h1>
+              <p className="max-w-xl text-sm leading-6 text-sidebar-text">
+                汇总企业准入、风控事件、API 数据源与敏感操作日志，帮助平台管理员快速定位异常并完成治理动作。
+              </p>
             </div>
           </div>
-          <div className="text-neutral-500 text-sm font-medium mb-1">系统健康度</div>
-          <div className="text-3xl font-semibold text-neutral-900">98%</div>
-        </div>
-
-        {/* Card 3: 拦截恶意报价 */}
-        <div className="bg-white rounded-3xl border border-neutral-200 shadow-sm p-6 group transition-all hover:shadow-md">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-neutral-100 rounded-2xl group-hover:bg-neutral-200 transition-colors">
-              <ShieldAlert className="w-5 h-5 text-neutral-900" />
-            </div>
-          </div>
-          <div className="text-neutral-500 text-sm font-medium mb-1">今日拦截恶意报价</div>
-          <div className="text-3xl font-semibold text-neutral-900">45<span className="text-base font-normal text-neutral-400 ml-1">次</span></div>
-        </div>
-
-        {/* Card 4: API 请求量 */}
-        <div className="bg-neutral-50 rounded-3xl border border-neutral-200 shadow-sm p-6 group transition-all hover:shadow-md">
-          <div className="flex items-center justify-between mb-4">
-            <div className="p-3 bg-white border border-neutral-200 rounded-2xl group-hover:bg-neutral-100 transition-colors">
-              <Database className="w-5 h-5 text-neutral-900" />
-            </div>
-          </div>
-          <div className="text-neutral-500 text-sm font-medium mb-1">API接口请求量</div>
-          <div className="text-3xl font-semibold text-neutral-900">2.4<span className="text-base font-normal text-neutral-400 ml-1">M</span></div>
-        </div>
-      </div>
-
-      {/* 中层 - 快捷操作与系统状态 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 左侧大卡片: 快捷操作 Quick Actions (2/3) */}
-        <div className="lg:col-span-2 bg-white rounded-3xl border border-neutral-200 shadow-sm p-8">
-          <div className="mb-6">
-            <h2 className="text-lg font-bold text-neutral-900 tracking-tight">快捷操作 <span className="text-neutral-400 font-normal text-sm ml-2">Quick Actions</span></h2>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {/* Button 1: Primary Action (Solid Black) */}
-            <Link to="/admin/dashboard/onboarding" className="flex flex-col items-center justify-center p-6 bg-neutral-900 transition-all rounded-[24px] group hover:scale-[1.02] shadow-md hover:shadow-lg">
-              <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mb-4 transition-all duration-300">
-                <UserCheck className="w-6 h-6 text-white" />
+          <div className="grid grid-cols-2 gap-3 bg-surface p-5">
+            {[
+              ['规则版本', 'v2.6'],
+              ['审计留痕', '开启'],
+              ['API 状态', '运行中'],
+              ['队列积压', '低'],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-md border border-border bg-surface-subtle p-4">
+                <div className="text-[11px] font-semibold text-ink-muted">{label}</div>
+                <div className="metric-number mt-2 text-lg font-black text-ink">{value}</div>
               </div>
-              <span className="text-sm font-semibold text-white">入驻审核</span>
-            </Link>
-            
-            {/* Button 2: Secondary Action (Light Background) */}
-            <Link to="/admin/dashboard/rules" className="flex flex-col items-center justify-center p-6 bg-neutral-100 hover:bg-neutral-200 border border-transparent transition-all rounded-[24px] group hover:scale-[1.02]">
-              <div className="w-14 h-14 bg-white rounded-2xl shadow-sm border border-neutral-200/50 flex items-center justify-center mb-4 transition-all duration-300">
-                <Settings2 className="w-6 h-6 text-neutral-900" />
-              </div>
-              <span className="text-sm font-semibold text-neutral-800">规则配置</span>
-            </Link>
-
-            {/* Button 3: Outlined Action (White with Border) */}
-            <Link to="/admin/dashboard/risk" className="flex flex-col items-center justify-center p-6 bg-white border border-neutral-200 hover:border-neutral-400 transition-all rounded-[24px] group hover:shadow-sm">
-              <div className="w-14 h-14 bg-neutral-50 rounded-2xl flex items-center justify-center mb-4 transition-all duration-300">
-                <ShieldAlert className="w-6 h-6 text-neutral-900" />
-              </div>
-              <span className="text-sm font-semibold text-neutral-800">预警处置</span>
-            </Link>
-
-            {/* Button 4: Outlined Action */}
-            <Link to="/admin/dashboard/api-management" className="flex flex-col items-center justify-center p-6 bg-white border border-neutral-200 hover:border-neutral-400 transition-all rounded-[24px] group hover:shadow-sm">
-              <div className="w-14 h-14 bg-neutral-50 rounded-2xl flex items-center justify-center mb-4 transition-all duration-300">
-                <KeyRound className="w-6 h-6 text-neutral-900" />
-              </div>
-              <span className="text-sm font-semibold text-neutral-800">接口管理</span>
-            </Link>
+            ))}
           </div>
         </div>
+      </section>
 
-        {/* 右侧中卡片: 数据清洗大屏预览 (1/3) - 强反差黑底灰条 */}
-        <div className="lg:col-span-1 bg-neutral-900 rounded-3xl border border-neutral-800 shadow-lg p-8 flex flex-col relative overflow-hidden">
-          <div className="flex items-center justify-between mb-8 relative z-10">
-            <h2 className="text-lg font-bold text-white tracking-tight">数据接入状态</h2>
-            <LayoutDashboard className="w-5 h-5 text-neutral-400" />
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {stats.map((stat) => (
+          <div key={stat.label} className="card-hover p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <div className={`flex h-9 w-9 items-center justify-center rounded-md ${toneClasses(stat.tone)}`}>
+                <stat.icon className="h-4.5 w-4.5" />
+              </div>
+              {stat.tone === 'risk' ? (
+                <span className="rounded-md bg-critical-soft px-2 py-1 text-[10px] font-bold text-critical">
+                  待处理
+                </span>
+              ) : null}
+            </div>
+            <div className="text-xs font-semibold text-ink-muted">{stat.label}</div>
+            <div className="metric-number mt-2 flex items-baseline gap-1 text-3xl font-black text-ink">
+              {stat.value}
+              <span className="text-sm font-bold text-ink-muted">{stat.unit}</span>
+            </div>
           </div>
-          <div className="flex-1 flex flex-col justify-center space-y-8 relative z-10">
+        ))}
+      </section>
+
+      <section className="grid grid-cols-1 gap-5 lg:grid-cols-[1.45fr_0.9fr]">
+        <div className="panel overflow-hidden">
+          <div className="panel-header flex items-center justify-between px-5 py-4">
             <div>
-              <div className="flex justify-between text-sm mb-3">
-                <span className="text-neutral-400 font-medium">当前活跃企业</span>
-                <span className="font-bold text-white">140 / 150</span>
-              </div>
-              <div className="h-2 w-full bg-neutral-700/50 rounded-full overflow-hidden">
-                <div className="h-full bg-white rounded-full w-[93%]"></div>
-              </div>
-            </div>
-            
-            <div>
-              <div className="flex justify-between text-sm mb-3">
-                <span className="text-neutral-400 font-medium">已接入数据源</span>
-                <span className="font-bold text-white">3 / 5</span>
-              </div>
-              <div className="h-2 w-full bg-neutral-700/50 rounded-full overflow-hidden">
-                <div className="h-full bg-white rounded-full w-[60%]"></div>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-sm mb-3">
-                <span className="text-neutral-400 font-medium">存储容量状态</span>
-                <span className="font-bold text-white">45%</span>
-              </div>
-              <div className="h-2 w-full bg-neutral-700/50 rounded-full overflow-hidden">
-                <div className="h-full bg-white rounded-full w-[45%]"></div>
-              </div>
+              <h2 className="text-base font-bold text-ink">快捷操作</h2>
+              <p className="mt-1 text-xs font-medium text-ink-muted">按平台治理频次排序</p>
             </div>
           </div>
+          <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
+            {actions.map((action) => (
+              <Link
+                key={action.path}
+                to={action.path}
+                className="group flex items-center gap-4 rounded-md border border-border bg-surface p-4 transition-all hover:border-brand/40 hover:bg-brand-soft/35 hover:shadow-elevation-1"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand-soft text-brand">
+                  <action.icon className="h-4.5 w-4.5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-bold text-ink">{action.label}</div>
+                  <div className="mt-1 truncate text-[11px] font-medium text-ink-muted">{action.sub}</div>
+                </div>
+                <ArrowRight className="h-4 w-4 text-ink-faint transition-colors group-hover:text-brand" />
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* 底层 - 最近动态 */}
-      <div className="bg-white rounded-3xl border border-neutral-200 shadow-sm p-8">
-        <div className="mb-6">
-          <h2 className="text-lg font-bold text-neutral-900 tracking-tight">最近敏感操作日志 <span className="text-neutral-400 font-normal text-sm ml-2">Recent Audit Logs</span></h2>
+        <div className="panel overflow-hidden">
+          <div className="panel-header flex items-center justify-between px-5 py-4">
+            <div>
+              <h2 className="text-base font-bold text-ink">数据接入状态</h2>
+              <p className="mt-1 text-xs font-medium text-ink-muted">核心运行指标</p>
+            </div>
+            <LayoutDashboard className="h-4.5 w-4.5 text-brand" />
+          </div>
+          <div className="space-y-5 p-5">
+            {[
+              ['当前活跃企业', '140 / 150', 93],
+              ['已接入数据源', '3 / 5', 60],
+              ['存储容量状态', '45%', 45],
+            ].map(([label, value, width]) => (
+              <div key={label}>
+                <div className="mb-2 flex justify-between text-xs">
+                  <span className="font-semibold text-ink-muted">{label}</span>
+                  <span className="metric-number font-bold text-ink">{value}</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-surface-container">
+                  <div className="h-full rounded-full bg-brand" style={{ width: `${width}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="panel overflow-hidden">
+        <div className="panel-header flex items-center justify-between px-5 py-4">
+          <div>
+            <h2 className="text-base font-bold text-ink">最近敏感操作日志</h2>
+            <p className="mt-1 text-xs font-medium text-ink-muted">Recent audit logs</p>
+          </div>
+          <Link to="/admin/dashboard/audit" className="btn-secondary btn-sm gap-1.5">
+            <ScrollText className="h-3.5 w-3.5" /> 全部日志
+          </Link>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
+          <table className="w-full min-w-[720px] border-collapse text-left">
+            <thead className="bg-surface-subtle">
               <tr>
-                <th className="pb-4 text-xs font-bold text-neutral-500 uppercase tracking-widest pl-2 border-b border-neutral-200">时间</th>
-                <th className="pb-4 text-xs font-bold text-neutral-500 uppercase tracking-widest border-b border-neutral-200">操作人</th>
-                <th className="pb-4 text-xs font-bold text-neutral-500 uppercase tracking-widest border-b border-neutral-200">动作</th>
-                <th className="pb-4 text-xs font-bold text-neutral-500 uppercase tracking-widest text-right pr-2 border-b border-neutral-200">状态</th>
+                {['时间', '操作人', '动作', '状态'].map((header, index) => (
+                  <th
+                    key={header}
+                    className={`border-b border-border px-5 py-3 text-xs font-bold uppercase text-ink-muted ${index === 3 ? 'text-right' : ''}`}
+                  >
+                    {header}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
-              <tr className="group hover:bg-neutral-50 transition-colors">
-                <td className="py-5 pl-2 text-sm text-neutral-500 whitespace-nowrap">10分钟前</td>
-                <td className="py-5 text-sm font-bold text-neutral-900 whitespace-nowrap">系统管理员 Admin</td>
-                <td className="py-5 text-sm text-neutral-700">修改了企业信用分计算权重组合规则</td>
-                <td className="py-5 pr-2 text-right">
-                  <span className="px-2.5 py-1 rounded-md bg-neutral-100 text-neutral-800 border border-neutral-200 text-xs font-bold">成功</span>
-                </td>
-              </tr>
-              <tr className="group hover:bg-neutral-50 transition-colors">
-                <td className="py-5 pl-2 text-sm text-neutral-500 whitespace-nowrap">2小时前</td>
-                <td className="py-5 text-sm font-bold text-neutral-900 whitespace-nowrap">系统管理员 Admin</td>
-                <td className="py-5 text-sm text-neutral-700">封禁了违规企业「智造科技有限公司」</td>
-                <td className="py-5 pr-2 text-right">
-                  <span className="px-2.5 py-1 rounded-md bg-neutral-100 text-neutral-800 border border-neutral-200 text-xs font-bold">成功</span>
-                </td>
-              </tr>
-              <tr className="group hover:bg-neutral-50 transition-colors">
-                <td className="py-5 pl-2 text-sm text-neutral-500 whitespace-nowrap">昨天 15:30</td>
-                <td className="py-5 text-sm font-bold text-neutral-900 whitespace-nowrap">系统管理员 Admin</td>
-                <td className="py-5 text-sm text-neutral-700">新增了一个工商数据API数据源对接配置</td>
-                <td className="py-5 pr-2 text-right">
-                  <span className="px-2.5 py-1 rounded-md bg-neutral-100 text-neutral-800 border border-neutral-200 text-xs font-bold">成功</span>
-                </td>
-              </tr>
+            <tbody className="divide-y divide-border">
+              {auditRows.map(([time, actor, action, status]) => (
+                <tr key={`${time}-${action}`} className="transition-colors hover:bg-surface-subtle">
+                  <td className="whitespace-nowrap px-5 py-4 text-sm text-ink-muted">{time}</td>
+                  <td className="whitespace-nowrap px-5 py-4 text-sm font-bold text-ink">{actor}</td>
+                  <td className="px-5 py-4 text-sm text-ink-soft">{action}</td>
+                  <td className="px-5 py-4 text-right">
+                    <span className="rounded-md bg-trust-soft px-2.5 py-1 text-xs font-bold text-trust">
+                      {status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

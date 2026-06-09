@@ -40,9 +40,9 @@ export default function GovDashboard() {
   }, []);
 
   const getLevelColor = (level: string) => {
-    if (level === 'red') return 'bg-neutral-900 text-white border-neutral-900 shadow-sm';
-    if (level === 'yellow') return 'bg-neutral-200 text-neutral-800 border-neutral-300';
-    return 'bg-neutral-50 text-neutral-500 border-neutral-200';
+    if (level === 'red') return 'bg-critical-soft text-critical border-critical/20';
+    if (level === 'yellow') return 'bg-risk-soft text-risk border-risk/20';
+    return 'bg-brand-soft text-brand border-brand/20';
   };
 
   const getLevelLabel = (level: string) => {
@@ -52,31 +52,48 @@ export default function GovDashboard() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="mx-auto max-w-[1440px] space-y-5">
 
       {/* Welcome Banner */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-br from-[#1C1C1E] to-black text-white p-8 rounded-[2rem] relative overflow-hidden"
+        className="panel overflow-hidden"
       >
-        <div className="absolute top-0 right-0 p-8 opacity-5">
-          <Building2 className="w-48 h-48" />
+        <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="relative overflow-hidden bg-sidebar-bg p-7 text-white">
+            <div className="absolute inset-0 bg-grid-fade opacity-10" />
+            <div className="relative">
+              <p className="mb-2 text-xs font-bold uppercase text-sidebar-text">产业监管平台</p>
+              <h1 className="mb-3 text-2xl font-black">产业链健康监管大屏</h1>
+              <p className="max-w-xl text-sm leading-6 text-sidebar-text">
+                以质量标签与验厂认证守住企业端产品合规底线，结合预警与产业链图谱实现精准监管与补链强链。
+              </p>
+              {error && (
+                <button onClick={() => void load()} className="btn-secondary btn-sm mt-5 gap-1.5">
+                  <RefreshCw className="h-3.5 w-3.5" /> 重新加载
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 bg-surface p-5">
+            {[
+              ['质量标签', '合规基线'],
+              ['预警中心', '风险处置'],
+              ['产业图谱', '链路洞察'],
+              ['招商决策', '补链强链'],
+            ].map(([label, sub]) => (
+              <div key={label} className="rounded-md border border-border bg-surface-subtle p-4">
+                <div className="text-sm font-bold text-ink">{label}</div>
+                <div className="mt-1 text-[11px] font-semibold text-ink-muted">{sub}</div>
+              </div>
+            ))}
+          </div>
         </div>
-        <p className="text-xs font-bold uppercase tracking-widest text-white/50 mb-2">产业监管平台</p>
-        <h1 className="text-2xl font-black tracking-tight mb-2">产业链健康监管大屏</h1>
-        <p className="text-sm text-white/50 max-w-lg">
-          以<strong className="text-white/80">质量标签与验厂认证</strong>守住企业端产品合规底线，结合预警与产业链图谱实现精准监管与补链强链。
-        </p>
-        {error && (
-          <button onClick={() => void load()} className="mt-4 flex items-center gap-1.5 px-4 py-2 bg-white/10 text-white rounded-lg text-xs font-bold hover:bg-white/20 transition-all">
-            <RefreshCw className="w-3.5 h-3.5" /> 重新加载
-          </button>
-        )}
       </motion.div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         {[
           { icon: Building2, label: '链内企业总数', value: stats?.enterprise_count, sub: '已注册企业' },
           { icon: TrendingUp, label: '活跃供应', value: stats?.supply_count, sub: '在售询盘' },
@@ -89,26 +106,26 @@ export default function GovDashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.07 }}
             className={cn(
-              'bg-white rounded-2xl border shadow-sm p-5',
-              item.accent ? 'border-neutral-300' : 'border-neutral-100',
+              'card-hover p-5',
+              item.accent ? 'border-risk/30' : '',
             )}
           >
             <div className="flex items-center gap-2 mb-3">
-              <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', item.accent ? 'bg-neutral-900 shadow-sm' : 'bg-neutral-100')}>
-                <item.icon className={cn('w-4 h-4', item.accent ? 'text-white' : 'text-neutral-600')} />
+              <div className={cn('flex h-8 w-8 items-center justify-center rounded-md', item.accent ? 'bg-risk-soft' : 'bg-brand-soft')}>
+                <item.icon className={cn('h-4 w-4', item.accent ? 'text-risk' : 'text-brand')} />
               </div>
-              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">{item.label}</span>
+              <span className="text-[10px] font-bold uppercase text-ink-muted">{item.label}</span>
             </div>
             <div className="flex items-baseline gap-1.5">
               {statsLoading ? (
                 <span className="inline-block h-9 w-14 animate-pulse rounded-lg bg-neutral-100" />
               ) : (
-                <span className={cn('text-3xl font-black tracking-tight', item.accent && (stats?.alert_count ?? 0) > 0 ? 'text-black' : '')}>
+                <span className={cn('metric-number text-3xl font-black text-ink', item.accent && (stats?.alert_count ?? 0) > 0 ? 'text-risk' : '')}>
                   {item.value ?? '—'}
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-neutral-400 mt-0.5 font-medium">{item.sub}</p>
+            <p className="mt-0.5 text-[10px] font-semibold text-ink-muted">{item.sub}</p>
           </motion.div>
         ))}
       </div>
@@ -118,20 +135,20 @@ export default function GovDashboard() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.25 }}
-        className="rounded-[2rem] border border-neutral-100 bg-white p-6 shadow-sm"
+        className="panel p-6"
       >
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Network className="h-5 w-5 text-neutral-700" />
+            <Network className="h-5 w-5 text-brand" />
             <div>
-              <h3 className="text-sm font-bold tracking-tight">全平台产业链图谱（Neo4j）</h3>
-              <p className="text-[10px] text-neutral-400">预览为采样子图，可拖拽缩放；完整画布见独立页。</p>
+              <h3 className="text-sm font-bold text-ink">全平台产业链图谱（Neo4j）</h3>
+              <p className="text-[10px] font-medium text-ink-muted">预览为采样子图，可拖拽缩放；完整画布见独立页。</p>
             </div>
           </div>
           <button
             type="button"
             onClick={() => navigate('/gov/supply-chain')}
-            className="flex items-center gap-1 rounded-xl border border-neutral-200 px-4 py-2 text-xs font-bold text-neutral-700 hover:border-black"
+            className="btn-secondary btn-sm gap-1"
           >
             全屏查看 <ChevronRight className="h-3.5 w-3.5" />
           </button>
@@ -139,19 +156,19 @@ export default function GovDashboard() {
         <GovSupplyChainGraph height={280} compact />
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
         {/* Recent Alerts */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-white rounded-2xl border border-neutral-100 shadow-sm p-6"
+          className="panel p-6"
         >
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold tracking-tight">最近活跃预警</h3>
+            <h3 className="text-sm font-bold text-ink">最近活跃预警</h3>
             <button
               onClick={() => navigate('/gov/alerts')}
-              className="text-[10px] font-bold text-neutral-500 hover:text-black flex items-center gap-1 transition-colors"
+              className="flex items-center gap-1 text-[10px] font-bold text-ink-muted transition-colors hover:text-brand"
             >
               查看全部 <ChevronRight className="w-3 h-3" />
             </button>
@@ -159,19 +176,19 @@ export default function GovDashboard() {
           {alertsLoading ? (
             <div className="space-y-2 py-2">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="flex animate-pulse gap-3 rounded-xl p-3">
-                  <div className="h-6 w-12 shrink-0 rounded bg-neutral-100" />
+                <div key={i} className="flex animate-pulse gap-3 rounded-md p-3">
+                  <div className="h-6 w-12 shrink-0 rounded bg-surface-container" />
                   <div className="min-w-0 flex-1 space-y-2">
-                    <div className="h-3 w-3/4 rounded bg-neutral-100" />
-                    <div className="h-3 w-full rounded bg-neutral-50" />
+                    <div className="h-3 w-3/4 rounded bg-surface-container" />
+                    <div className="h-3 w-full rounded bg-surface-subtle" />
                   </div>
                 </div>
               ))}
             </div>
           ) : alerts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8">
-              <ShieldAlert className="w-8 h-8 text-neutral-200 mb-2" />
-              <p className="text-xs text-neutral-400">暂无活跃预警</p>
+              <ShieldAlert className="mb-2 h-8 w-8 text-ink-faint" />
+              <p className="text-xs text-ink-muted">暂无活跃预警</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -179,16 +196,16 @@ export default function GovDashboard() {
                 <div
                   key={alert.id}
                   onClick={() => navigate('/gov/alerts')}
-                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-neutral-50 cursor-pointer transition-colors group"
+                  className="group flex cursor-pointer items-center gap-3 rounded-md p-3 transition-colors hover:bg-surface-subtle"
                 >
                   <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0', getLevelColor(alert.level))}>
                     {getLevelLabel(alert.level)}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate">{alert.product_name}</p>
-                    <p className="text-[10px] text-neutral-400 truncate">{alert.message}</p>
+                    <p className="truncate text-xs font-semibold text-ink">{alert.product_name}</p>
+                    <p className="truncate text-[10px] text-ink-muted">{alert.message}</p>
                   </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-neutral-300 group-hover:text-black shrink-0 transition-colors" />
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-ink-faint transition-colors group-hover:text-brand" />
                 </div>
               ))}
             </div>
@@ -200,9 +217,9 @@ export default function GovDashboard() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35 }}
-          className="bg-white rounded-2xl border border-neutral-100 shadow-sm p-6"
+          className="panel p-6"
         >
-          <h3 className="text-sm font-bold tracking-tight mb-4">快捷操作</h3>
+          <h3 className="mb-4 text-sm font-bold text-ink">快捷操作</h3>
           <div className="space-y-3">
             {[
               { icon: Users, label: '质量标签', sub: '绿标与验厂：为企业端产品合规把关', path: '/gov/labels', urgent: false },
@@ -213,16 +230,16 @@ export default function GovDashboard() {
               <button
                 key={action.path}
                 onClick={() => navigate(action.path)}
-                className="w-full flex items-center gap-4 p-4 rounded-xl border border-neutral-100 hover:border-black hover:shadow-sm transition-all group text-left"
+                className="group flex w-full items-center gap-4 rounded-md border border-border p-4 text-left transition-all hover:border-brand/40 hover:shadow-elevation-1"
               >
-                <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border transition-all', action.urgent ? 'bg-black border-black text-white shadow-sm' : 'bg-neutral-50 border-neutral-200 text-neutral-600 group-hover:bg-neutral-100')}>
+                <div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-md border transition-all', action.urgent ? 'border-risk/20 bg-risk-soft text-risk' : 'border-border bg-surface-subtle text-ink-muted group-hover:bg-brand-soft group-hover:text-brand')}>
                   <action.icon className="w-4 h-4" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold">{action.label}</p>
-                  <p className="text-[10px] text-neutral-400">{action.sub}</p>
+                  <p className="text-sm font-bold text-ink">{action.label}</p>
+                  <p className="text-[10px] text-ink-muted">{action.sub}</p>
                 </div>
-                <ArrowRight className="w-4 h-4 text-neutral-300 group-hover:text-black shrink-0 transition-colors" />
+                <ArrowRight className="h-4 w-4 shrink-0 text-ink-faint transition-colors group-hover:text-brand" />
               </button>
             ))}
           </div>
@@ -234,11 +251,11 @@ export default function GovDashboard() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.4 }}
-        className="bg-neutral-50 border border-neutral-100 rounded-2xl p-6 flex items-center justify-between"
+        className="panel flex items-center justify-between p-6"
       >
         <div>
-          <p className="text-sm font-bold text-neutral-800 mb-1">手动触发预警检查</p>
-          <p className="text-xs text-neutral-500">对全部链内企业立即执行一次风险扫描，生成最新预警</p>
+          <p className="mb-1 text-sm font-bold text-ink">手动触发预警检查</p>
+          <p className="text-xs text-ink-muted">对全部链内企业立即执行一次风险扫描，生成最新预警</p>
         </div>
         <RunChecksButton onSuccess={() => void load()} />
       </motion.div>
@@ -266,13 +283,13 @@ function RunChecksButton({ onSuccess }: { onSuccess: () => void }) {
 
   return (
     <div className="flex items-center gap-3">
-      {result && <span className="text-xs text-neutral-500">{result}</span>}
+      {result && <span className="text-xs text-ink-muted">{result}</span>}
       <button
         onClick={() => void run()}
         disabled={running}
-        className="flex items-center gap-2 px-5 py-3 bg-black text-white rounded-xl text-xs font-bold hover:bg-neutral-800 transition-all shadow-lg shadow-black/10 disabled:opacity-50 whitespace-nowrap"
+        className="btn-primary whitespace-nowrap disabled:opacity-50"
       >
-        {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 fill-white" />}
+        {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4 fill-white" />}
         立即扫描
       </button>
     </div>

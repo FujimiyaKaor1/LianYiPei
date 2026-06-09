@@ -103,7 +103,7 @@ function DeepThinkingOverlay() {
         </div>
 
         <p className="text-[10px] text-neutral-500 mt-4 font-medium leading-relaxed max-w-xs">
-          💡 首次加载语义向量模型与调用本地大模型可能需要 1~2 分钟，请勿刷新页面。
+          首次加载语义向量模型与调用本地大模型可能需要 1-2 分钟，请勿刷新页面。
         </p>
         <p className="text-[10px] text-neutral-400 mt-2 font-medium">
           模型已驻留后，同会话请求通常会快很多。
@@ -234,7 +234,7 @@ export default function Matching() {
     event.preventDefault();
     event.stopPropagation();
     if (!user) {
-      setGlobalToast('⚠️ 请先登录后再发起询价');
+      setGlobalToast('请先登录后再发起询价');
       setIsLoginModalOpen(true);
       return;
     }
@@ -254,7 +254,7 @@ export default function Matching() {
       });
 
       if (!inquiryResp.success) {
-        setGlobalToast('❌ 询盘发送失败，请重试');
+        setGlobalToast('询盘发送失败，请重试');
         return;
       }
 
@@ -276,7 +276,7 @@ export default function Matching() {
       }
 
       // Step 3：跳转至控制台并自动打开意向报价单
-      setGlobalToast(`✅ 询盘已成功发送至 ${name}！正在跳转至议价中心...`);
+      setGlobalToast(`询盘已成功发送至 ${name}，正在跳转至议价中心...`);
       setTimeout(() => {
         setGlobalToast(null);
         if (createdChatId) {
@@ -295,7 +295,7 @@ export default function Matching() {
       }, 1200);
     } catch (err) {
       console.error('Inquiry send error:', err);
-      setGlobalToast('❌ 系统异常，请稍后再试');
+      setGlobalToast('系统异常，请稍后再试');
     } finally {
       setInquirySendingId(null);
     }
@@ -341,12 +341,12 @@ export default function Matching() {
   const activeSupplier = suppliers.find(s => Number(s.id) === activeEnterpriseId) || suppliers[0];
 
   return (
-    <div className="relative h-[calc(100vh-5rem)] max-h-[860px] flex flex-col gap-4 max-w-6xl mx-auto w-full font-sans antialiased text-neutral-900">
+    <div className="relative mx-auto flex h-[calc(100vh-6rem)] max-h-[900px] w-full max-w-[1440px] flex-col gap-4 font-sans text-ink antialiased">
       {globalToast ? (
         <div className="fixed inset-x-0 bottom-6 z-[900] flex justify-center px-4 pointer-events-none" role="status">
           <div className={cn(
-            'pointer-events-auto max-w-sm rounded-[12px] border border-neutral-200 bg-white px-4 py-3 text-sm font-medium text-black',
-            'shadow-[0_8px_30px_rgb(0,0,0,0.08)]',
+            'pointer-events-auto max-w-sm rounded-md border border-border bg-white px-4 py-3 text-sm font-medium text-ink',
+            'shadow-elevation-3',
             'animate-in fade-in zoom-in-95 slide-in-from-bottom-4 duration-300',
           )}>
             {globalToast}
@@ -355,35 +355,45 @@ export default function Matching() {
       ) : null}
 
       {/* Top Search Card */}
-      <section className="shrink-0 bg-white rounded-2xl p-5 border border-neutral-100 shadow-sm flex flex-col md:flex-row justify-between md:items-end gap-5">
+      <section className="panel shrink-0 overflow-hidden">
+        <div className="panel-header flex items-center justify-between px-5 py-3">
+          <div>
+            <h2 className="text-base font-bold text-ink">智能供需匹配</h2>
+            <p className="mt-1 text-xs font-medium text-ink-muted">自然语言条件会转译为产品、距离、质量、产能与信用约束</p>
+          </div>
+          <span className="rounded-md border border-brand/20 bg-brand-soft px-2 py-1 text-[11px] font-bold text-brand">
+            {algorithmMode === 'deep_learning' ? 'AI fusion' : 'Rule engine'}
+          </span>
+        </div>
+        <div className="flex flex-col justify-between gap-5 p-5 md:flex-row md:items-end">
         <div className="space-y-3 flex-1">
           <textarea
             rows={2}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="寻找一家主营驱动电机的工厂，位于周边 500 公里内，具备政府绿标认证，且近 30 天产能相对宽裕以满足紧急打样。"
-            className="w-full bg-transparent text-lg md:text-xl font-medium text-gray-800 focus:outline-none focus:ring-0 resize-none"
+            className="min-h-[74px] w-full resize-none rounded-md border border-border bg-surface px-4 py-3 text-base font-medium leading-7 text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand-soft md:text-lg"
           />
           <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            {['📍 产品: 驱动电机', '📍 距离: <500km', '📍 质量: 政府绿标', '📍 产能: 宽裕'].map(tag => (
-              <span key={tag} className="px-2 py-0.5 bg-neutral-100 text-neutral-600 rounded-md text-[10px] font-medium tracking-wide">
+            {['产品: 驱动电机', '距离: <500km', '质量: 政府绿标', '产能: 宽裕'].map(tag => (
+              <span key={tag} className="rounded-md border border-border bg-surface-subtle px-2 py-0.5 text-[10px] font-bold text-ink-muted">
                 {tag}
               </span>
             ))}
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button
             onClick={() => showToast('匹配算法参数调优将根据历史数据自动推荐最佳权重，此功能即将上线', 'info')}
-            className="px-4 py-2 bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50 transition-colors rounded-lg text-xs font-semibold"
+            className="btn-secondary btn-sm"
           >
             参数调优
           </button>
           <button
             onClick={() => setGreenOnly(!greenOnly)}
             className={cn(
-              'px-4 py-2 border rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5',
-              greenOnly ? 'bg-success-soft text-success border-success/30' : 'bg-white border-neutral-200 text-neutral-700 hover:bg-neutral-50',
+              'btn-secondary btn-sm gap-1.5',
+              greenOnly ? 'border-trust/30 bg-trust-soft text-trust' : '',
             )}
           >
             <Leaf className="w-3.5 h-3.5" />
@@ -392,26 +402,27 @@ export default function Matching() {
           <button 
             onClick={handleSearch}
             disabled={isLoading}
-            className="px-5 py-2 bg-black text-white hover:bg-neutral-800 transition-colors rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-[0_4px_14px_0_rgb(0,0,0,0.1)] disabled:opacity-60"
+            className="btn-primary btn-sm gap-1.5 disabled:opacity-60"
           >
             {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 fill-white" />}
-            {isLoading && algorithmMode === 'deep_learning' ? 'AI 深度思考中...' : '⚡ 智能匹配'}
+            {isLoading && algorithmMode === 'deep_learning' ? 'AI 深度思考中...' : '智能匹配'}
           </button>
+        </div>
         </div>
       </section>
 
       {/* Error Banner */}
       {errorText && (
-        <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-2.5 text-xs text-red-600 font-medium shrink-0">
+        <div className="shrink-0 rounded-md border border-critical/20 bg-critical-soft px-4 py-2.5 text-xs font-semibold text-critical">
           {errorText}
         </div>
       )}
 
       {/* Fallback Indicator */}
       {isBasicMatch && !isLoading && suppliers.length > 0 && (
-        <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-2.5 text-xs text-amber-700 font-medium shrink-0 flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2 rounded-md border border-risk/20 bg-risk-soft px-4 py-2.5 text-xs font-semibold text-risk">
           <Sparkles className="w-3.5 h-3.5" />
-          当前结果由基础规则引擎返回。切换「⚡ 智能匹配」可启用 AI 深度思考获得更精准结果。
+          当前结果由基础规则引擎返回。切换「智能匹配」可启用 AI 深度思考获得更精准结果。
         </div>
       )}
 
@@ -419,23 +430,23 @@ export default function Matching() {
       <section className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4">
         
         {/* Left List (1/3 Width) */}
-        <div className="w-full lg:w-[32%] bg-white rounded-2xl border border-neutral-100 flex flex-col overflow-hidden shadow-sm">
+        <div className="panel flex w-full flex-col overflow-hidden lg:w-[32%]">
           {/* Header */}
-          <div className="px-4 py-3 shrink-0 border-b border-neutral-100 bg-white z-10 flex flex-col gap-2.5">
+          <div className="panel-header z-10 flex shrink-0 flex-col gap-2.5 px-4 py-3">
             <div className="flex justify-between items-center">
-              <h3 className="text-sm font-bold text-neutral-900">匹配结果</h3>
-              <div className="text-[10px] font-medium text-neutral-400 flex items-center gap-0.5">
+              <h3 className="text-sm font-bold text-ink">匹配结果</h3>
+              <div className="flex items-center gap-0.5 text-[10px] font-semibold text-ink-muted">
                 召回 {suppliers.length} 家 <ChevronRight className="w-3 h-3" />
               </div>
             </div>
-            <div className="flex gap-4 text-[10px] font-semibold text-neutral-500">
+            <div className="flex gap-4 text-[10px] font-bold text-ink-muted">
               {SORT_OPTIONS.map((option) => (
                 <span
                   key={option.key}
                   onClick={() => handleSortClick(option.key)}
                   className={cn(
-                    'cursor-pointer transition-colors hover:text-black',
-                    sortBy === option.key ? 'text-black' : ''
+                    'cursor-pointer transition-colors hover:text-brand',
+                    sortBy === option.key ? 'text-brand' : ''
                   )}
                 >
                   {option.label}
@@ -445,7 +456,7 @@ export default function Matching() {
           </div>
           
           {/* Scrollable list */}
-          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2 bg-neutral-50/50">
+          <div className="scrollbar-thin flex-1 space-y-2 overflow-y-auto bg-surface-subtle px-3 py-3">
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
             ) : suppliers.length > 0 ? (
@@ -454,26 +465,26 @@ export default function Matching() {
                 const matchScore = item.score || item.confidence_index || 0;
                 const utilization = 65 + (Number(item.id) % 25);
                 const isAmple = utilization < 75;
-                
+
                 return (
                   <div
                     key={item.id}
                     onClick={() => setActiveEnterpriseId(Number(item.id))}
                     className={cn(
-                      "cursor-pointer p-3.5 rounded-xl border transition-all duration-200 flex flex-col gap-2",
-                      isActive 
-                        ? "bg-black border-black text-white shadow-[0_8px_30px_rgb(0,0,0,0.12)]" 
-                        : "bg-white border-neutral-200/60 text-neutral-900 hover:border-neutral-300 hover:shadow-sm"
+                      "flex cursor-pointer flex-col gap-2 rounded-md border p-3.5 transition-all duration-200",
+                      isActive
+                        ? "border-sidebar-bg bg-sidebar-bg text-white shadow-elevation-2"
+                        : "border-border bg-white text-ink hover:border-border-hover hover:shadow-elevation-1"
                     )}
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex-1 min-w-0 pr-2">
-                        <h4 className="font-semibold text-[13px] truncate leading-tight tracking-tight mb-1">{item.name}</h4>
+                        <h4 className="mb-1 truncate text-[13px] font-bold leading-tight">{item.name}</h4>
                         <div className="flex flex-wrap gap-1">
                           {(item.tags || []).filter(Boolean).slice(0, 3).map((tag, idx) => (
                             <span key={`${tag}-${idx}`} className={cn(
-                              "px-1 py-0.5 text-[9px] font-medium rounded-sm",
-                              isActive ? "bg-white/10 text-white/90" : "bg-neutral-100 text-neutral-600"
+                              "rounded-sm px-1 py-0.5 text-[9px] font-semibold",
+                              isActive ? "bg-white/10 text-white/90" : "bg-surface-subtle text-ink-muted"
                             )}>
                               {tag}
                             </span>
@@ -481,7 +492,7 @@ export default function Matching() {
                           {item.match_basis && (
                             <span className={cn(
                               "px-1 py-0.5 text-[8px] font-bold rounded-sm uppercase",
-                              isActive ? "bg-white/20 text-white" : "bg-black/5 text-neutral-500"
+                              isActive ? "bg-white/20 text-white" : "bg-brand-soft text-brand"
                             )}>
                               {item.match_basis}
                             </span>
@@ -489,10 +500,10 @@ export default function Matching() {
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <div className={cn("text-xl font-bold leading-none tracking-tight", isActive ? "text-white" : "text-black")}>
+                        <div className={cn("metric-number text-xl font-black leading-none", isActive ? "text-white" : "text-ink")}>
                           {Math.round(matchScore)}
                         </div>
-                        <div className={cn("text-[9px] font-medium mt-1 scale-90 origin-right", isActive ? "text-white/60" : "text-neutral-400")}>匹配分</div>
+                        <div className={cn("mt-1 origin-right scale-90 text-[9px] font-semibold", isActive ? "text-white/60" : "text-ink-muted")}>匹配分</div>
                       </div>
                     </div>
                     
@@ -503,7 +514,7 @@ export default function Matching() {
                          产能利用率 <span className={cn(isActive ? "text-white font-semibold" : "text-neutral-900 font-semibold")}>{utilization}%</span>
                        </span>
                        <span className={cn("flex items-center gap-1.5")}>
-                         <div className={cn("w-1.5 h-1.5 rounded-full", isAmple ? (isActive ? "bg-blue-400" : "bg-blue-500") : (isActive ? "bg-amber-400" : "bg-amber-500"))}></div>
+                         <div className={cn("w-1.5 h-1.5 rounded-full", isAmple ? "bg-trust" : "bg-risk")}></div>
                          <span className={cn(isActive ? "text-white/90" : "text-neutral-600")}>{isAmple ? '近期充裕' : '排期较紧'}</span>
                        </span>
                     </div>
@@ -528,32 +539,32 @@ export default function Matching() {
         </div>
 
         {/* Right Detail Panel (Deep Analysis) */}
-        <div className="w-full lg:w-[68%] bg-white rounded-2xl border border-neutral-100 shadow-sm overflow-hidden flex flex-col relative">
+        <div className="panel relative flex w-full flex-col overflow-hidden lg:w-[68%]">
           {/* 深度思考 Loading 状态覆盖整个右侧面板 */}
           {isLoading && algorithmMode === 'deep_learning' ? (
             <DeepThinkingOverlay />
           ) : activeSupplier ? (
             <>
               {/* Header Info */}
-              <div className="px-7 py-6 border-b border-neutral-100 shrink-0">
+              <div className="panel-header shrink-0 px-7 py-6">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-center gap-3">
-                     <div className="w-10 h-10 rounded-lg bg-neutral-50 border border-neutral-100 flex items-center justify-center shrink-0">
+                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-surface">
                        <Building className="w-4 h-4 text-neutral-600" />
                      </div>
                      <div>
                        <div className="flex items-center gap-2 mb-1">
-                         <h2 className="text-lg font-bold text-neutral-900 tracking-tight">{activeSupplier.name}</h2>
-                         <div className="bg-black text-white px-1.5 py-0.5 text-[9px] font-semibold rounded-sm flex items-center gap-1 uppercase tracking-widest">
+                         <h2 className="text-lg font-bold text-ink">{activeSupplier.name}</h2>
+                         <div className="flex items-center gap-1 rounded-sm bg-sidebar-bg px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
                            <Target className="w-2.5 h-2.5" /> 匹配度 {activeSupplier.score || activeSupplier.confidence_index || activeSupplier.match || '—'}
                          </div>
                          {activeSupplier.match_basis && (
-                           <span className="bg-neutral-100 text-neutral-500 px-1.5 py-0.5 text-[8px] font-bold rounded-sm uppercase">
+                           <span className="rounded-sm bg-brand-soft px-1.5 py-0.5 text-[8px] font-bold uppercase text-brand">
                              {activeSupplier.match_basis}
                            </span>
                          )}
                        </div>
-                       <p className="text-[11px] text-neutral-500 leading-snug max-w-lg font-medium">
+                       <p className="max-w-lg text-[11px] font-medium leading-snug text-ink-muted">
                          {activeSupplier.desc || '暂无企业描述信息'}
                        </p>
                      </div>
@@ -562,24 +573,24 @@ export default function Matching() {
               </div>
 
               {/* Scrollable Content */}
-              <div className="flex-1 overflow-y-auto px-7 py-6 bg-white grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+              <div className="scrollbar-thin grid flex-1 grid-cols-1 gap-x-12 gap-y-8 overflow-y-auto bg-white px-7 py-6 md:grid-cols-2">
                 
                 {/* AI 专家推荐理由：正文仅绑定 ai_match_reason；算分公式仅作脚注小字 */}
                 {(algorithmMode === 'deep_learning' || Boolean(activeSupplier.ai_match_reason)) && (
                   <div className="md:col-span-2">
-                    <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                      <span className="w-1 h-3 bg-neutral-300 rounded-full"></span>
+                    <h3 className="mb-3 flex items-center gap-2 text-[10px] font-bold uppercase text-ink-muted">
+                      <span className="h-3 w-1 rounded-full bg-brand"></span>
                       <Sparkles className="w-3 h-3" />
                       AI 专家推荐理由
                     </h3>
-                    <div className="bg-slate-50/60 rounded-xl border border-neutral-100 p-4">
+                    <div className="rounded-md border border-border bg-surface-subtle p-4">
                       {activeSupplier.ai_match_reason ? (
                         <p className="text-sm text-neutral-700 leading-relaxed">{activeSupplier.ai_match_reason}</p>
                       ) : isLoading && algorithmMode === 'deep_learning' ? (
                         <AiExpertReasonSkeleton />
                       ) : algorithmMode === 'deep_learning' ? (
                         <p className="text-sm text-neutral-400 leading-relaxed">
-                          ✨ AI 专家正在结合全网数据进行深度思考，请稍候...
+                          AI 专家正在结合全网数据进行深度思考，请稍候...
                         </p>
                       ) : null}
                       {algorithmMode === 'deep_learning' && activeSupplier.deep_learning_explain ? (
@@ -593,26 +604,26 @@ export default function Matching() {
 
                 {/* Metrics Analysis */}
                 <div>
-                   <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-5 flex items-center gap-2">
-                     <span className="w-1 h-3 bg-neutral-300 rounded-full"></span>
+                   <h3 className="mb-5 flex items-center gap-2 text-[10px] font-bold uppercase text-ink-muted">
+                     <span className="h-3 w-1 rounded-full bg-brand"></span>
                      核心指标分析
                    </h3>
                    <div className="space-y-4">
                      {getMetrics(activeSupplier).map((metric, idx) => (
                        <div key={idx} className="group">
-                         <div className="flex justify-between text-[11px] font-semibold text-neutral-700 mb-1.5">
+                         <div className="mb-1.5 flex justify-between text-[11px] font-semibold text-ink-soft">
                            <div className="flex items-center gap-1.5">
-                             <metric.icon className="w-3 h-3 text-neutral-400 group-hover:text-black transition-colors" />
+                             <metric.icon className="h-3 w-3 text-ink-muted transition-colors group-hover:text-brand" />
                              {metric.label}
                            </div>
-                           <span className="font-bold text-black">{metric.value}%</span>
+                           <span className="font-bold text-ink">{metric.value}%</span>
                          </div>
-                         <div className="h-1 w-full bg-neutral-100 rounded-full overflow-hidden">
+                         <div className="h-1 w-full overflow-hidden rounded-full bg-surface-container">
                            <motion.div 
                              initial={{ width: 0 }}
                              animate={{ width: `${metric.value}%` }}
                              transition={{ duration: 0.8, delay: 0.05 * idx, ease: "easeOut" }}
-                             className={cn("h-full rounded-full bg-black")}
+                             className="h-full rounded-full bg-brand"
                            />
                          </div>
                        </div>
@@ -623,12 +634,12 @@ export default function Matching() {
                 {/* Capacity Calendar */}
                 <div>
                   <div className="flex justify-between items-center mb-5">
-                    <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest flex items-center gap-2">
-                      <span className="w-1 h-3 bg-neutral-300 rounded-full"></span>
+                    <h3 className="flex items-center gap-2 text-[10px] font-bold uppercase text-ink-muted">
+                      <span className="h-3 w-1 rounded-full bg-brand"></span>
                       未来30天产能日历
                     </h3>
                   </div>
-                  <div className="bg-[#f9fafb] border border-neutral-100 rounded-xl p-5">
+                  <div className="rounded-md border border-border bg-surface-subtle p-5">
                     <div className="grid grid-cols-6 gap-2">
                       {getCapacityHeatmap(Number(activeSupplier.id)).map((status, idx) => (
                         <motion.div 
@@ -637,11 +648,11 @@ export default function Matching() {
                           animate={{ opacity: 1, scale: 1 }}
                           transition={{ delay: idx * 0.01 }}
                           className={cn(
-                            "aspect-square rounded-[4px] transition-all hover:scale-105 cursor-crosshair border",
-                            status === 0 ? "bg-black border-black" :
-                            status === 1 ? "bg-neutral-400 border-neutral-400" :
-                            status === 2 ? "bg-neutral-200 border-neutral-200" :
-                            "bg-white border-neutral-200"
+                            "aspect-square cursor-crosshair rounded-[4px] border transition-all hover:scale-105",
+                            status === 0 ? "border-sidebar-bg bg-sidebar-bg" :
+                            status === 1 ? "border-risk bg-risk" :
+                            status === 2 ? "border-trust/30 bg-trust-soft" :
+                            "border-border bg-white"
                           )}
                           title={`Day ${idx + 1}`}
                         />
@@ -650,10 +661,10 @@ export default function Matching() {
                     <div className="flex items-center justify-end gap-1.5 mt-3 text-[9px] font-medium text-neutral-400">
                       <span>排满</span>
                       <div className="flex gap-0.5">
-                        <div className="w-2.5 h-2.5 rounded-[2px] bg-black"></div>
-                        <div className="w-2.5 h-2.5 rounded-[2px] bg-neutral-400"></div>
-                        <div className="w-2.5 h-2.5 rounded-[2px] bg-neutral-200"></div>
-                        <div className="w-2.5 h-2.5 rounded-[2px] border border-neutral-200 bg-white"></div>
+                        <div className="w-2.5 h-2.5 rounded-[2px] bg-sidebar-bg"></div>
+                        <div className="w-2.5 h-2.5 rounded-[2px] bg-risk"></div>
+                        <div className="w-2.5 h-2.5 rounded-[2px] bg-trust-soft"></div>
+                        <div className="w-2.5 h-2.5 rounded-[2px] border border-border bg-white"></div>
                       </div>
                       <span>空闲</span>
                     </div>
@@ -663,11 +674,11 @@ export default function Matching() {
               </div>
               
               {/* Footer Actions */}
-              <div className="px-7 py-4 border-t border-neutral-100 bg-[#fbfcfd] flex justify-end items-center gap-3 shrink-0">
+              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border bg-surface-subtle px-7 py-4">
                 <button
                   disabled={inquirySendingId !== null}
                   onClick={(e) => handleAnonymousInquiry(e, activeSupplier)}
-                  className="px-4 py-2 bg-white text-neutral-800 border border-neutral-200 hover:border-black hover:text-black hover:shadow-sm transition-all rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                  className="btn-secondary btn-sm gap-1.5"
                 >
                   {inquirySendingId === Number(activeSupplier.id) ? (
                     <><Loader2 className="h-3 w-3 animate-spin" /> 准备发送中</>
@@ -679,7 +690,7 @@ export default function Matching() {
                   disabled={inquirySendingId !== null}
                   onClick={async () => {
                     if (!user) {
-                      setGlobalToast('⚠️ 请先登录');
+                      setGlobalToast('请先登录');
                       setIsLoginModalOpen(true);
                       return;
                     }
@@ -694,18 +705,18 @@ export default function Matching() {
                         product_name: searchQuery || '精密零部件',
                         match_score: Number(activeSupplier.score || 0),
                       });
-                      setGlobalToast(`✅ 已创建会话，正在跳转…`);
+                      setGlobalToast('已创建会话，正在跳转...');
                       setTimeout(() => {
                         setGlobalToast(null);
                         navigate(`/sales-console?chat_id=${chatResp.chat_id}`);
                       }, 800);
                     } catch {
-                      setGlobalToast('❌ 创建会话失败，请重试');
+                      setGlobalToast('创建会话失败，请重试');
                     } finally {
                       setInquirySendingId(null);
                     }
                   }}
-                  className="px-5 py-2 bg-black text-white hover:bg-neutral-800 transition-all rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-[0_4px_14px_0_rgb(0,0,0,0.1)] disabled:opacity-50"
+                  className="btn-primary btn-sm gap-1.5 disabled:opacity-50"
                 >
                   <ArrowRightLeft className="h-3 w-3" />
                   带信息交换

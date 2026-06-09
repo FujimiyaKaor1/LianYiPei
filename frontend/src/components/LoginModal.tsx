@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { useAuth } from '@/src/context/AuthContext';
 import { loginHomePathForRole } from '@/src/lib/rbac';
 import { cn } from '@/src/lib/utils';
+import { BrandLogo } from './BrandLogo';
 
 type ModalMode = 'login' | 'register';
 
@@ -170,42 +171,47 @@ export function LoginModal() {
   if (!isLoginModalOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 pointer-events-auto">
+    <div className="pointer-events-auto fixed inset-0 z-[1000] flex items-center justify-center bg-sidebar-bg/58 p-4 backdrop-blur-sm">
       <div
         className={cn(
-          'relative z-[1001] w-full rounded-2xl bg-white shadow-2xl border border-black/5 animate-in fade-in zoom-in duration-200 pointer-events-auto flex flex-col max-h-[min(92vh,720px)]',
+          'pointer-events-auto relative z-[1001] flex max-h-[min(92vh,720px)] w-full flex-col rounded-md border border-border bg-white shadow-elevation-3 animate-in fade-in zoom-in duration-200',
           mode === 'register' ? 'max-w-lg' : 'max-w-sm',
         )}
       >
         <button
           onClick={handleClose}
-          className="absolute top-4 right-4 p-2 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-100 rounded-full transition-colors z-10"
+          className="absolute right-4 top-4 z-10 rounded-md p-2 text-ink-muted transition-colors hover:bg-surface-subtle hover:text-ink"
           aria-label="关闭"
         >
           <X className="w-5 h-5" />
         </button>
 
         <div className="p-8 pb-4 shrink-0">
-          <h1 className="text-xl font-black text-primary tracking-tight">链易配</h1>
-          <h2 className="text-lg font-bold text-neutral-900 mt-4">
+          <BrandLogo
+            subtitle={mode === 'login' ? '供应链经营工作台' : '企业入驻与履约协同'}
+            markClassName="h-11 w-11 border-brand/20"
+            titleClassName="text-xl font-black text-brand"
+            subtitleClassName="text-xs text-ink-muted"
+          />
+          <h2 className="mt-4 text-lg font-bold text-ink">
             {mode === 'login' ? '用户登录' : '企业注册'}
           </h2>
-          <p className="text-xs text-neutral-500 mt-1">
+          <p className="mt-1 text-xs text-ink-muted">
             {mode === 'login'
               ? '使用企业名称与账号密码登录'
               : '填写企业信息提交后，将由管理员审核，通过后方可登录'}
           </p>
         </div>
 
-        <div className="px-8 pb-8 flex-1 min-h-0 overflow-y-auto no-scrollbar">
+        <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-8 pb-8">
           {mode === 'login' ? (
             <form onSubmit={(e) => void handleSubmitLogin(e)} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-neutral-600 mb-1">企业名称</label>
+                <label className="mb-1 block text-xs font-semibold text-ink-muted">企业名称</label>
                 <input
                   type="text"
                   autoComplete="username"
-                  className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-shadow"
+                  className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus:ring-2 focus:ring-brand-soft"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   disabled={submitting}
@@ -213,11 +219,11 @@ export function LoginModal() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-neutral-600 mb-1">密码</label>
+                <label className="mb-1 block text-xs font-semibold text-ink-muted">密码</label>
                 <input
                   type="password"
                   autoComplete="current-password"
-                  className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-shadow"
+                  className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus:ring-2 focus:ring-brand-soft"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={submitting}
@@ -226,22 +232,22 @@ export function LoginModal() {
               </div>
 
               {error ? (
-                <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+                <p className="rounded-md bg-critical-soft px-3 py-2 text-xs text-critical">{error}</p>
               ) : null}
 
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full rounded-xl bg-primary text-white text-sm font-bold py-2.5 hover:opacity-95 disabled:opacity-50 transition-opacity"
+                className="btn-primary w-full disabled:opacity-50"
               >
                 {submitting ? '登录中…' : '登录'}
               </button>
 
-              <p className="text-center text-xs text-neutral-500 pt-1">
+              <p className="pt-1 text-center text-xs text-ink-muted">
                 还没有账号？{' '}
                 <button
                   type="button"
-                  className="font-bold text-primary underline-offset-2 hover:underline"
+                  className="font-bold text-brand underline-offset-2 hover:underline"
                   onClick={() => {
                     setMode('register');
                     setError(null);
