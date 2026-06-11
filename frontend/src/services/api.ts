@@ -597,11 +597,11 @@ function normalizeSuccessPayload<T>(payload: unknown): T {
   }
 
   if (okByCode || o.success === true) {
-    return o.data as T;
+    return (o.data !== undefined ? o.data : o) as T;
   }
 
   if (codeNum === null && o.success !== false) {
-    return o.data as T;
+    return (o.data !== undefined ? o.data : o) as T;
   }
 
   return payload as T;
