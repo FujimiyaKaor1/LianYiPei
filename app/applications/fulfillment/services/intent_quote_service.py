@@ -102,7 +102,14 @@ class IntentQuoteService:
         if quote.buyer_id != sender_id:
             return None, "只有采购方可以发送意向报价"
 
-        if quote.status not in ("draft",):
+        if quote.status == "pending":
+            if not quote.buyer_confirmed:
+                quote.buyer_confirmed = True
+                quote.updated_at = datetime.utcnow()
+                db.session.commit()
+            return quote, ""
+
+        if quote.status != "draft":
             return None, f"当前状态为 {quote.status}，无法发送"
 
         quote.status = "pending"
