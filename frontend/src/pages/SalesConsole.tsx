@@ -897,23 +897,26 @@ export default function SalesConsole() {
   };
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // 报价 Modal
+  // 报价 Modal — 统一走意向报价（不依赖询价会话）
   // ═══════════════════════════════════════════════════════════════════════════
   const openQuoteModal = () => {
     setQuoteError('');
-    // 若无活跃询价会话，则走意向报价流程（不依赖 chatId）
-    if (!activeInquiryChatId) {
-      const targetId = counterpartyEnterpriseId;
-      if (targetId) {
-        api.getEnterprisePublicProfile(targetId)
-          .then((res) => setIntentQuoteProfile(res.profile))
-          .catch(() => {});
-        setIntentQuoteSellerId(targetId);
-      }
-      setShowIntentQuoteModal(true);
+    const sm = chatItemToSalesMessageLike(activeChat || { id: '', title: '', content: '', is_read: true });
+    const sellerId = activeInquiryChat
+      ? (user?.id === activeInquiryChat.buyer_id ? activeInquiryChat.seller_id : activeInquiryChat.buyer_id)
+      : extractEnterpriseId(sm);
+    if (!sellerId) {
+      setQuoteError('请先在左侧选择一条供需消息或询价会话');
       return;
     }
-    setShowQuoteModal(true);
+    const productName = activeInquiryChat?.product_name || extractProductName(sm);
+    if (sellerId) {
+      api.getEnterprisePublicProfile(sellerId)
+        .then((res) => setIntentQuoteProfile(res.profile))
+        .catch(() => {});
+      setIntentQuoteSellerId(sellerId);
+    }
+    setShowIntentQuoteModal(true);
   };
 
   const handleQuoteSuccess = () => {
