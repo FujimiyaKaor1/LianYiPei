@@ -250,8 +250,11 @@ function QuoteModal({
   const displayScore = creditScore !== null ? Math.round(creditScore) : null;
 
   const handleSubmit = async () => {
-    if (!chatId) return;
     setError('');
+    if (!chatId) {
+      setError('请先在左侧选择一个询价会话');
+      return;
+    }
     if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
       setError('请填写有效的预估单价（元）');
       return;
@@ -898,6 +901,18 @@ export default function SalesConsole() {
   // ═══════════════════════════════════════════════════════════════════════════
   const openQuoteModal = () => {
     setQuoteError('');
+    // 若无活跃询价会话，则走意向报价流程（不依赖 chatId）
+    if (!activeInquiryChatId) {
+      const targetId = counterpartyEnterpriseId;
+      if (targetId) {
+        api.getEnterprisePublicProfile(targetId)
+          .then((res) => setIntentQuoteProfile(res.profile))
+          .catch(() => {});
+        setIntentQuoteSellerId(targetId);
+      }
+      setShowIntentQuoteModal(true);
+      return;
+    }
     setShowQuoteModal(true);
   };
 
