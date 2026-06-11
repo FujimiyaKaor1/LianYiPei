@@ -459,7 +459,7 @@ export default function SalesConsole() {
   const [msgError, setMsgError] = useState('');
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
-  const msgBottomRef = useRef<HTMLDivElement>(null);
+  const messageScrollRef = useRef<HTMLDivElement>(null);
 
   // ── AI 商机洞察 ───────────────────────────────────────────────────────────
   const [insightLoading, setInsightLoading] = useState(false);
@@ -799,9 +799,14 @@ export default function SalesConsole() {
     }
   }, [activeInquiryChatId, loadInquiryMessages, loadInsights]);
 
-  // 滚动到底部
+  // 只滚动聊天容器，避免把整个企业看板带到页面中部。
   useEffect(() => {
-    msgBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const messageScroll = messageScrollRef.current;
+    if (!messageScroll) return;
+    messageScroll.scrollTo({
+      top: messageScroll.scrollHeight,
+      behavior: 'smooth',
+    });
   }, [inquiryMessages]);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1315,7 +1320,7 @@ export default function SalesConsole() {
 
           {/* ── 中间：聊天消息流 ─────────────────────────────────────────── */}
           <div className="flex-1 flex flex-col bg-surface-container-low/30 min-w-0">
-            <div className="flex-1 p-6 space-y-5 overflow-y-auto no-scrollbar min-h-0">
+            <div ref={messageScrollRef} className="flex-1 p-6 space-y-5 overflow-y-auto no-scrollbar min-h-0">
               {!hasAnyActiveChat ? (
                 <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-neutral-200 bg-white/40 px-6 text-center">
                   <MessageSquare className="h-10 w-10 text-neutral-300" aria-hidden />
@@ -1531,7 +1536,6 @@ export default function SalesConsole() {
                   </div>
                 </>
               )}
-              <div ref={msgBottomRef} />
             </div>
 
             {/* ── 输入区（仅 InquiryChat 会话可用）─────────────────────── */}
@@ -1736,7 +1740,7 @@ export default function SalesConsole() {
             <p className="text-xs text-neutral-400 mt-1">当前进行中的 48 个合作项目</p>
           </div>
           <button
-            onClick={() => showToast('全部合作动态即将上线', 'info')}
+            onClick={() => navigate('/orders')}
             className="text-xs font-bold text-neutral-400 hover:text-primary transition-colors flex items-center gap-1"
           >
             全部动态 <ArrowRight className="w-4 h-4" />
@@ -1800,7 +1804,7 @@ export default function SalesConsole() {
               </div>
             </div>
             <button
-              onClick={() => showToast('SaaS订单系统同步功能即将上线', 'info')}
+              onClick={() => navigate('/orders')}
               className="mt-8 w-full py-4 bg-white text-primary rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-neutral-100 transition-colors"
             >
               <RefreshCw className="w-4 h-4" />
@@ -1813,14 +1817,14 @@ export default function SalesConsole() {
           <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-4">快速特权</h4>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { icon: TrendingUp, label: '优先抢单' },
-              { icon: Wallet, label: '账期保理' },
-              { icon: Award, label: '优质商机' },
-              { icon: Zap, label: 'AI 营销' },
+              { icon: TrendingUp, label: '优先抢单', path: '/matching' },
+              { icon: Wallet, label: '账期保理', path: '/assets' },
+              { icon: Award, label: '优质商机', path: '/enterprise-directory' },
+              { icon: Zap, label: 'AI 营销', path: '/sales-console' },
             ].map((item, i) => (
               <button
                 key={i}
-                onClick={() => showToast(`${item.label}功能即将上线`, 'info')}
+                onClick={() => navigate(item.path)}
                 className="p-4 bg-surface-container-low rounded-2xl flex flex-col gap-2 items-center text-center hover:bg-neutral-100 transition-colors group"
               >
                 <item.icon className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />

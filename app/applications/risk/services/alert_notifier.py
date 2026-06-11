@@ -62,6 +62,7 @@ def notify_alert(alert: Alert, recipients: Optional[List[int]] = None) -> None:
     level = alert.level
 
     if level == LEVEL_RED:
+        _send_hermes_alert(alert, recipients)
         _send_wechat_push(alert, recipients)
         _send_sms(alert, recipients)
         _send_in_site_message(alert, recipients)
@@ -134,6 +135,26 @@ def _send_wechat_push(alert: Alert, recipient_ids: List[int]) -> None:
             logger.error(f"[AlertNotifier] 微信推送异常 user={rid}: {e}")
             # 确保至少有站内消息
             _send_in_site_message(alert, [rid])
+
+
+def _send_hermes_alert(alert: Alert, recipient_ids: List[int]) -> dict:
+    """将红色预警交给本机 Hermes 总结/转发；失败时只记录，不影响旧通知链路。"""
+    try:
+        from app.services.hermes_notification_service import send_alert_to_hermes
+
+        result = send_alert_to_hermes(alert, recipient_ids)
+        if result.get("success"):
+            logger.info("[AlertNotifier] Hermes 预警交接成功 alert=%s", alert.id)
+        else:
+            logger.info(
+                "[AlertNotifier] Hermes 预警交接跳过/失败 alert=%s reason=%s",
+                alert.id,
+                result.get("message"),
+            )
+        return result
+    except Exception as e:
+        logger.warning("[AlertNotifier] Hermes 预警交接异常 alert=%s: %s", alert.id, e)
+        return {"success": False, "message": str(e)}
 
 
 def _send_sms(alert: Alert, recipient_ids: List[int]) -> None:

@@ -33,6 +33,7 @@ eggs/
 .coverage
 htmlcov/
 .tox/
+frontend/test-artifacts/
 
 # ========== 日志 ==========
 *.log

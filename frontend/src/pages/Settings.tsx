@@ -3,7 +3,6 @@ import {
   User,
   Bell,
   Shield,
-  Globe,
   ChevronRight,
   LogOut,
   Loader2,
@@ -188,7 +187,6 @@ export default function Settings() {
             { icon: User, label: '个人账户' },
             { icon: Shield, label: '安全与隐私' },
             { icon: Bell, label: '通知偏好（微信）' },
-            { icon: Globe, label: '语言与地区' },
           ].map((item, i) => (
             <button
               key={i}
@@ -400,16 +398,6 @@ export default function Settings() {
                     发送测试推送
                   </button>
                 </div>
-              </div>
-            </section>
-          )}
-
-          {/* Tab 3: Language placeholder */}
-          {activeTab === 3 && (
-            <section className="space-y-6">
-              <h3 className="text-xl font-bold">语言与地区</h3>
-              <div className="bg-white rounded-[2rem] border border-neutral-100 shadow-sm p-8">
-                <p className="text-sm text-neutral-400">语言设置功能即将上线</p>
               </div>
             </section>
           )}

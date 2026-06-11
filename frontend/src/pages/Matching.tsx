@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useToast } from '@/src/components/ToastProvider';
 import {
   Search,
   ChevronRight,
@@ -150,7 +149,6 @@ function SkeletonCard() {
 
 export default function Matching() {
   const navigate = useNavigate();
-  const { showToast } = useToast();
   const { user, setIsLoginModalOpen } = useAuth();
   const demoTimersRef = useRef<{ t1?: ReturnType<typeof setTimeout>; t2?: ReturnType<typeof setTimeout> }>({});
 
@@ -313,6 +311,12 @@ export default function Matching() {
     void loadSuppliers({ sort });
   };
 
+  const handleToggleAlgorithm = () => {
+    const nextMode = algorithmMode === 'rule' ? 'deep_learning' : 'rule';
+    setAlgorithmMode(nextMode);
+    void loadSuppliers({ algorithm: nextMode });
+  };
+
   // ── 指标分析（基于真实数据动态生成） ────────────────────────────────────
 
   const getMetrics = (item: SupplierSearchItem) => {
@@ -384,10 +388,10 @@ export default function Matching() {
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button
-            onClick={() => showToast('匹配算法参数调优将根据历史数据自动推荐最佳权重，此功能即将上线', 'info')}
+            onClick={handleToggleAlgorithm}
             className="btn-secondary btn-sm"
           >
-            参数调优
+            {algorithmMode === 'rule' ? '启用 AI 融合' : '使用规则引擎'}
           </button>
           <button
             onClick={() => setGreenOnly(!greenOnly)}

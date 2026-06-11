@@ -397,12 +397,6 @@ export default function Alerts() {
                 >
                   已知晓预警
                 </button>
-                <button
-                  onClick={() => showToast('数据申诉功能即将上线', 'info')}
-                  className="px-4 py-2 bg-white border border-neutral-200 rounded-lg text-xs font-semibold text-neutral-600 hover:border-neutral-400 hover:text-black transition-all"
-                >
-                  发起数据申诉
-                </button>
               </div>
               <button
                 onClick={() => navigate('/quote-pool')}

@@ -5,6 +5,7 @@
 - 每日凌晨2点批量重新计算所有企业信用分
 """
 import logging
+import os
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -15,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 # 全局调度器实例
 scheduler = None
+_lock_handle = None
 
 
 def init_scheduler(app):
@@ -23,10 +25,18 @@ def init_scheduler(app):
     在Flask应用启动时调用
     """
     global scheduler
+
+    if not app.config.get("SCHEDULER_ENABLED", True):
+        logger.info("定时任务调度器已通过 SCHEDULER_ENABLED 关闭")
+        return None
     
     if scheduler is not None:
         logger.warning("调度器已经初始化，跳过重复初始化")
         return scheduler
+
+    if not _acquire_scheduler_lock(app):
+        logger.warning("检测到其他进程已持有调度器锁，本进程跳过 APScheduler 启动")
+        return None
     
     # 创建后台调度器
     scheduler = BackgroundScheduler(
@@ -260,11 +270,49 @@ def shutdown_scheduler():
         scheduler.shutdown(wait=False)
         logger.info("定时任务调度器已关闭")
         scheduler = None
+    _release_scheduler_lock()
 
 
 def get_scheduler():
     """获取调度器实例"""
     return scheduler
+
+
+def _acquire_scheduler_lock(app) -> bool:
+    """进程级锁，避免 Gunicorn 多 worker 同时启动同一组定时任务。"""
+    global _lock_handle
+    lock_path = app.config.get("SCHEDULER_LOCK_FILE") or "/tmp/lianyipei-scheduler.lock"
+    try:
+        import fcntl
+
+        os.makedirs(os.path.dirname(lock_path), exist_ok=True)
+        _lock_handle = open(lock_path, "a+")
+        fcntl.flock(_lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        _lock_handle.seek(0)
+        _lock_handle.truncate()
+        _lock_handle.write(str(os.getpid()))
+        _lock_handle.flush()
+        return True
+    except BlockingIOError:
+        return False
+    except Exception as exc:
+        logger.warning("调度器锁获取失败，将继续启动调度器: %s", exc)
+        return True
+
+
+def _release_scheduler_lock() -> None:
+    global _lock_handle
+    if _lock_handle is None:
+        return
+    try:
+        import fcntl
+
+        fcntl.flock(_lock_handle.fileno(), fcntl.LOCK_UN)
+        _lock_handle.close()
+    except Exception:
+        pass
+    finally:
+        _lock_handle = None
 
 
 def get_job_status():

@@ -83,6 +83,13 @@ def _collab_api_keys_list():
     return [x.strip() for x in raw.split(",") if x.strip()]
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 # 管理后台创建的密钥（进程内；重启后丢失，生产请写入 COLLAB_API_KEYS）
 _RUNTIME_COLLAB_API_KEYS = []
 
@@ -182,10 +189,13 @@ EXTERNAL_INTERFACES = build_external_interfaces()
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-12345'
 
-    # 本地联调（硬编码，不读 .env）：顶层 /api/… 由 Flask-Login request_loader 自动登录，禁止 302 到登录页
-    # 上线前务必改回 False；pytest 见 tests/conftest.TestConfig 覆盖为 False
-    DISABLE_API_AUTH = True
-    DEV_API_LOGIN_ENTERPRISE_ID = 123
+    # 本地联调：顶层 /api/… 可通过 request_loader 自动登录，生产默认关闭。
+    DISABLE_API_AUTH = _env_bool("DISABLE_API_AUTH", False)
+    DEV_API_LOGIN_ENTERPRISE_ID = int(os.environ.get("DEV_API_LOGIN_ENTERPRISE_ID") or 123)
+
+    # 生产部署时建议仅在一个独立进程启用调度器，避免 Gunicorn 多 worker 重复跑任务。
+    SCHEDULER_ENABLED = _env_bool("SCHEDULER_ENABLED", True)
+    SCHEDULER_LOCK_FILE = os.environ.get("SCHEDULER_LOCK_FILE") or "/tmp/lianyipei-scheduler.lock"
 
     # 为扩展注入的 /hybridaction/* JSONP 探测提供空响应；与业务无关，可减少本地 404
     BROWSER_EXTENSION_PROBE_NOOP = True
@@ -230,6 +240,17 @@ class Config:
     WECHAT_TEMPLATE_ID = os.environ.get('WECHAT_TEMPLATE_ID') or ''  # 模板消息ID
     # 模板 data 字段名，须与公众号后台模板详情中 {{xxx.DATA}} 的 xxx 一致；主文案,时间 两个键，逗号分隔
     WECHAT_TEMPLATE_DATA_KEYS = os.environ.get('WECHAT_TEMPLATE_DATA_KEYS') or 'thing1,time2'
+
+    # Hermes 本机网关 / 链易配内部控制接口
+    HERMES_API_SERVER_URL = (os.environ.get("HERMES_API_SERVER_URL") or "http://127.0.0.1:8642/v1").rstrip("/")
+    HERMES_API_SERVER_KEY = os.environ.get("HERMES_API_SERVER_KEY") or ""
+    HERMES_WEIXIN_TARGET = os.environ.get("HERMES_WEIXIN_TARGET") or "weixin"
+    HERMES_LIANYIPEI_TOKEN = os.environ.get("HERMES_LIANYIPEI_TOKEN") or ""
+    HERMES_LIANYIPEI_BASE_URL = (os.environ.get("HERMES_LIANYIPEI_BASE_URL") or "").rstrip("/")
+    HERMES_ACTION_CONFIRM_TTL_SECONDS = int(os.environ.get("HERMES_ACTION_CONFIRM_TTL_SECONDS") or 300)
+    HERMES_ALLOWED_REMOTE_ADDRS = os.environ.get("HERMES_ALLOWED_REMOTE_ADDRS") or "127.0.0.1,::1,localhost"
+    HERMES_TRUST_PROXY_HEADERS = _env_bool("HERMES_TRUST_PROXY_HEADERS", False)
+    HERMES_API_TIMEOUT_SECONDS = float(os.environ.get("HERMES_API_TIMEOUT_SECONDS") or 30)
 
     DEFAULT_ALERT_THRESHOLDS = DEFAULT_ALERT_THRESHOLDS
     DEFAULT_CREDIT_RULES = DEFAULT_CREDIT_RULES

@@ -319,6 +319,7 @@ def ensure_schema(db) -> None:
     from app.models import (
         Alert,
         Enterprise,
+        HermesPendingAction,
         Inquiry,
         MatchFeedback,
         Message,
@@ -338,6 +339,7 @@ def ensure_schema(db) -> None:
         MatchFeedback,
         RecruitmentTask,
         Alert,
+        HermesPendingAction,
         PriceIndex,
         Message,
     )

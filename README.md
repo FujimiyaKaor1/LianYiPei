@@ -57,19 +57,25 @@ CREATE DATABASE lianyipei CHARACTER SET utf8mb4;
 ### 5. 初始化数据库
 
 ```bash
-python scripts/init_db.py
+python scripts/db/init_db.py
 ```
 
 ### 6. 生成测试数据
 
 ```bash
-python scripts/generate_test_data.py
+python scripts/seed/generate_test_data.py
+```
+
+### 6.1 生成完整演示数据
+
+```bash
+python scripts/seed/seed_demo_full_flow.py
 ```
 
 ### 7. 导入产业链关系 (需要Neo4j)
 
 ```bash
-python scripts/import_graph.py
+python scripts/seed/import_graph.py
 ```
 
 ### 8. 启动服务
@@ -92,6 +98,8 @@ python run.py
 | [ARCHITECTURE.md](ARCHITECTURE.md) | **架构文档**（前端层、控制层、业务层、数据层） |
 | [DATA_GUIDE.md](DATA_GUIDE.md) | 数据使用说明 |
 | [TECH_STACK.md](TECH_STACK.md) | 技术栈实现说明 |
+| [docs/HERMES_INTEGRATION.md](docs/HERMES_INTEGRATION.md) | Hermes 微信智能告警与确认后远程操作 |
+| [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md) | 云服务器 / ECS 生产部署建议 |
 | [启动说明.md](启动说明.md) | 启动与排错指南 |
 
 ## 项目结构（按架构分层）

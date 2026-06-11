@@ -60,6 +60,12 @@ export default function Assets() {
     );
   }
 
+  const tags = Array.isArray(data.tags) ? data.tags : [];
+  const qualifications = Array.isArray(data.qualifications) ? data.qualifications : [];
+  const dataAuth = Array.isArray(data.data_auth) ? data.data_auth : [];
+  const teamMembers = Array.isArray(data.team_members) ? data.team_members : [];
+  const creditBreakdown = Array.isArray(data.credit_breakdown) ? data.credit_breakdown : [];
+
   return (
     <div className="space-y-12">
       {/* Identity Banner */}
@@ -81,7 +87,7 @@ export default function Assets() {
               <div className="flex flex-wrap gap-6 text-sm text-neutral-400 font-medium mt-4">
                 <span className="flex items-center gap-2"><MapPin className="w-4 h-4" /> {data.location}</span>
                 <span className="flex items-center gap-2"><Building2 className="w-4 h-4" /> 制造业 · {data.industry_tag}</span>
-                {data.tags.slice(0, 1).map((tag, i) => (
+                {tags.slice(0, 1).map((tag, i) => (
                   <span key={i} className="flex items-center gap-2"><Award className="w-4 h-4" /> {tag}</span>
                 ))}
               </div>
@@ -115,7 +121,7 @@ export default function Assets() {
               </button>
             </div>
             <div className="grid grid-cols-2 gap-6">
-              {data.qualifications.map((cert, i) => (
+              {qualifications.map((cert, i) => (
                 <div key={i} className="p-6 bg-white rounded-3xl border border-neutral-100 shadow-sm flex items-center justify-between group cursor-pointer hover:shadow-md transition-all">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 bg-neutral-50 rounded-2xl flex items-center justify-center text-neutral-400 group-hover:text-black transition-colors">
@@ -129,7 +135,7 @@ export default function Assets() {
                   {cert.status === '有效' && <ShieldCheck className="w-5 h-5 text-blue-500" />}
                 </div>
               ))}
-              {data.qualifications.length === 0 && (
+              {qualifications.length === 0 && (
                 <div className="col-span-2 py-8 text-center text-sm text-neutral-400 border-2 border-dashed border-neutral-100 rounded-3xl">
                   暂无资质信息
                 </div>
@@ -149,7 +155,7 @@ export default function Assets() {
                 <span className="text-[10px] text-neutral-400 font-bold">最后同步：10分钟前</span>
               </div>
               <div className="divide-y divide-neutral-50">
-                {data.data_auth.map((sys, i) => (
+                {dataAuth.map((sys, i) => (
                   <div key={i} className="p-8 flex items-center justify-between hover:bg-neutral-50/50 transition-colors">
                     <div className="flex items-center gap-6">
                       <div className="w-10 h-10 bg-neutral-100 rounded-xl flex items-center justify-center">
@@ -182,7 +188,7 @@ export default function Assets() {
           <div className="bg-surface-container-highest rounded-[2.5rem] p-10 space-y-8 shadow-sm">
             <h4 className="text-lg font-bold">信用分构成</h4>
             <div className="space-y-6">
-              {data.credit_breakdown.map((item, i) => (
+              {creditBreakdown.map((item, i) => (
                 <div key={i} className="space-y-2">
                   <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest">
                     <span>{item.label}</span>
@@ -209,7 +215,7 @@ export default function Assets() {
               <button className="text-xs font-bold text-black border border-neutral-200 px-3 py-1.5 rounded-lg hover:bg-neutral-50 transition-colors">管理</button>
             </div>
             <div className="space-y-3">
-              {data.team_members.map((member, i) => (
+              {teamMembers.map((member, i) => (
                 <div key={i} className="p-4 bg-white rounded-2xl border border-neutral-100 shadow-sm flex items-center justify-between group cursor-pointer hover:bg-neutral-50 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 bg-brand-solid text-white rounded-full flex items-center justify-center font-bold text-xs shrink-0">{member.avatar}</div>

@@ -7,6 +7,7 @@ import {
   Award,
   ShieldCheck,
   Network,
+  Monitor,
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '@/src/context/AuthContext';
@@ -15,6 +16,7 @@ import { BrandLogo } from './BrandLogo';
 /** 顺序突出「质量把关 → 风险预警 → 产业链视图 → 招商」 */
 const govNavItems = [
   { icon: LayoutDashboard, label: '监管首页', path: '/gov' },
+  { icon: Monitor, label: '数字大屏', path: '/gov/screen' },
   { icon: Award, label: '质量标签', path: '/gov/labels' },
   { icon: ShieldAlert, label: '预警中心', path: '/gov/alerts' },
   { icon: Network, label: '产业链图谱', path: '/gov/supply-chain' },

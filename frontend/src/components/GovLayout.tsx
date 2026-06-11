@@ -18,9 +18,9 @@ export function GovLayout() {
   return (
     <div className="app-shell flex min-h-screen w-full">
       <GovSidebar />
-      <main className="flex min-h-screen min-w-0 flex-1 flex-col">
+      <main className="flex h-screen min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <TopBar title={getTitle(location.pathname)} />
-        <div data-scroll-root className="min-h-0 w-full flex-1 p-4 pb-12 md:p-6">
+        <div data-scroll-root className="min-h-0 w-full flex-1 overflow-auto p-4 pb-12 md:p-6">
           <Outlet />
         </div>
       </main>

@@ -5,13 +5,10 @@ import {
   ShieldCheck, 
   Filter,
   Download,
-  MoreHorizontal,
   Loader2,
   AlertTriangle,
   RefreshCw,
-  Plus,
-  Target,
-  BarChart3
+  FileText,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
@@ -49,6 +46,7 @@ export default function QuotePool() {
 
   // 默认查看 "精密轴承" 价格指数（与设计文档一致）
   const [targetProduct, setTargetProduct] = useState('精密轴承');
+  const productFilters = ['精密轴承', '驱动电机', '车规级传感器', '高频连接器'];
 
   const loadData = async () => {
     setIsLoading(true);
@@ -101,7 +99,36 @@ export default function QuotePool() {
 
   useEffect(() => {
     void loadData();
-  }, []);
+  }, [targetProduct]);
+
+  const handleCycleProduct = () => {
+    const index = productFilters.indexOf(targetProduct);
+    const nextProduct = productFilters[(index + 1) % productFilters.length];
+    setTargetProduct(nextProduct);
+    showToast(`已切换到 ${nextProduct} 报价样本`, 'success');
+  };
+
+  const handleExportCsv = () => {
+    const rows = [
+      ['单号', '合作商', '项目内容', '报价金额', '状态'],
+      ...quotes.map(row => [
+        String(row.id),
+        row.supplier_name || '',
+        row.product_name || '',
+        String(row.price ?? ''),
+        row.status || '',
+      ]),
+    ];
+    const csv = rows.map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `链易配报价池-${targetProduct}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast('当前报价列表已导出', 'success');
+  };
 
   // 组装图表数据
   const chartData = priceIndex?.history || [];
@@ -249,12 +276,9 @@ export default function QuotePool() {
               </div>
             ))}
           </div>
-          <button
-            onClick={() => showToast('完整审计报告即将上线', 'info')}
-            className="mt-8 lg:mt-0 w-full py-4 bg-white/10 hover:bg-white/20 border border-white/10 rounded-xl text-xs font-bold transition-all text-neutral-300 hover:text-white"
-          >
-            查看完整审计报告
-          </button>
+          <div className="mt-8 lg:mt-0 rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-xs leading-relaxed text-neutral-300">
+            审计结论已并入右侧日志和下方报价状态，异常报价会被自动剔除后再进入价格指数。
+          </div>
         </div>
       </section>
 
@@ -263,8 +287,23 @@ export default function QuotePool() {
         <div className="p-6 lg:p-8 border-b border-neutral-50 flex justify-between items-center">
           <h4 className="font-bold">最新意向报价单集合</h4>
           <div className="flex gap-3">
-            <button onClick={() => showToast('筛选功能即将上线', 'info')} className="p-2 hover:bg-neutral-50 rounded-lg transition-colors"><Filter className="w-4 h-4 text-neutral-400" /></button>
-            <button onClick={() => showToast('导出功能即将上线', 'info')} className="p-2 hover:bg-neutral-50 rounded-lg transition-colors"><Download className="w-4 h-4 text-neutral-400" /></button>
+            <button
+              type="button"
+              onClick={handleCycleProduct}
+              className="p-2 hover:bg-neutral-50 rounded-lg transition-colors"
+              title="切换产品样本"
+            >
+              <Filter className="w-4 h-4 text-neutral-400" />
+            </button>
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              disabled={quotes.length === 0}
+              className="p-2 hover:bg-neutral-50 rounded-lg transition-colors disabled:opacity-30"
+              title="导出当前报价列表"
+            >
+              <Download className="w-4 h-4 text-neutral-400" />
+            </button>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -314,10 +353,11 @@ export default function QuotePool() {
                     </td>
                     <td className="px-8 py-5 text-right">
                       <button
-                        onClick={() => showToast(`报价单 ${row.quote_id} 详情即将上线`, 'info')}
+                        onClick={() => showToast(`报价单 ${row.quote_id || row.id}：${row.supplier_name} / ${formatAmount(row.price)} / ${row.status === 'active' ? '已核验' : '待处理'}`, 'info')}
                         className="p-2 hover:bg-white rounded-lg transition-all group-hover:shadow-sm inline-flex"
+                        title="查看报价摘要"
                       >
-                        <MoreHorizontal className="w-4 h-4 text-neutral-400" />
+                        <FileText className="w-4 h-4 text-neutral-400" />
                       </button>
                     </td>
                   </tr>

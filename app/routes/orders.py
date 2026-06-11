@@ -50,29 +50,14 @@ def _estimate_progress(order_date, delivery_date, status):
 bp = Blueprint('orders', __name__, url_prefix='/orders')
 
 
-@bp.route('/')
+@bp.route('', strict_slashes=False)
+@bp.route('/', strict_slashes=False)
 @login_required
 def index():
-    """订单列表页面"""
-    page = request.args.get('page', 1, type=int)
-    status = request.args.get('status', '')
-    
-    # 获取订单列表
-    result = OrderService.get_orders(
-        enterprise_id=current_user.id,
-        status=status if status else None,
-        page=page,
-        per_page=20
-    )
-    
-    # 获取统计信息
-    stats = OrderService.get_order_statistics(current_user.id)
-    
-    return render_template('orders/index.html',
-                         orders=result['orders'],
-                         pagination=result,
-                         stats=stats,
-                         current_status=status)
+    """React 订单工作流入口，避免直达 /orders 时落回旧 Bootstrap 页面。"""
+    from app.routes.main import _render_spa
+
+    return _render_spa('订单工作流 - 链易配')
 
 
 @bp.route('/create', methods=['GET', 'POST'])

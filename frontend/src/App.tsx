@@ -37,6 +37,7 @@ import GovAlerts from './pages/gov/GovAlerts';
 import GovRecruitment from './pages/gov/GovRecruitment';
 import GovQualityLabels from './pages/gov/GovQualityLabels';
 import GovSupplyChain from './pages/gov/GovSupplyChain';
+const GovDigitalScreen = lazy(() => import('./pages/gov/GovDigitalScreen'));
 
 // Admin pages（按需加载，减小首包）
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -94,11 +95,11 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route element={<RequireAuth />}>
-        <Route path="/dashboard" element={<Navigate to="/" replace />} />
         <Route path="/supervision" element={<Navigate to="/gov" replace />} />
 
         <Route path="/" element={<EnterpriseLayoutGuard />}>
           <Route index element={<RoleBasedHomeOutlet />} />
+          <Route path="dashboard" element={<SalesConsole />} />
           <Route path="enterprise-directory" element={<EnterpriseDirectory />} />
           <Route path="matching" element={<Matching />} />
           <Route path="collaboration" element={<Navigate to="/" replace />} />
@@ -122,6 +123,14 @@ export default function App() {
         </Route>
 
         <Route element={<RequireRole allow={['government', 'admin']} />}>
+          <Route
+            path="/gov/screen"
+            element={
+              <Suspense fallback={<AuthLoadingShell />}>
+                <GovDigitalScreen />
+              </Suspense>
+            }
+          />
           <Route path="/gov" element={<GovLayoutGuard />}>
             <Route index element={<GovDashboard />} />
             <Route path="alerts" element={<GovAlerts />} />

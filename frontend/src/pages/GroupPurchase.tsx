@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Search, 
-  Plus,
+  Send,
   Loader2,
   AlertTriangle,
   RefreshCw,
@@ -164,6 +164,10 @@ export default function GroupPurchase() {
     ? items.filter(gp => gp.product_name.toLowerCase().includes(searchQuery.toLowerCase()))
     : items;
 
+  const handleCreateDemand = () => {
+    navigate('/matching');
+  };
+
   if (authLoading) {
     return (
       <div className="flex items-center justify-center py-32">
@@ -221,11 +225,11 @@ export default function GroupPurchase() {
           </button>
           
           <button
-            onClick={() => showToast('拼单创建功能即将上线', 'info')}
+            onClick={handleCreateDemand}
             className="bg-brand-solid text-white px-5 py-2.5 rounded-lg text-xs font-bold hover:bg-brand-solid-hover transition-all flex items-center gap-2 shadow-[0_4px_14px_0_rgb(0,0,0,0.1)] shrink-0"
           >
-            <Plus className="w-3.5 h-3.5" />
-            发起新拼单
+            <Send className="w-3.5 h-3.5" />
+            发布采购意向
           </button>
         </div>
       </header>
@@ -246,14 +250,14 @@ export default function GroupPurchase() {
         <div className="flex flex-col items-center justify-center py-16 px-6 rounded-2xl border border-dashed border-neutral-200 bg-neutral-50/80 max-w-lg mx-auto">
           <Package className="w-12 h-12 text-neutral-300 mb-4" strokeWidth={1.1} />
           <p className="text-sm font-semibold text-neutral-600 mb-1">暂无进行中的集采拼单</p>
-          <p className="text-xs text-neutral-400 text-center mb-6">当前没有开放中的拼单。发起新拼单并写入数据库后将在此展示。</p>
+          <p className="text-xs text-neutral-400 text-center mb-6">当前没有开放中的拼单。可先发布采购意向，系统会按品类聚合可集采需求。</p>
           <button
             type="button"
-            onClick={() => showToast('拼单创建功能即将上线', 'info')}
+            onClick={handleCreateDemand}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-brand-solid text-white text-xs font-bold hover:bg-brand-solid-hover shadow-sm"
           >
-            <Plus className="w-3.5 h-3.5" />
-            发起新拼单
+            <Send className="w-3.5 h-3.5" />
+            发布采购意向
           </button>
         </div>
       )}
@@ -337,7 +341,7 @@ export default function GroupPurchase() {
                       </div>
                       <div className="flex items-center gap-3">
                         <button
-                          onClick={() => navigate(`/group-purchase/${gp.id}`)}
+                          onClick={() => showToast(`${gp.product_name}：已集结 ${formatQuantity(gp.current_quantity)} / 目标 ${formatQuantity(gp.target_quantity)}，${discount}`, 'info')}
                           className="text-[13px] font-bold text-neutral-500 hover:text-black transition-colors"
                         >
                           查看详情
@@ -378,10 +382,10 @@ export default function GroupPurchase() {
           </p>
           <div className="pt-2">
             <button
-              onClick={() => showToast('洞察报告即将上线', 'info')}
+              onClick={() => navigate('/quote-pool')}
               className="bg-white/10 hover:bg-white/20 text-white border border-white/10 px-6 py-2.5 rounded-lg font-bold text-xs transition-all"
             >
-              提取完整洞察
+              查看报价指数
             </button>
           </div>
         </div>

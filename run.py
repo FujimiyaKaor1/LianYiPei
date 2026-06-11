@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 from dotenv import load_dotenv
 
@@ -32,13 +33,15 @@ def scheduled_bandit_update():
         else:
             print(f'[Scheduler] Bandit更新失败或无数据 (day_key={day_key})')
 
-scheduler = BackgroundScheduler()
-scheduler.add_job(scheduled_alert_check, 'cron', hour=8, minute=0)
-scheduler.add_job(scheduled_bandit_update, 'cron', hour=2, minute=0)
-scheduler.start()
+scheduler = None
+if __name__ == '__main__' and os.getenv("RUN_LEGACY_SCHEDULER", "").strip().lower() in {"1", "true", "yes", "on"}:
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(scheduled_alert_check, 'cron', hour=8, minute=0)
+    scheduler.add_job(scheduled_bandit_update, 'cron', hour=2, minute=0)
+    scheduler.start()
 
 if __name__ == '__main__':
-    import sys, socket, os
+    import sys, socket
 
     def _find_port(preferred=5000, fallback=5050):
         """自适应端口选择：macOS 上 5000 常被 AirPlay Receiver 占用。"""

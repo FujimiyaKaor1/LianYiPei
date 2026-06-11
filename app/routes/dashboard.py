@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, jsonify, request, send_file, abort, redirect
+from flask_login import login_required
 from app.authz import role_required
 from config import DEFAULT_ALERT_THRESHOLDS
 
@@ -216,10 +217,9 @@ def download_report():
 # SPA 通配：与 @bp.route('/dashboard/', ...) + @bp.route('/dashboard/<path:path>') 等价
 # （另注册 /dashboard 无尾斜杠，避免重定向丢参）
 # ---------------------------------------------------------------------------
-@dashboard.route('/dashboard', defaults={'path': ''})
-@dashboard.route('/dashboard/', defaults={'path': ''})
-@dashboard.route('/dashboard/<path:path>')
-@role_required('admin')
+@dashboard.route('/dashboard', defaults={'path': ''}, strict_slashes=False)
+@dashboard.route('/dashboard/<path:path>', strict_slashes=False)
+@login_required
 def dashboard_spa(path):
     from app.routes.main import _render_spa
 

@@ -1,5 +1,5 @@
 """
-核心数据模型（10 张表 + JSON 拍平策略）
+核心数据模型（业务核心表 + JSON 拍平策略）
 
 说明：
 - MatchFeedback 独立成表，供 Bandit/RL 等高频查询匹配反馈日志。
@@ -7,8 +7,8 @@
 - 其他附属数据迁入 Enterprise / Product / Inquiry / Transaction / Alert 的 JSON 字段。
 - 信用分规则、预警阈值等请在 config.py 中维护（不再使用 credit_rules / alert_thresholds 表）。
 
-当前 10 张表：enterprises, products, inquiries, quotes, transactions, match_feedbacks,
-recruitment_tasks, alerts, price_indices, messages。
+当前核心业务表：enterprises, products, inquiries, quotes, transactions, match_feedbacks,
+recruitment_tasks, alerts, price_indices, messages；Hermes 写操作确认单独落表。
 """
 from datetime import datetime
 import hashlib
@@ -391,6 +391,38 @@ class Alert(db.Model):
 
     def __repr__(self):
         return f"<Alert {self.product_name} - {self.level}>"
+
+
+# ---------------------------------------------------------------------------
+# 8.1 HermesPendingAction（Hermes 写操作二次确认）
+# ---------------------------------------------------------------------------
+class HermesPendingAction(db.Model):
+    __tablename__ = "hermes_pending_actions"
+
+    id = db.Column(db.String(64), primary_key=True)
+    action = db.Column(db.String(50), nullable=False)
+    alert_id = db.Column(db.Integer, db.ForeignKey("alerts.id", ondelete="CASCADE"), nullable=False)
+    requested_by = db.Column(db.String(120), nullable=False, default="hermes")
+    parameters = db.Column(db.JSON)
+    summary = db.Column(db.Text)
+    status = db.Column(db.String(20), nullable=False, default="pending")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    executed_at = db.Column(db.DateTime)
+
+    alert = db.relationship("Alert", foreign_keys=[alert_id])
+
+    def to_payload(self) -> dict:
+        return {
+            "id": self.id,
+            "action": self.action,
+            "alert_id": self.alert_id,
+            "requested_by": self.requested_by,
+            "parameters": self.parameters or {},
+            "created_at": self.created_at,
+            "expires_at": self.expires_at,
+            "summary": self.summary or "",
+        }
 
 
 # ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Building2, TrendingUp, Users,
   ShieldAlert, Landmark, ChevronRight, Loader2,
-  RefreshCw, ArrowRight, Zap, Network,
+  RefreshCw, ArrowRight, Zap, Network, Award, Monitor,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
@@ -60,28 +60,28 @@ export default function GovDashboard() {
         animate={{ opacity: 1, y: 0 }}
         className="panel overflow-hidden"
       >
-        <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="grid grid-cols-1 lg:grid-cols-[1.18fr_0.82fr]">
           <div className="relative overflow-hidden bg-brand-hero p-7 text-white">
-            <div className="absolute inset-0 bg-grid-fade opacity-10" />
-            <div className="relative">
-              <p className="mb-2 text-xs font-bold uppercase text-sidebar-text">产业监管平台</p>
-              <h1 className="mb-3 text-2xl font-black">产业链健康监管大屏</h1>
-              <p className="max-w-xl text-sm leading-6 text-sidebar-text">
-                以质量标签与验厂认证守住企业端产品合规底线，结合预警与产业链图谱实现精准监管与补链强链。
+            <div className="absolute inset-x-0 bottom-0 h-px bg-white/20" />
+            <div className="relative max-w-2xl">
+              <p className="mb-2 text-xs font-bold uppercase text-white/60">产业监管平台</p>
+              <h1 className="mb-3 text-2xl font-black">产业链健康监管工作台</h1>
+              <p className="max-w-xl text-sm leading-6 text-white/70">
+                聚合质量标签、风险预警、产业链关系与招商缺口，把监管动作沉淀为可追踪、可复核的日常工作流。
               </p>
               {error && (
-                <button onClick={() => void load()} className="btn-secondary btn-sm mt-5 gap-1.5">
+                <button onClick={() => void load()} className="mt-5 inline-flex h-8 items-center gap-1.5 rounded-md border border-white/20 bg-white/10 px-3 text-xs font-semibold text-white transition-colors hover:bg-white/16">
                   <RefreshCw className="h-3.5 w-3.5" /> 重新加载
                 </button>
               )}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 bg-surface p-5">
+          <div className="grid grid-cols-2 gap-3 bg-surface-raised p-5">
             {[
               ['质量标签', '合规基线'],
+              ['数字大屏', '投屏总览'],
               ['预警中心', '风险处置'],
               ['产业图谱', '链路洞察'],
-              ['招商决策', '补链强链'],
             ].map(([label, sub]) => (
               <div key={label} className="rounded-md border border-border bg-surface-subtle p-4">
                 <div className="text-sm font-bold text-ink">{label}</div>
@@ -222,7 +222,8 @@ export default function GovDashboard() {
           <h3 className="mb-4 text-sm font-bold text-ink">快捷操作</h3>
           <div className="space-y-3">
             {[
-              { icon: Users, label: '质量标签', sub: '绿标与验厂：为企业端产品合规把关', path: '/gov/labels', urgent: false },
+              { icon: Monitor, label: '数字大屏', sub: '投屏式产业监管态势总览', path: '/gov/screen', urgent: false },
+              { icon: Award, label: '质量标签', sub: '绿标与验厂：为企业端产品合规把关', path: '/gov/labels', urgent: false },
               { icon: ShieldAlert, label: '预警中心', sub: '查看并处置产业链风险预警', path: '/gov/alerts', urgent: (stats?.alert_count ?? 0) > 0 },
               { icon: Network, label: '产业链图谱', sub: 'Neo4j 全平台供应关系网络', path: '/gov/supply-chain', urgent: false },
               { icon: Landmark, label: '招商决策', sub: '分析产业链缺口，发布招商任务', path: '/gov/recruitment', urgent: false },

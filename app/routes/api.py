@@ -1043,6 +1043,85 @@ def remove_favorite(supplier_id):
         db.session.commit()
         
     return jsonify({"success": True, "message": "已取消收藏"})
+def _asset_default_qualifications():
+    return [
+        {"title": "ISO 9001 质量管理体系", "date": "有效期至 2026.12", "status": "有效"},
+        {"title": "高新技术企业证书", "date": "有效期至 2025.08", "status": "有效"},
+        {"title": "安全生产标准化二级", "date": "有效期至 2027.03", "status": "有效"},
+        {"title": "精密加工特种行业许可证", "date": "有效期至 2026.01", "status": "有效"},
+    ]
+
+
+def _asset_default_data_auth():
+    return [
+        {"name": "金蝶云星空 ERP", "status": "已连接", "data": "订单、库存、财务"},
+        {"name": "钉钉数字化办公", "status": "已连接", "data": "组织架构、审批流"},
+        {"name": "顺丰物流开放平台", "status": "未连接", "data": "实时轨迹、电子面单"},
+    ]
+
+
+def _normalize_asset_qualifications(raw):
+    if not isinstance(raw, list) or not raw:
+        return _asset_default_qualifications()
+
+    normalized = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        title = (
+            item.get("title")
+            or item.get("label_name")
+            or item.get("name")
+            or item.get("certificate_no")
+            or "企业资质"
+        )
+        valid_until = item.get("valid_until") or item.get("expire_at") or item.get("date")
+        date_text = item.get("date") or (f"有效期至 {valid_until}" if valid_until else "长期有效")
+        status_raw = str(item.get("status") or "").lower()
+        status = "有效" if status_raw in {"valid", "active", "enabled", "有效"} else item.get("status") or "有效"
+        normalized.append({"title": str(title), "date": str(date_text), "status": str(status)})
+    return normalized or _asset_default_qualifications()
+
+
+def _normalize_asset_data_auth(raw):
+    if isinstance(raw, list):
+        normalized = []
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            normalized.append(
+                {
+                    "name": str(item.get("name") or item.get("system") or "外部数据接口"),
+                    "status": str(item.get("status") or "已连接"),
+                    "data": str(item.get("data") or item.get("scope") or "授权数据"),
+                }
+            )
+        return normalized or _asset_default_data_auth()
+
+    if isinstance(raw, dict) and raw:
+        labels = {
+            "power": ("电力数据接口", "用电负荷、产能曲线"),
+            "invoice": ("发票数据接口", "开票、交易流水"),
+            "business": ("工商数据接口", "企业登记、经营状态"),
+            "tax": ("税务数据接口", "纳税信用、税票信息"),
+        }
+        normalized = []
+        for key, value in raw.items():
+            item = value if isinstance(value, dict) else {}
+            name, data_scope = labels.get(str(key), (f"{key} 数据接口", "授权数据"))
+            authorized = bool(item.get("authorized")) or item.get("sync_status") == "success"
+            normalized.append(
+                {
+                    "name": name,
+                    "status": "已连接" if authorized else "未连接",
+                    "data": data_scope,
+                }
+            )
+        return normalized or _asset_default_data_auth()
+
+    return _asset_default_data_auth()
+
+
 @api_bp.route("/user/assets", methods=["GET"])
 @login_required
 def api_user_assets():
@@ -1051,20 +1130,8 @@ def api_user_assets():
     if not ent:
         return jsonify({"error": "未找到企业信息"}), 404
 
-    # 构造资质证书 (如果为空则提供示例数据)
-    qualifications = ent.qualifications or [
-        {"title": "ISO 9001 质量管理体系", "date": "有效期至 2026.12", "status": "有效"},
-        {"title": "高新技术企业证书", "date": "有效期至 2025.08", "status": "有效"},
-        {"title": "安全生产标准化二级", "date": "有效期至 2027.03", "status": "有效"},
-        {"title": "精密加工特种行业许可证", "date": "有效期至 2026.01", "status": "有效"}
-    ]
-
-    # 构造数据授权接口 (如果为空则提供示例数据)
-    data_auth = ent.data_auth or [
-        {"name": "金蝶云星空 ERP", "status": "已连接", "data": "订单、库存、财务"},
-        {"name": "钉钉数字化办公", "status": "已连接", "data": "组织架构、审批流"},
-        {"name": "顺丰物流开放平台", "status": "未连接", "data": "实时轨迹、电子面单"}
-    ]
+    qualifications = _normalize_asset_qualifications(ent.qualifications)
+    data_auth = _normalize_asset_data_auth(ent.data_auth)
 
     # 团队成员 (Mock数据，实际中可以从另一个表或extras读取)
     team_members = [
@@ -1080,7 +1147,7 @@ def api_user_assets():
             "name": ent.name,
             "is_certified": True,
             "location": f"{ent.province or '未知'} · {ent.city or '未知'}",
-            "industry_tag": ent.business_scope.split(',')[0] if ent.business_scope else "精密制造",
+            "industry_tag": str(ent.business_scope).split(',')[0] if ent.business_scope else "精密制造",
             "tags": ["专精特新“小巨人”", "高新技术企业", "绿色工厂"] if ent.is_green_factory else ["优质客商", "信守承诺"],
             "credit_score": int(ent.credit_score or 0),
             "patent_count": ent.patent_count or 12,

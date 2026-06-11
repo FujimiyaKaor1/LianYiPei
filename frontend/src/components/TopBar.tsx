@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Bell, History, LogOut, Moon, Search, Sun, User } from 'lucide-react';
+import { Bell, LogOut, Moon, Search, Sun, User } from 'lucide-react';
 import { useAuth } from '@/src/context/AuthContext';
 import { useTheme } from '@/src/context/ThemeContext';
 import { useToast } from '@/src/components/ToastProvider';
@@ -120,13 +120,6 @@ export function TopBar({ title, showSearch = true }: TopBarProps) {
             )}
           </button>
 
-          <button
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-ink-soft shadow-elevation-1 transition-colors hover:border-border-hover hover:text-ink"
-            onClick={() => showToast('操作历史功能即将上线', 'info')}
-            title="操作历史"
-          >
-            <History className="h-4.5 w-4.5" />
-          </button>
         </div>
       </div>
     </header>

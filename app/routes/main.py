@@ -1,5 +1,15 @@
 import os
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, current_app
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_from_directory,
+    url_for,
+)
 from flask_login import current_user, login_required
 from app.models import Enterprise, Inquiry, Product, Alert
 from app.authz import role_required, user_effective_role, user_session_role
@@ -8,6 +18,16 @@ from app.authz import role_required, user_effective_role, user_session_role
 # 的读写约定与 10 表清单见 app.enterprise_json_helpers
 
 main = Blueprint('main', __name__)
+
+
+FRONTEND_ROOT_ASSETS = {
+    "china.js",
+    "logo.png",
+    "logo.svg",
+    "screen-map.png",
+    "screen-ring.png",
+    "screen-arrow-ring.png",
+}
 
 
 def _get_initial_data():
@@ -86,6 +106,21 @@ def _render_spa(title='链易配'):
 @main.route('/')
 def index():
     return _render_spa('首页 - 链易配')
+
+
+@main.route('/china.js')
+@main.route('/logo.png')
+@main.route('/logo.svg')
+@main.route('/screen-map.png')
+@main.route('/screen-ring.png')
+@main.route('/screen-arrow-ring.png')
+def frontend_root_asset():
+    """Expose selected Vite public assets when the SPA is served by Flask."""
+    requested = request.path.lstrip("/")
+    if requested not in FRONTEND_ROOT_ASSETS:
+        abort(404)
+    static_dir = os.path.join(current_app.static_folder, 'frontend')
+    return send_from_directory(static_dir, requested)
 
 
 @main.route('/workspace')
