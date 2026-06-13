@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Search,
   ChevronRight,
@@ -20,7 +20,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { api, type SupplierSearchItem } from '@/src/services/api';
-import { getStoredModelChoice, onModelChoiceChanged } from '@/src/lib/modelChoice';
+import { getStoredModelChoice, onModelChoiceChanged, type ModelChoice } from '@/src/lib/modelChoice';
 import { useAuth } from '@/src/context/AuthContext';
 
 const SORT_OPTIONS = [
@@ -149,7 +149,8 @@ function SkeletonCard() {
 
 export default function Matching() {
   const navigate = useNavigate();
-  const { user, setIsLoginModalOpen } = useAuth();
+  const location = useLocation();
+  const { user, requestLogin } = useAuth();
   const demoTimersRef = useRef<{ t1?: ReturnType<typeof setTimeout>; t2?: ReturnType<typeof setTimeout> }>({});
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -162,7 +163,7 @@ export default function Matching() {
   const [errorText, setErrorText] = useState('');
   const [algorithmMode, setAlgorithmMode] = useState<'rule' | 'deep_learning'>('rule');
   const [greenOnly, setGreenOnly] = useState(false);
-  const [modelChoice, setModelChoice] = useState<'qwen' | 'deepseek'>(getStoredModelChoice());
+  const [modelChoice, setModelChoice] = useState<ModelChoice>(getStoredModelChoice());
   const [isBasicMatch, setIsBasicMatch] = useState(false);
   
   const [inquirySendingId, setInquirySendingId] = useState<number | null>(null);
@@ -233,7 +234,7 @@ export default function Matching() {
     event.stopPropagation();
     if (!user) {
       setGlobalToast('请先登录后再发起询价');
-      setIsLoginModalOpen(true);
+      requestLogin(`${location.pathname}${location.search}`);
       return;
     }
     if (inquirySendingId !== null) return;
@@ -695,7 +696,7 @@ export default function Matching() {
                   onClick={async () => {
                     if (!user) {
                       setGlobalToast('请先登录');
-                      setIsLoginModalOpen(true);
+                      requestLogin(`${location.pathname}${location.search}`);
                       return;
                     }
                     const sid = Number(activeSupplier.id);

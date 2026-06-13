@@ -31,16 +31,9 @@ type RankItem = {
   value: number;
 };
 
-type RegionItem = {
+type ProvinceMapItem = {
   name: string;
-  count: number;
-  x: number;
-  y: number;
-  product: string;
-};
-
-type RegionGeoRule = {
-  provinces: string[];
+  value: number;
   coord: [number, number];
 };
 
@@ -205,70 +198,38 @@ const FALLBACK_RANK_ITEMS: RankItem[] = [
   { name: '伺服驱动器', value: 66 },
 ];
 
-const REGION_RULES = [
-  {
-    name: '京津冀',
-    keywords: ['北京', '天津', '河北', '石家庄', '唐山', '保定'],
-    x: 60,
-    y: 31,
-    ratio: 0.19,
-    product: '工业控制主板',
-  },
-  {
-    name: '长三角',
-    keywords: ['上海', '江苏', '浙江', '安徽', '南京', '苏州', '杭州', '宁波', '合肥'],
-    x: 68,
-    y: 52,
-    ratio: 0.38,
-    product: '智能网关模组',
-  },
-  {
-    name: '粤港澳',
-    keywords: ['广东', '广州', '深圳', '佛山', '东莞', '香港', '澳门', '珠海'],
-    x: 61,
-    y: 75,
-    ratio: 0.15,
-    product: '高精度传感器',
-  },
-  {
-    name: '成渝',
-    keywords: ['四川', '重庆', '成都', '绵阳'],
-    x: 42,
-    y: 60,
-    ratio: 0.12,
-    product: '伺服驱动器',
-  },
-  {
-    name: '中部枢纽',
-    keywords: ['湖南', '湖北', '河南', '江西', '武汉', '长沙', '郑州', '南昌'],
-    x: 55,
-    y: 57,
-    ratio: 0.16,
-    product: '新能源配套件',
-  },
-] as const;
-
-const REGION_GEO: Record<string, RegionGeoRule> = {
-  京津冀: {
-    provinces: ['北京', '天津', '河北'],
-    coord: [116.4, 39.9],
-  },
-  长三角: {
-    provinces: ['上海', '江苏', '浙江', '安徽'],
-    coord: [120.15, 31.95],
-  },
-  粤港澳: {
-    provinces: ['广东', '香港', '澳门'],
-    coord: [113.35, 23.12],
-  },
-  成渝: {
-    provinces: ['四川', '重庆'],
-    coord: [104.07, 30.67],
-  },
-  中部枢纽: {
-    provinces: ['湖南', '湖北', '河南', '江西'],
-    coord: [113.0, 28.2],
-  },
+const PROVINCE_COORDS: Record<string, [number, number]> = {
+  北京: [116.4, 39.9],
+  天津: [117.2, 39.13],
+  河北: [114.5, 38.04],
+  山西: [112.55, 37.87],
+  内蒙古: [111.75, 40.84],
+  辽宁: [123.43, 41.8],
+  吉林: [125.32, 43.82],
+  黑龙江: [126.53, 45.8],
+  上海: [121.47, 31.23],
+  江苏: [118.8, 32.06],
+  浙江: [120.16, 30.27],
+  安徽: [117.23, 31.82],
+  福建: [119.3, 26.08],
+  江西: [115.86, 28.68],
+  山东: [117.12, 36.65],
+  河南: [113.62, 34.75],
+  湖北: [114.3, 30.59],
+  湖南: [112.94, 28.23],
+  广东: [113.26, 23.13],
+  广西: [108.37, 22.82],
+  海南: [110.2, 20.04],
+  重庆: [106.55, 29.56],
+  四川: [104.07, 30.57],
+  贵州: [106.63, 26.65],
+  云南: [102.83, 24.88],
+  西藏: [91.14, 29.65],
+  陕西: [108.94, 34.34],
+  甘肃: [103.83, 36.06],
+  青海: [101.78, 36.62],
+  宁夏: [106.23, 38.49],
+  新疆: [87.62, 43.83],
 };
 
 type EChartsWindow = Window & typeof globalThis & {
@@ -318,48 +279,96 @@ function urgencyRank(gap: RecruitmentGap) {
   return 1;
 }
 
-function fallbackRegions(totalEnterpriseCount: number): RegionItem[] {
+const FALLBACK_PROVINCE_RATIOS: Array<[string, number]> = [
+  ['江苏', 0.069],
+  ['浙江', 0.066],
+  ['山东', 0.064],
+  ['广东', 0.061],
+  ['河南', 0.054],
+  ['湖北', 0.051],
+  ['四川', 0.05],
+  ['河北', 0.046],
+  ['安徽', 0.044],
+  ['湖南', 0.041],
+  ['福建', 0.039],
+  ['上海', 0.036],
+  ['重庆', 0.033],
+  ['江西', 0.032],
+  ['北京', 0.03],
+  ['陕西', 0.029],
+  ['辽宁', 0.028],
+  ['天津', 0.026],
+  ['广西', 0.025],
+  ['山西', 0.024],
+  ['云南', 0.022],
+  ['贵州', 0.021],
+  ['吉林', 0.018],
+  ['黑龙江', 0.017],
+  ['内蒙古', 0.015],
+  ['甘肃', 0.014],
+  ['新疆', 0.012],
+  ['海南', 0.011],
+  ['宁夏', 0.008],
+  ['青海', 0.008],
+  ['西藏', 0.007],
+];
+
+function normalizeProvinceName(value: string | null | undefined) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (PROVINCE_COORDS[text]) return text;
+  return Object.keys(PROVINCE_COORDS).find((province) => text.includes(province)) || '';
+}
+
+function fallbackProvinceItems(totalEnterpriseCount: number): ProvinceMapItem[] {
+  const total = totalEnterpriseCount || FALLBACK_STATS.enterprise_count;
   let assigned = 0;
-  return REGION_RULES.map((rule, index) => {
-    const isLast = index === REGION_RULES.length - 1;
-    const count = isLast
-      ? Math.max(totalEnterpriseCount - assigned, 0)
-      : Math.max(Math.round(totalEnterpriseCount * rule.ratio), 0);
-    assigned += count;
+  return FALLBACK_PROVINCE_RATIOS.map(([name, ratio], index) => {
+    const isLast = index === FALLBACK_PROVINCE_RATIOS.length - 1;
+    const value = isLast
+      ? Math.max(total - assigned, 0)
+      : Math.max(Math.round(total * ratio), 0);
+    assigned += value;
     return {
-      name: rule.name,
-      count,
-      x: rule.x,
-      y: rule.y,
-      product: rule.product,
+      name,
+      value,
+      coord: PROVINCE_COORDS[name],
     };
-  });
+  }).filter((item) => item.value > 0);
 }
 
-function classifyEnterpriseRegion(item: EnterpriseDirectoryItem) {
-  const text = `${item.province || ''}${item.city || ''}${item.address || ''}`;
-  return REGION_RULES.find((rule) => rule.keywords.some((keyword) => text.includes(keyword)))?.name;
-}
-
-function buildRegions(directory: EnterpriseDirectoryItem[], stats: GovStatsData): RegionItem[] {
+function buildProvinceItems(directory: EnterpriseDirectoryItem[], stats: GovStatsData): ProvinceMapItem[] {
   const counts = new Map<string, number>();
-  REGION_RULES.forEach((rule) => counts.set(rule.name, 0));
 
   directory.forEach((item) => {
-    const region = classifyEnterpriseRegion(item);
-    if (region) counts.set(region, (counts.get(region) || 0) + 1);
+    const province = normalizeProvinceName(item.province)
+      || normalizeProvinceName(item.address)
+      || normalizeProvinceName(item.city);
+    if (!province) return;
+    counts.set(province, (counts.get(province) || 0) + 1);
   });
 
-  const matchedTotal = [...counts.values()].reduce((sum, count) => sum + count, 0);
-  if (matchedTotal <= 0) return fallbackRegions(stats.enterprise_count || FALLBACK_STATS.enterprise_count);
+  const provinceItems = Object.entries(PROVINCE_COORDS)
+    .map(([name, coord]) => ({
+      name,
+      value: counts.get(name) || 0,
+      coord,
+    }))
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value);
 
-  return REGION_RULES.map((rule) => ({
-    name: rule.name,
-    count: counts.get(rule.name) || 0,
-    x: rule.x,
-    y: rule.y,
-    product: rule.product,
+  return provinceItems.length > 0
+    ? provinceItems
+    : fallbackProvinceItems(stats.enterprise_count || FALLBACK_STATS.enterprise_count);
+}
+
+function buildProvincePieData(provinceItems: ProvinceMapItem[]) {
+  const topItems = provinceItems.slice(0, 8).map((item) => ({
+    name: item.name,
+    value: item.value,
   }));
+  const otherValue = provinceItems.slice(8).reduce((sum, item) => sum + item.value, 0);
+  return otherValue > 0 ? [...topItems, { name: '其他省份', value: otherValue }] : topItems;
 }
 
 function normalizeRankItems(value: unknown): RankItem[] {
@@ -449,51 +458,32 @@ function useChinaMapReady() {
   return ready;
 }
 
-function buildProvinceMapData(regions: RegionItem[]) {
-  return regions.flatMap((region) => {
-    const geo = REGION_GEO[region.name];
-    if (!geo) return [];
-    const provinceValue = Math.max(1, Math.round(region.count / Math.max(geo.provinces.length, 1)));
-    return geo.provinces.map((province) => ({
-      name: province,
-      value: provinceValue,
-      regionName: region.name,
-      product: region.product,
-    }));
-  });
+function buildProvinceScatterData(provinceItems: ProvinceMapItem[]) {
+  return provinceItems.slice(0, 10).map((item) => ({
+    name: item.name,
+    value: [...item.coord, item.value],
+  }));
 }
 
-function buildRegionScatterData(regions: RegionItem[]) {
-  return regions
-    .map((region) => {
-      const geo = REGION_GEO[region.name];
-      if (!geo) return null;
-      return {
-        name: region.name,
-        value: [...geo.coord, region.count],
-        product: region.product,
-      };
-    })
-    .filter(Boolean) as Array<{ name: string; value: [number, number, number]; product: string }>;
-}
-
-function buildRegionLineData(regions: RegionItem[], topRegion: RegionItem) {
-  const fromCoord = REGION_GEO[topRegion.name]?.coord;
-  if (!fromCoord) return [];
-  return regions
-    .filter((region) => region.name !== topRegion.name && REGION_GEO[region.name])
-    .map((region) => ({
-      fromName: topRegion.name,
-      toName: region.name,
-      coords: [fromCoord, REGION_GEO[region.name].coord],
-      value: region.count,
+function buildProvinceLineData(provinceItems: ProvinceMapItem[], topProvince: ProvinceMapItem) {
+  return provinceItems
+    .filter((item) => item.name !== topProvince.name)
+    .slice(0, 6)
+    .map((item) => ({
+      fromName: topProvince.name,
+      toName: item.name,
+      coords: [topProvince.coord, item.coord],
+      value: item.value,
     }));
 }
 
-function buildChinaMapOption(regions: RegionItem[], topRegion: RegionItem): EChartsOption {
-  const provinceData = buildProvinceMapData(regions);
-  const scatterData = buildRegionScatterData(regions);
-  const lineData = buildRegionLineData(regions, topRegion);
+function buildChinaMapOption(provinceItems: ProvinceMapItem[], topProvince: ProvinceMapItem): EChartsOption {
+  const provinceData = provinceItems.map((item) => ({
+    name: item.name,
+    value: item.value,
+  }));
+  const scatterData = buildProvinceScatterData(provinceItems);
+  const lineData = buildProvinceLineData(provinceItems, topProvince);
   const maxValue = Math.max(...provinceData.map((item) => Number(item.value) || 0), 1);
 
   return {
@@ -508,16 +498,16 @@ function buildChinaMapOption(regions: RegionItem[], topRegion: RegionItem): ECha
       formatter: (params: unknown) => {
         const row = params as {
           name?: string;
-          data?: { product?: string; regionName?: string; value?: number | number[] };
+          data?: { value?: number | number[] };
           value?: number | number[];
           seriesType?: string;
         };
         const value = Array.isArray(row.value) ? row.value[2] : row.value;
         if (row.seriesType === 'effectScatter') {
-          return `${row.name}<br/>重点产品：${row.data?.product || '-'}<br/>企业数量：${value || 0}家`;
+          return `${row.name}<br/>企业数量：${value || 0}家`;
         }
-        if (row.data?.regionName) {
-          return `${row.data.regionName} · ${row.name}<br/>区域产品：${row.data.product || '-'}<br/>省域企业：${row.data.value || 0}家`;
+        if (row.data?.value) {
+          return `${row.name || '-'}<br/>省域企业：${row.data.value || 0}家`;
         }
         return `${row.name || '-'}<br/>暂无企业标注`;
       },
@@ -562,7 +552,7 @@ function buildChinaMapOption(regions: RegionItem[], topRegion: RegionItem): ECha
         data: provinceData,
       },
       {
-        name: '区域企业',
+        name: '重点省份',
         type: 'effectScatter',
         coordinateSystem: 'geo',
         zlevel: 3,
@@ -660,7 +650,7 @@ export default function GovDigitalScreen() {
       api.getRecruitmentGaps({ includeNeo4j: false }, { timeoutMs: 35_000 }),
       api.getRecruitmentTasks(),
       api.getGovPageRank(),
-      api.fetchEnterpriseDirectory({ limit: 200 }),
+      api.fetchEnterpriseDirectory({ limit: 10000, include_self: true }),
     ]);
 
     const [
@@ -714,8 +704,9 @@ export default function GovDigitalScreen() {
     .filter((key) => !sources[key])
     .map((key) => SOURCE_META[key]);
 
-  const regions = useMemo(() => buildRegions(data.directory, data.stats), [data.directory, data.stats]);
-  const topRegion = regions.reduce((max, item) => (item.count > max.count ? item : max), regions[0]);
+  const provinceItems = useMemo(() => buildProvinceItems(data.directory, data.stats), [data.directory, data.stats]);
+  const provincePieData = useMemo(() => buildProvincePieData(provinceItems), [provinceItems]);
+  const topProvince = provinceItems[0];
   const alertCounts = useMemo(() => {
     const counts = { red: 0, yellow: 0, blue: 0 };
     data.alerts.forEach((alert) => {
@@ -731,7 +722,7 @@ export default function GovDigitalScreen() {
   );
   const marketTotal = data.stats.supply_count + data.stats.demand_count;
   const completionRate = Math.round((data.workflow.completion_rate || 0) * 100);
-  const regionTotal = Math.max(regions.reduce((sum, region) => sum + region.count, 0), 1);
+  const provinceTotal = Math.max(provinceItems.reduce((sum, item) => sum + item.value, 0), 1);
   const taskActiveCount = data.tasks.filter((task) => task.status !== 'signed').length;
 
   const supplyTrendOption = useMemo<EChartsOption>(() => {
@@ -955,10 +946,10 @@ export default function GovDigitalScreen() {
         center: ['50%', '45%'],
         label: { color: '#d8ecff', formatter: '{b}\n{c}家', fontSize: 10 },
         labelLine: { lineStyle: { color: 'rgba(216,236,255,.36)' } },
-        data: regions.map((region) => ({ name: region.name, value: region.count })),
+        data: provincePieData,
       },
     ],
-  }), [regions]);
+  }), [provincePieData]);
 
   const requestFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -1043,8 +1034,9 @@ export default function GovDigitalScreen() {
           </div>
 
           <ChinaMapStage
-            regions={regions}
-            topRegion={topRegion}
+            provinceItems={provinceItems}
+            topProvince={topProvince}
+            provinceTotal={provinceTotal}
             rankItems={data.rankItems}
             healthIndex={Math.max(42, Math.min(96, 88 - alertCounts.red * 7 - alertCounts.yellow * 3 + completionRate * 0.12))}
           />
@@ -1063,7 +1055,7 @@ export default function GovDigitalScreen() {
                 <Chart option={alertBarOption} />
               </div>
               <div className="alert-feed">
-                {data.alerts.slice(0, 4).map((alert) => (
+                {data.alerts.slice(0, 1).map((alert) => (
                   <article key={alert.id}>
                     <span>{levelLabel(alert.level)}</span>
                     <time>{alert.created_at?.slice(0, 16) || '待同步'}</time>
@@ -1081,7 +1073,7 @@ export default function GovDigitalScreen() {
                 <Chart option={gapOption} />
               </div>
               <div className="gap-list">
-                {sortedGaps.slice(0, 2).map((gap) => (
+                {sortedGaps.slice(0, 1).map((gap) => (
                   <article key={gap.product_name}>
                     <div>
                       <strong>{gap.product_name}</strong>
@@ -1104,19 +1096,13 @@ export default function GovDigitalScreen() {
                 <Chart option={regionOption} />
               </div>
               <div className="region-rank">
-                {regions.map((region) => (
-                  <div key={region.name}>
-                    <span>{region.name}</span>
-                    <strong>{region.count}家</strong>
-                    <i style={{ width: `${Math.round((region.count / regionTotal) * 100)}%` }} />
+                {provinceItems.slice(0, 3).map((province) => (
+                  <div key={province.name}>
+                    <span>{province.name}</span>
+                    <strong>{province.value}家</strong>
+                    <i style={{ width: `${Math.round((province.value / provinceTotal) * 100)}%` }} />
                   </div>
                 ))}
-                <div className="rank-box">
-                  <span>关键节点排行</span>
-                  {data.rankItems.slice(0, 3).map((item, index) => (
-                    <p key={item.name}><b>{index + 1}</b>{item.name}</p>
-                  ))}
-                </div>
               </div>
             </div>
           </ScreenPanel>
@@ -1164,21 +1150,23 @@ function ScreenPanel({
 }
 
 function ChinaMapStage({
-  regions,
-  topRegion,
+  provinceItems,
+  topProvince,
+  provinceTotal,
   rankItems,
   healthIndex,
 }: {
-  regions: RegionItem[];
-  topRegion: RegionItem;
+  provinceItems: ProvinceMapItem[];
+  topProvince: ProvinceMapItem;
+  provinceTotal: number;
   rankItems: RankItem[];
   healthIndex: number;
 }) {
   const leadingProduct = rankItems[0]?.name || '关键产品';
   const chinaMapReady = useChinaMapReady();
   const chinaMapOption = useMemo(
-    () => buildChinaMapOption(regions, topRegion),
-    [regions, topRegion],
+    () => buildChinaMapOption(provinceItems, topProvince),
+    [provinceItems, topProvince],
   );
 
   return (
@@ -1189,7 +1177,7 @@ function ChinaMapStage({
       <div className="chart">
         <div className="map-title">
           <strong>中国区域监管态势</strong>
-          <span>标注区域企业数量与重点产品</span>
+          <span>标注省份企业数量与分布热力</span>
         </div>
 
         <div className="china-map">
@@ -1206,16 +1194,16 @@ function ChinaMapStage({
         </div>
 
         <div className="map-metrics">
-          <div><span>标注区域</span><strong>{regions.length}</strong></div>
-          <div><span>平台企业</span><strong>{regions.reduce((sum, region) => sum + region.count, 0)}</strong></div>
+          <div><span>标注省份</span><strong>{provinceItems.length}</strong></div>
+          <div><span>平台企业</span><strong>{provinceTotal}</strong></div>
         </div>
 
         <div className="region-cards">
-          {regions.slice(0, 3).map((region) => (
-            <article key={region.name}>
-              <span>{region.name}</span>
-              <strong>{region.product}</strong>
-              <em>{region.count}家</em>
+          {provinceItems.slice(0, 3).map((province) => (
+            <article key={province.name}>
+              <span>{province.name}</span>
+              <strong>企业占比 {Math.round((province.value / provinceTotal) * 100)}%</strong>
+              <em>{province.value}家</em>
             </article>
           ))}
         </div>
@@ -1223,7 +1211,7 @@ function ChinaMapStage({
         <div className="map-insight">
           <strong>监管研判</strong>
           <p>
-            以中国地图标注重点区域公司数量，当前 {topRegion.name} 标注 {topRegion.count} 家，
+            以中国地图标注省域企业数量，当前 {topProvince.name} 标注 {topProvince.value} 家，
             优先关注 {leadingProduct}。
           </p>
         </div>

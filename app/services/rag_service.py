@@ -7,16 +7,23 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Generator, Iterable, List
 
-from langchain.chains import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
+try:
+    from langchain.chains import create_retrieval_chain
+    from langchain.chains.combine_documents import create_stuff_documents_chain
+except ModuleNotFoundError:  # LangChain 1.x moved legacy chains to langchain_classic.
+    from langchain_classic.chains import create_retrieval_chain
+    from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.documents import Document
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+try:
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+except ModuleNotFoundError:
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
+from app.services.mimo_client import create_mimo_chat_model_from_env
 
 
 DEFAULT_EMBEDDING_MODEL = os.getenv(
@@ -29,7 +36,7 @@ DEFAULT_CHUNK_SIZE = int(os.getenv("RAG_CHUNK_SIZE", "800"))
 DEFAULT_CHUNK_OVERLAP = int(os.getenv("RAG_CHUNK_OVERLAP", "120"))
 DEFAULT_MAX_PROMPT_TOKENS = int(os.getenv("RAG_MAX_PROMPT_TOKENS", "3000"))
 DEFAULT_TOP_K = int(os.getenv("RAG_RETRIEVE_TOP_K", "3"))
-FALLBACK_NOTICE = "【系统提示：因文档较长，已自动为您切换至云端深度思考引擎】"
+FALLBACK_NOTICE = "【系统提示：因文档较长，已自动为您切换至云端 MiMo 深度思考引擎】"
 
 
 def _build_text_splitter(
@@ -158,20 +165,9 @@ def _estimate_tokens(text: str) -> int:
         return cjk_chars + max(non_cjk_chars // 4, 1)
 
 
-def _deepseek_fallback_llm() -> BaseChatModel:
-    """创建云端 DeepSeek 对话模型，用于长文档保护降级。"""
-    api_key = (os.getenv("DEEPSEEK_API_KEY") or "").strip()
-    if not api_key:
-        raise ValueError("触发长文档降级，但缺少 DEEPSEEK_API_KEY")
-
-    return ChatOpenAI(
-        model=(os.getenv("DEEPSEEK_MODEL") or "deepseek-chat").strip(),
-        base_url="https://api.deepseek.com",
-        api_key=api_key,
-        temperature=float(os.getenv("LLM_TEMPERATURE", "0.3")),
-        timeout=int(float(os.getenv("LLM_TIMEOUT_SECONDS", "120"))),
-        streaming=True,
-    )
+def _mimo_fallback_llm() -> BaseChatModel:
+    """创建云端 MiMo 对话模型，用于长文档保护降级。"""
+    return create_mimo_chat_model_from_env()
 
 
 def _stream_answer(
@@ -219,7 +215,7 @@ def ask_with_context(
 
     关键策略：
     1) 在拼接 Prompt 前先估算 query + context token 总量；
-    2) 若超过阈值，则强制降级到 DeepSeek，避免本地 8GB 显存 OOM；
+    2) 若超过阈值，则强制降级到 MiMo，避免本地 8GB 显存 OOM；
     3) 首条返回系统提示，告知已自动切换云端引擎。
     """
     clean_query = (query or "").strip()
@@ -244,8 +240,8 @@ def ask_with_context(
 
     answer_llm: BaseChatModel = llm_instance
     if total_tokens > max_prompt_tokens:
-        # 显存保护：超阈值即强制走云端 DeepSeek
-        answer_llm = _deepseek_fallback_llm()
+        # 显存保护：超阈值即强制走云端 MiMo
+        answer_llm = _mimo_fallback_llm()
         yield FALLBACK_NOTICE
 
     # 保留 retrieval chain 的构建逻辑，便于后续扩展重排器/过滤器

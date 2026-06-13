@@ -8,6 +8,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import and_, or_
+from sqlalchemy.orm.attributes import flag_modified
 
 from app import db
 from app.models import Enterprise, Transaction
@@ -40,6 +41,7 @@ def _save_saas_orders(ent: Enterprise, orders: List[Dict[str, Any]]) -> None:
     ex = _extras(ent)
     ex["saas_orders"] = orders
     ent.extras = ex
+    flag_modified(ent, "extras")
 
 
 def _next_order_id(orders: List[Dict[str, Any]]) -> int:
@@ -91,33 +93,50 @@ class OrderService:
         return _OrderView(enterprise_id, row)
 
     @staticmethod
+    def _find_order(order_id: int, enterprise_id: Optional[int] = None) -> tuple[Enterprise, Dict[str, Any]]:
+        if enterprise_id is not None:
+            enterprises = [Enterprise.query.get_or_404(enterprise_id)]
+        else:
+            enterprises = Enterprise.query.all()
+
+        for ent in enterprises:
+            for row in _saas_orders(ent):
+                if int(row.get("id", 0)) == int(order_id):
+                    return ent, row
+
+        from flask import abort
+
+        abort(404)
+
+    @staticmethod
     def update_order_status(
-        order_id: int, status: str, actual_delivery_date: Optional[date] = None
+        order_id: int,
+        status: str,
+        actual_delivery_date: Optional[date] = None,
+        enterprise_id: Optional[int] = None,
     ) -> _OrderView:
-        ent = None
-        for e in Enterprise.query.all():
-            for o in _saas_orders(e):
-                if int(o.get("id", 0)) == int(order_id):
-                    ent = e
-                    row = o
-                    break
-            if ent:
+        ent, row = OrderService._find_order(order_id, enterprise_id=enterprise_id)
+        orders = _saas_orders(ent)
+        target = None
+        for candidate in orders:
+            if int(candidate.get("id", 0)) == int(order_id):
+                target = candidate
                 break
-        if not ent:
+        if target is None:
             from flask import abort
 
             abort(404)
-        old_status = row.get("status")
-        row["status"] = status
+        old_status = target.get("status")
+        target["status"] = status
         if status == "completed" and actual_delivery_date:
-            row["actual_delivery_date"] = actual_delivery_date.isoformat()
-        _save_saas_orders(ent, _saas_orders(ent))
+            target["actual_delivery_date"] = actual_delivery_date.isoformat()
+        _save_saas_orders(ent, orders)
         if status in ("completed", "cancelled") and old_status not in ("completed", "cancelled"):
             if ent.current_orders and ent.current_orders > 0:
                 ent.current_orders -= 1
             ent.last_order_update = datetime.utcnow()
         db.session.commit()
-        return _OrderView(ent.id, row)
+        return _OrderView(ent.id, target)
 
     @staticmethod
     def get_orders(
@@ -163,18 +182,13 @@ class OrderService:
         }
 
     @staticmethod
-    def get_order_by_id(order_id: int) -> _OrderView:
-        for e in Enterprise.query.all():
-            for o in _saas_orders(e):
-                if int(o.get("id", 0)) == int(order_id):
-                    return _OrderView(e.id, o)
-        from flask import abort
-
-        abort(404)
+    def get_order_by_id(order_id: int, enterprise_id: Optional[int] = None) -> _OrderView:
+        ent, row = OrderService._find_order(order_id, enterprise_id=enterprise_id)
+        return _OrderView(ent.id, row)
 
     @staticmethod
-    def update_order(order_id: int, **kwargs) -> _OrderView:
-        ov = OrderService.get_order_by_id(order_id)
+    def update_order(order_id: int, enterprise_id: Optional[int] = None, **kwargs) -> _OrderView:
+        ov = OrderService.get_order_by_id(order_id, enterprise_id=enterprise_id)
         ent = Enterprise.query.get_or_404(ov.enterprise_id)
         orders = _saas_orders(ent)
         for o in orders:
@@ -202,8 +216,8 @@ class OrderService:
         abort(404)
 
     @staticmethod
-    def delete_order(order_id: int) -> bool:
-        ov = OrderService.get_order_by_id(order_id)
+    def delete_order(order_id: int, enterprise_id: Optional[int] = None) -> bool:
+        ov = OrderService.get_order_by_id(order_id, enterprise_id=enterprise_id)
         ent = Enterprise.query.get_or_404(ov.enterprise_id)
         orders = [o for o in _saas_orders(ent) if int(o.get("id", 0)) != int(order_id)]
         _save_saas_orders(ent, orders)

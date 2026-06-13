@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
+    "verify:ai-sidebar-drag": "tsx scripts/verify-ai-sidebar-drag.ts",
     "verify:gov-screen": "tsx scripts/verify-gov-digital-screen.ts"
   },
   "dependencies": {

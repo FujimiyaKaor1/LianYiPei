@@ -13,7 +13,7 @@ _logger = logging.getLogger(__name__)
 
 from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
 from flask_login import current_user, login_required
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.authz import role_required, user_effective_role, user_session_role
@@ -25,6 +25,7 @@ from app.services.fulfillment_service import get_all_cases, toggle_case_visibili
 from app.services.intent_parser import extract_weights_from_nl
 from app.services.order_service import OrderService
 from app.services.matcher import DEFAULT_WEIGHTS, match_suppliers
+from app.services.mimo_client import create_mimo_chat_model_from_env
 from app.routes.match import ai_match_view, api_inquiry_send, api_inquiry_sign
 
 api_bp = Blueprint("api", __name__)
@@ -47,6 +48,51 @@ def _order_date_to_str(value):
             pass
     text = str(value).strip()
     return text[:10] if text else None
+
+
+def _public_region_from_address(address: str | None) -> str:
+    """Best-effort province/city redaction for anonymous public search results."""
+    text = (address or "").strip()
+    if not text:
+        return ""
+
+    province_match = re.search(r"([\u4e00-\u9fa5]{2,12}(?:省|自治区|特别行政区))", text)
+    city_search_text = text[province_match.end() :] if province_match else text
+    city_match = re.search(r"([\u4e00-\u9fa5]{2,12}市)", city_search_text)
+    parts = []
+    if province_match:
+        parts.append(province_match.group(1))
+    if city_match and city_match.group(1) not in parts:
+        parts.append(city_match.group(1))
+    if parts:
+        return " ".join(parts)
+
+    direct_city_match = re.match(r"([\u4e00-\u9fa5]{2,12}市)", text)
+    if direct_city_match:
+        return direct_city_match.group(1)
+
+    return ""
+
+
+def _join_public_region(province: str | None, city: str | None) -> str:
+    province_text = (province or "").strip()
+    city_text = (city or "").strip()
+    if province_text and city_text.startswith(province_text):
+        city_text = city_text[len(province_text) :].strip()
+    parts = [province_text]
+    if city_text and city_text not in parts:
+        parts.append(city_text)
+    return " ".join([p for p in parts if p])
+
+
+def _enterprise_public_address(ent: Enterprise) -> str:
+    region = _join_public_region(getattr(ent, "province", None), getattr(ent, "city", None))
+    return region or _public_region_from_address(getattr(ent, "address", None))
+
+
+def _matching_public_address(row: dict) -> str:
+    region = _join_public_region(row.get("province"), row.get("city"))
+    return region or _public_region_from_address(row.get("address"))
 
 
 @api_bp.route("/orders", methods=["GET"])
@@ -267,23 +313,12 @@ def api_orders_by_date_api(date_str: str):
 def get_llm_instance(model_choice: str):
     """
     按前端传入 model_choice 返回 LLM 实例（工厂模式）。
-    - deepseek: ChatOpenAI(base_url=https://api.deepseek.com)
+    - mimo: Xiaomi MiMo-V2.5-Pro 云端模型
     - qwen: ChatOllama(本地 Ollama)
     """
     choice = (model_choice or "qwen").strip().lower()
-    if choice == "deepseek":
-        api_key = (os.getenv("DEEPSEEK_API_KEY") or "").strip()
-        if not api_key:
-            raise ValueError("缺少 DEEPSEEK_API_KEY 环境变量")
-        from langchain_openai import ChatOpenAI
-
-        return ChatOpenAI(
-            model=(os.getenv("DEEPSEEK_MODEL") or "deepseek-chat").strip(),
-            base_url="https://api.deepseek.com",
-            api_key=api_key,
-            temperature=float(os.getenv("LLM_TEMPERATURE", "0.3")),
-            timeout=int(float(os.getenv("LLM_TIMEOUT_SECONDS", "120"))),
-        )
+    if choice in {"mimo", "deepseek"}:
+        return create_mimo_chat_model_from_env()
 
     if choice == "qwen":
         from langchain_ollama import ChatOllama
@@ -301,7 +336,7 @@ def get_llm_instance(model_choice: str):
             timeout=int(float(os.getenv("LLM_TIMEOUT_SECONDS", "120"))),
         )
 
-    raise ValueError("model_choice 仅支持 'deepseek' 或 'qwen'")
+    raise ValueError("model_choice 仅支持 'mimo' 或 'qwen'")
 
 
 def _extract_json_list(text: str):
@@ -356,19 +391,19 @@ def _dedupe_ai_scores_sequential(pairs: list[tuple[int, int]]) -> dict[int, int]
     return out
 
 
-def _build_deepseek_match_reasons(
+def _build_mimo_match_reasons(
     keyword: str, top_results: list[dict]
 ) -> tuple[dict[int, str], dict[int, int], bool, str | None]:
-    """使用 DeepSeek 对 TopN 候选生成 AI 理由 + Agent 专家分（ai_score）。"""
+    """使用 MiMo 对 TopN 候选生成 AI 理由 + Agent 专家分（ai_score）。"""
     candidates = top_results[:5]
     if not candidates:
         return {}, {}, True, "no_candidates"
 
     try:
-        llm = get_llm_instance("deepseek")
+        llm = get_llm_instance("mimo")
     except Exception as exc:
-        current_app.logger.exception("matching.deepseek.init_failed: %s", exc)
-        return {}, {}, True, f"deepseek_init_failed:{type(exc).__name__}"
+        current_app.logger.exception("matching.mimo.init_failed: %s", exc)
+        return {}, {}, True, f"mimo_init_failed:{type(exc).__name__}"
 
     compact_rows = []
     for row in candidates:
@@ -415,8 +450,8 @@ def _build_deepseek_match_reasons(
             )
         parsed = _extract_json_list(str(content))
     except Exception as exc:
-        current_app.logger.exception("matching.deepseek.invoke_failed: %s", exc)
-        return {}, {}, True, f"deepseek_invoke_failed:{type(exc).__name__}"
+        current_app.logger.exception("matching.mimo.invoke_failed: %s", exc)
+        return {}, {}, True, f"mimo_invoke_failed:{type(exc).__name__}"
 
     reason_map: dict[int, str] = {}
     score_pairs: list[tuple[int, int]] = []
@@ -440,7 +475,7 @@ def _build_deepseek_match_reasons(
     score_map = _dedupe_ai_scores_sequential(score_pairs) if score_pairs else {}
 
     if not reason_map and not score_map:
-        return {}, {}, True, "deepseek_empty_output"
+        return {}, {}, True, "mimo_empty_output"
     return reason_map, score_map, False, None
 
 
@@ -656,7 +691,7 @@ def api_llm_chat():
 
         return Response(
             stream_with_context(generate()),
-            mimetype="text/event-stream",
+            content_type="text/event-stream; charset=utf-8",
             headers={
                 "Cache-Control": "no-cache",
                 "X-Accel-Buffering": "no",
@@ -692,6 +727,7 @@ def api_matching_search():
     sort = (request.args.get("sort") or "score").strip().lower()
     algorithm = (request.args.get("algorithm") or "rule").strip().lower()
     model_choice = (request.args.get("model_choice") or "qwen").strip().lower()
+    is_guest = not current_user.is_authenticated
     if algorithm not in {"rule", "deep_learning"}:
         algorithm = "rule"
     keyword = query or tag
@@ -724,7 +760,7 @@ def api_matching_search():
                     {
                         "id": ent.id,
                         "name": ent.name,
-                        "address": ent.address or "",
+                        "address": _enterprise_public_address(ent) if is_guest else (ent.address or ""),
                         "credit_score": float(ent.credit_score or 0.0),
                         "score": float(ent.credit_score or 0.0),
                         "match": f"{int(round(float(ent.credit_score or 0.0)))}%",
@@ -777,25 +813,25 @@ def api_matching_search():
         algorithm=algorithm,
     )
     _logger.debug("matching/search match_suppliers done count=%s", len(results))
-    deepseek_reasons: dict[int, str] = {}
+    mimo_reasons: dict[int, str] = {}
     is_basic_match = False
     fallback_reason = None
-    deepseek_ai_scores: dict[int, int] = {}
+    mimo_ai_scores: dict[int, int] = {}
     if algorithm == "deep_learning":
-        deepseek_reasons, deepseek_ai_scores, is_basic_match, fallback_reason = _build_deepseek_match_reasons(
+        mimo_reasons, mimo_ai_scores, is_basic_match, fallback_reason = _build_mimo_match_reasons(
             core_product, results[:5]
         )
         for row in results:
             sid = int(row.get("id") or 0)
-            if sid in deepseek_ai_scores:
-                s = float(deepseek_ai_scores[sid])
+            if sid in mimo_ai_scores:
+                s = float(mimo_ai_scores[sid])
                 row["score"] = s
                 row["total_score"] = s
                 row["confidence_index"] = round(s, 2)
                 row["deep_learning_explain"] = (
                     f"{row.get('deep_learning_explain') or ''} · Agent评分{int(s)}"
                 ).strip(" ·")
-        if deepseek_ai_scores:
+        if mimo_ai_scores:
             results.sort(
                 key=lambda r: float(r.get("confidence_index") or r.get("score") or 0.0),
                 reverse=True,
@@ -819,13 +855,13 @@ def api_matching_search():
                 {
                     "id": row.get("id"),
                     "name": row.get("name"),
-                    "address": row.get("address") or "",
+                    "address": _matching_public_address(row) if is_guest else (row.get("address") or ""),
                     "credit_score": row.get("credit_score"),
                     "score": row.get("confidence_index", row.get("score")),
                     "match": f"{int(round(float(row.get('confidence_index', row.get('score')) or 0)))}%",
                     "distance_km": row.get("distance_km"),
                     "desc": row.get("match_reason") or "智能匹配供应商",
-                    "ai_match_reason": deepseek_reasons.get(int(row.get("id") or 0))
+                    "ai_match_reason": mimo_reasons.get(int(row.get("id") or 0))
                     or row.get("ai_match_reason"),
                     "tags": row.get("reasons") or [],
                     "deep_learning_score": row.get("deep_learning_score"),
@@ -861,29 +897,48 @@ INDUSTRY_DIRECTORY_KEYWORDS: dict[str, list[str]] = {
 
 
 @api_bp.route("/enterprises/directory", methods=["GET"])
-@login_required
 def api_enterprises_directory():
     """
     GET /api/enterprises/directory
     企业端名录多维筛选（参考产业目录类 B2B 检索）。
-    参数：province（省/直辖市/自治区名）、industry（预置行业 key）、q（关键词）、min_credit、limit
+    参数：province（省/直辖市/自治区名）、industry（预置行业 key）、q（关键词）、
+    min_credit、page、per_page；limit 作为旧参数兼容 per_page；
+    include_self=1 可用于政府大屏等全量监管视图。
     """
     province = (request.args.get("province") or "").strip()
     industry_key = (request.args.get("industry") or "").strip()
     q = (request.args.get("q") or "").strip()
     min_credit = request.args.get("min_credit", type=float)
-    limit = request.args.get("limit", default=80, type=int) or 80
-    limit = max(1, min(int(limit), 200))
+    page = request.args.get("page", default=1, type=int) or 1
+    per_page = request.args.get("per_page", type=int)
+    legacy_limit = request.args.get("limit", type=int)
+    is_guest = not current_user.is_authenticated
+    include_self = (request.args.get("include_self") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    } and not is_guest
+    if per_page is None:
+        per_page = legacy_limit if legacy_limit is not None else 80
+    page = max(1, int(page))
+    per_page = max(1, min(int(per_page), 10000))
 
     query = Enterprise.query.filter(Enterprise.role == "enterprise")
-    if current_user.is_authenticated and getattr(current_user, "id", None):
+    if (
+        not include_self
+        and current_user.is_authenticated
+        and getattr(current_user, "id", None)
+    ):
         query = query.filter(Enterprise.id != current_user.id)
 
     if province:
         query = query.filter(
             or_(
                 Enterprise.province == province,
-                Enterprise.address.contains(province),
+                and_(
+                    or_(Enterprise.province.is_(None), Enterprise.province == ""),
+                    Enterprise.address.contains(province),
+                ),
             )
         )
 
@@ -904,16 +959,28 @@ def api_enterprises_directory():
     if min_credit is not None and min_credit > 0:
         query = query.filter(Enterprise.credit_score >= min_credit)
 
-    rows = query.order_by(Enterprise.credit_score.desc()).limit(limit).all()
+    total = query.count()
+    pages = (total + per_page - 1) // per_page if total else 0
+    rows = (
+        query.order_by(Enterprise.credit_score.desc(), Enterprise.id.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
 
     return jsonify(
         {
             "count": len(rows),
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": pages,
+            "has_more": page < pages,
             "enterprises": [
                 {
                     "id": ent.id,
                     "name": ent.name,
-                    "address": ent.address or "",
+                    "address": _enterprise_public_address(ent) if is_guest else (ent.address or ""),
                     "province": ent.province or "",
                     "city": ent.city or "",
                     "credit_score": float(ent.credit_score or 0.0),

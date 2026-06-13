@@ -44,6 +44,9 @@ assertPattern('src/App.tsx', /path="\/gov\/screen"[\s\S]*<GovDigitalScreen \/>/,
 assertIncludes('src/components/GovSidebar.tsx', "label: '数字大屏', path: '/gov/screen'", 'sidebar navigation');
 assertIncludes('src/pages/gov/GovDashboard.tsx', "label: '数字大屏'", 'dashboard shortcut');
 assertIncludes('src/index.css', '.gov-digital-screen .mainbox', 'screen layout styles');
+assertIncludes('src/index.css', '--screen-header-height', 'viewport-fit sizing variables');
+assertIncludes('src/index.css', 'height: 100dvh', 'viewport-fit screen height');
+assertIncludes('src/index.css', '@media (max-height: 820px) and (min-width: 1101px)', 'short viewport compaction');
 assertIncludes('src/index.css', '@keyframes gov-screen-rotate', 'screen map rotation styles');
 
 console.log('Gov digital screen structure checks passed');

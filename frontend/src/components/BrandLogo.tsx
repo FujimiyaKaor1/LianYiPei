@@ -26,7 +26,7 @@ export function BrandLogo({
     <div className={cn('flex min-w-0 items-center gap-3', className)}>
       <div
         className={cn(
-          'flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-sidebar-divider bg-white p-1 shadow-elevation-1',
+          'flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-sidebar-divider bg-white shadow-elevation-1',
           sidebar && 'sidebar-logo-mark',
           markClassName,
         )}
@@ -35,7 +35,7 @@ export function BrandLogo({
         <img
           src="/logo.png"
           alt=""
-          className="h-full w-full object-contain"
+          className="h-full w-full scale-[2.08] object-contain"
           draggable={false}
         />
       </div>

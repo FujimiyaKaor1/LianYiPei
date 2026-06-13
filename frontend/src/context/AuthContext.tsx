@@ -41,7 +41,9 @@ type AuthContextValue = {
   user: AuthUser | null;
   loading: boolean;
   isLoginModalOpen: boolean;
+  pendingLoginPath: string | null;
   setIsLoginModalOpen: (open: boolean) => void;
+  requestLogin: (nextPath?: string | null) => void;
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
 };
@@ -52,6 +54,21 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [pendingLoginPath, setPendingLoginPath] = useState<string | null>(null);
+
+  const setLoginModalOpen = useCallback((open: boolean) => {
+    if (!open) {
+      setPendingLoginPath(null);
+    }
+    setIsLoginModalOpen(open);
+  }, []);
+
+  const requestLogin = useCallback((nextPath?: string | null) => {
+    if (nextPath && nextPath.startsWith('/')) {
+      setPendingLoginPath(nextPath);
+    }
+    setIsLoginModalOpen(true);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -83,8 +100,9 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
       /* 网络失败仍退出前端态 */
     }
     clearAuthSessionStorage();
+    setPendingLoginPath(null);
     setUser(null);
-    setIsLoginModalOpen(true);
+    setIsLoginModalOpen(false);
   }, []);
 
   useEffect(() => {
@@ -94,15 +112,34 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const onUnauthorized = () => {
       setUser(null);
-      setIsLoginModalOpen(true);
+      const nextPath = `${window.location.pathname}${window.location.search}`;
+      requestLogin(nextPath);
     };
     window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
-  }, []);
+  }, [requestLogin]);
 
   const value = useMemo(
-    () => ({ user, loading, isLoginModalOpen, setIsLoginModalOpen, refresh, logout }),
-    [user, loading, isLoginModalOpen, setIsLoginModalOpen, refresh, logout],
+    () => ({
+      user,
+      loading,
+      isLoginModalOpen,
+      pendingLoginPath,
+      setIsLoginModalOpen: setLoginModalOpen,
+      requestLogin,
+      refresh,
+      logout,
+    }),
+    [
+      user,
+      loading,
+      isLoginModalOpen,
+      pendingLoginPath,
+      setLoginModalOpen,
+      requestLogin,
+      refresh,
+      logout,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

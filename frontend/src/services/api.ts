@@ -96,7 +96,7 @@ export interface SupplierSearchParams {
   delivery_days?: number;
   min_credit?: string | number;
   algorithm?: 'rule' | 'deep_learning';
-  model_choice?: 'qwen' | 'deepseek';
+  model_choice?: 'qwen' | 'mimo';
 }
 
 export interface SupplierSearchItem {
@@ -139,6 +139,11 @@ export interface EnterpriseDirectoryItem {
 
 export interface EnterpriseDirectoryResponse {
   count: number;
+  total: number;
+  page: number;
+  per_page: number;
+  pages: number;
+  has_more: boolean;
   enterprises: EnterpriseDirectoryItem[];
 }
 
@@ -745,7 +750,10 @@ export const api = {
     industry?: string;
     q?: string;
     min_credit?: number;
+    page?: number;
+    per_page?: number;
     limit?: number;
+    include_self?: boolean;
   }) {
     const query = new URLSearchParams();
     if (params?.province) query.set('province', params.province);
@@ -754,7 +762,10 @@ export const api = {
     if (params?.min_credit !== undefined && params.min_credit !== null) {
       query.set('min_credit', String(params.min_credit));
     }
+    if (params?.page !== undefined) query.set('page', String(params.page));
+    if (params?.per_page !== undefined) query.set('per_page', String(params.per_page));
     if (params?.limit !== undefined) query.set('limit', String(params.limit));
+    if (params?.include_self !== undefined) query.set('include_self', params.include_self ? '1' : '0');
     const suffix = query.toString();
     const url = suffix ? `/api/enterprises/directory?${suffix}` : '/api/enterprises/directory';
     return request<EnterpriseDirectoryResponse>(url);
@@ -893,7 +904,6 @@ export const api = {
     seller_tax_no?: string;
   }) {
     const formData = new FormData();
-    // 第三参保留原始文件名；multipart 不要手写 Content-Type（否则无 boundary）
     formData.append('file', file, file.name);
     formData.append('seller_id', String(payload.seller_id));
     formData.append('invoice_no', payload.invoice_no);
@@ -910,7 +920,6 @@ export const api = {
       method: 'POST',
       credentials: 'include',
       body: formData,
-      // 禁止手动设置 multipart Content-Type，否则会丢失 boundary
     });
 
     let result: InvoiceUploadResponse | null = null;
@@ -1321,6 +1330,16 @@ export const api = {
     });
   },
 
+  testEmailPush() {
+    return request<{
+      success: boolean;
+      message: string;
+      hint?: string;
+    }>('/api/wechat/test-email', {
+      method: 'POST',
+    });
+  },
+
   // ═══════════════════════════════════════════════════════════════════════
   // 政府端：监管首页
   // ═══════════════════════════════════════════════════════════════════════
@@ -1662,60 +1681,6 @@ export const api = {
   },
 
   // ═══════════════════════════════════════════════════════════════════════
-  // 电子合同
-  // ═══════════════════════════════════════════════════════════════════════
-
-  getContractsList() {
-    return request<{ contracts: ContractItem[] }>('/contract/list');
-  },
-
-  getContractDetail(contractId: number) {
-    return request<ContractDetail>(`/contract/view/${contractId}`);
-  },
-
-  createContract(data: {
-    buyer_id: number;
-    seller_id: number;
-    product_name: string;
-    quantity: number;
-    unit: string;
-    price: number;
-    total_amount: number;
-    delivery_time: string;
-    quality_requirements: string;
-    payment_terms: string;
-  }) {
-    return request<{ success: boolean; contract_id: number; contract_no: string }>(
-      '/contract/create',
-      { method: 'POST', body: JSON.stringify(data) },
-    );
-  },
-
-  signContract(contractId: number, signatureData: Record<string, unknown>) {
-    return request<{ code: number; message: string; data: { status: string; collaboration_code?: string } }>(
-      '/contract/api/sign',
-      { method: 'POST', body: JSON.stringify({ contract_id: String(contractId), signature_data: signatureData }) },
-    );
-  },
-
-  getContractStatus(contractId: number) {
-    return request<{ code: number; data: { contract_id: number; status: string } }>(
-      `/contract/api/status/${contractId}`,
-    );
-  },
-
-  downloadContract(contractId: number) {
-    return request<Blob>(`/contract/download/${contractId}`, { responseType: 'blob' } as any);
-  },
-
-  fulfillContract(contractId: number, invoiceInfo: Record<string, unknown>) {
-    return request<{ code: number; data: Record<string, unknown> }>(
-      '/contract/api/fulfill',
-      { method: 'POST', body: JSON.stringify({ contract_id: String(contractId), invoice_info: invoiceInfo }) },
-    );
-  },
-
-  // ═══════════════════════════════════════════════════════════════════════
   // 绿色低碳 / 碳排估算
   // ═══════════════════════════════════════════════════════════════════════
 
@@ -1751,17 +1716,6 @@ export const api = {
     );
   },
 
-  // 高德地图
-  getMapDistance(params: { from: string; to: string }) {
-    const q = new URLSearchParams(params);
-    return request<{ distance_km: number; duration_min: number }>(`/api/map/distance?${q}`);
-  },
-
-  getMapLocation(address: string) {
-    return request<{ longitude: number; latitude: number; address: string }>(
-      `/api/map/location?address=${encodeURIComponent(address)}`,
-    );
-  },
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1985,33 +1939,6 @@ export interface BusinessInsightsData {
   risk_detail: string;
   credit_score: number;
   level: string;
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// 电子合同
-
-export interface ContractItem {
-  id: number;
-  contract_no: string;
-  product_name: string;
-  buyer_name: string;
-  seller_name: string;
-  total_amount: number;
-  status: 'draft' | 'pending_sign' | 'signed' | 'fulfilled';
-  created_at: string;
-  signed_at?: string;
-}
-
-export interface ContractDetail extends ContractItem {
-  quantity: number;
-  unit: string;
-  price: number;
-  delivery_time: string;
-  quality_requirements: string;
-  payment_terms: string;
-  buyer_signed: boolean;
-  seller_signed: boolean;
-  collaboration_code?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════════

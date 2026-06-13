@@ -9,7 +9,7 @@ export function Layout() {
 
   const getTitle = (path: string) => {
     switch (path) {
-      case '/': return '控制面板';
+      case '/': return '企业看板';
       case '/dashboard': return '企业看板';
       case '/enterprise-directory': return '企业名录筛选';
       case '/matching': return '智能供需匹配';

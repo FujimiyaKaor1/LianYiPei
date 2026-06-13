@@ -157,6 +157,7 @@ def create_app(config_class=Config):
     from app.routes.favorite import favorite_bp
     from app.routes.intent_quote import intent_quote_bp
     from app.routes.hermes import bp as hermes_bp
+    from app.routes.rag import rag_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(enterprise_bp, url_prefix='/enterprise')
@@ -185,6 +186,7 @@ def create_app(config_class=Config):
     app.register_blueprint(favorite_bp)
     app.register_blueprint(intent_quote_bp)
     app.register_blueprint(hermes_bp)
+    app.register_blueprint(rag_bp)
 
     from app.routes.react_admin_shell import bp as react_admin_shell_bp
 

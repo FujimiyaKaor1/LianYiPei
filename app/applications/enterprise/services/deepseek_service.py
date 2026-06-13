@@ -1,5 +1,5 @@
 """
-DeepSeek 企业画像服务
+AI 企业画像服务
 ======================
 
 职责：
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class DeepSeekProfileService:
-    """DeepSeek 企业画像服务"""
+    """AI 企业画像服务（保留历史类名以兼容旧导入路径）。"""
 
     # 允许公开的企业画像字段
     PUBLIC_PROFILE_FIELDS = [
@@ -259,7 +259,7 @@ class DeepSeekProfileService:
             }
         }
 
-    # ── AI对话生成（模拟DeepSeek调用） ────────────────────────────────────
+    # ── AI对话生成（模拟云端大模型调用） ────────────────────────────────────
 
     def generate_ai_insight_text(
         self,
@@ -270,9 +270,9 @@ class DeepSeekProfileService:
         is_green: bool,
     ) -> str:
         """
-        模拟DeepSeek调用生成AI洞察文本。
+        模拟云端大模型调用生成AI洞察文本。
 
-        实际项目中应替换为真实的DeepSeek API调用。
+        实际项目中应替换为真实的 MiMo API调用。
         """
         return self._generate_insight_text(
             product_name=product_name,

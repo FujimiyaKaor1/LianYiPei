@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { useAuth } from '@/src/context/AuthContext';
-import { loginHomePathForRole } from '@/src/lib/rbac';
+import { canRoleAccessPath, loginHomePathForRole } from '@/src/lib/rbac';
 import { cn } from '@/src/lib/utils';
 import { BrandLogo } from './BrandLogo';
 
@@ -11,7 +11,7 @@ type ModalMode = 'login' | 'register';
 
 export function LoginModal() {
   const navigate = useNavigate();
-  const { isLoginModalOpen, setIsLoginModalOpen, refresh } = useAuth();
+  const { isLoginModalOpen, pendingLoginPath, setIsLoginModalOpen, refresh } = useAuth();
 
   const [mode, setMode] = useState<ModalMode>('login');
 
@@ -89,9 +89,13 @@ export function LoginModal() {
       setPassword('');
       await refresh();
 
+      const fromPending =
+        pendingLoginPath && canRoleAccessPath(payload.role, pendingLoginPath);
       const fromRedirect =
         typeof payload.redirect === 'string' && payload.redirect.startsWith('/');
-      const target = fromRedirect
+      const target = fromPending
+        ? pendingLoginPath
+        : fromRedirect
         ? payload.redirect!
         : loginHomePathForRole(payload.role);
 

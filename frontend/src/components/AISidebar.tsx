@@ -1,6 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Download, MessageCircle, Minus, Send, Sparkles, Trash2, Upload } from 'lucide-react';
+import { Download, MessageCircle, Minus, Move, Send, Sparkles, Trash2, Upload } from 'lucide-react';
 import { notifyIfUnauthorized } from '@/src/lib/authEvents';
+import {
+  clampFloatingPosition,
+  DEFAULT_FLOATING_MARGIN,
+  type FloatingPosition,
+} from '@/src/lib/floatingWindowDrag';
 import { api, ApiError } from '@/src/services/api';
 import { getStoredModelChoice, setStoredModelChoice, type ModelChoice } from '@/src/lib/modelChoice';
 
@@ -10,6 +15,17 @@ interface ChatMessage {
   role: MessageRole;
   content: string;
   timestamp: string;
+}
+
+interface DragState {
+  pointerId: number;
+  captureElement: HTMLElement;
+  startPointerX: number;
+  startPointerY: number;
+  startX: number;
+  startY: number;
+  didMove: boolean;
+  shouldSuppressTriggerClick: boolean;
 }
 
 function createMessageId(role: MessageRole) {
@@ -22,6 +38,13 @@ function formatTimestamp(date = new Date()) {
     minute: '2-digit',
     hour12: false,
   });
+}
+
+function isInteractiveDragTarget(target: EventTarget | null) {
+  return (
+    target instanceof HTMLElement &&
+    Boolean(target.closest('button, input, textarea, select, a, [role="button"]'))
+  );
 }
 
 function extractStreamText(payload: unknown): string {
@@ -38,7 +61,7 @@ function extractStreamText(payload: unknown): string {
   }
 
   const record = payload as Record<string, unknown>;
-  const directKeys = ['content', 'text', 'response', 'answer', 'output_text'];
+  const directKeys = ['content', 'text', 'response', 'answer', 'output_text', 'error'];
 
   for (const key of directKeys) {
     const text = extractStreamText(record[key]);
@@ -92,8 +115,12 @@ export function AISidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const [isUploadingPdf, setIsUploadingPdf] = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
+  const [dragPosition, setDragPosition] = useState<FloatingPosition | null>(null);
   const messagesListRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const floatingRootRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef<DragState | null>(null);
+  const suppressTriggerClickRef = useRef(false);
 
   useEffect(() => {
     if (!messages.length) {
@@ -112,6 +139,39 @@ export function AISidebar() {
       });
     });
   }, [messages]);
+
+  useEffect(() => {
+    const clampCurrentPosition = () => {
+      setDragPosition((position) => {
+        const floatingRoot = floatingRootRef.current;
+        if (!position || !floatingRoot) {
+          return position;
+        }
+
+        const rect = floatingRoot.getBoundingClientRect();
+        const nextPosition = clampFloatingPosition(position, {
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+          elementWidth: rect.width,
+          elementHeight: rect.height,
+          margin: DEFAULT_FLOATING_MARGIN,
+        });
+
+        if (nextPosition.x === position.x && nextPosition.y === position.y) {
+          return position;
+        }
+
+        return nextPosition;
+      });
+    };
+
+    clampCurrentPosition();
+    window.addEventListener('resize', clampCurrentPosition);
+
+    return () => {
+      window.removeEventListener('resize', clampCurrentPosition);
+    };
+  }, [isOpen]);
 
   const updateAssistantMessage = (messageId: string, content: string) => {
     setMessages((previousMessages) =>
@@ -182,8 +242,21 @@ export function AISidebar() {
         return;
       }
 
-      if (!response.ok || !response.body) {
-        throw new Error('chat_request_failed');
+      if (!response.ok) {
+        let errorMessage = '模型连接异常，请重试';
+        try {
+          const payload = (await response.json()) as { error?: string };
+          if (payload.error) {
+            errorMessage = payload.error;
+          }
+        } catch {
+          /* 非 JSON 错误响应使用默认文案 */
+        }
+        throw new Error(errorMessage);
+      }
+
+      if (!response.body) {
+        throw new Error('模型连接异常，请重试');
       }
 
       const reader = response.body.getReader();
@@ -242,8 +315,11 @@ export function AISidebar() {
       if (!hasReceivedContent) {
         updateAssistantMessage(assistantMessageId, '模型连接异常，请重试');
       }
-    } catch {
-      updateAssistantMessage(assistantMessageId, '模型连接异常，请重试');
+    } catch (error) {
+      const errorMessage = error instanceof Error && error.message
+        ? error.message
+        : '模型连接异常，请重试';
+      updateAssistantMessage(assistantMessageId, errorMessage);
     } finally {
       setIsStreaming(false);
     }
@@ -324,19 +400,138 @@ export function AISidebar() {
     }
   };
 
+  const beginDrag = (
+    event: React.PointerEvent<HTMLElement>,
+    options: { allowInteractiveTarget?: boolean; shouldSuppressTriggerClick?: boolean } = {},
+  ) => {
+    if (
+      event.button !== 0 ||
+      (!options.allowInteractiveTarget && isInteractiveDragTarget(event.target))
+    ) {
+      return;
+    }
+
+    const floatingRoot = floatingRootRef.current;
+    if (!floatingRoot) {
+      return;
+    }
+
+    const rect = floatingRoot.getBoundingClientRect();
+    dragStateRef.current = {
+      pointerId: event.pointerId,
+      captureElement: event.currentTarget,
+      startPointerX: event.clientX,
+      startPointerY: event.clientY,
+      startX: rect.left,
+      startY: rect.top,
+      didMove: false,
+      shouldSuppressTriggerClick: Boolean(options.shouldSuppressTriggerClick),
+    };
+    suppressTriggerClickRef.current = false;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleDragMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const dragState = dragStateRef.current;
+    const floatingRoot = floatingRootRef.current;
+
+    if (!dragState || dragState.pointerId !== event.pointerId || !floatingRoot) {
+      return;
+    }
+
+    const deltaX = event.clientX - dragState.startPointerX;
+    const deltaY = event.clientY - dragState.startPointerY;
+
+    if (Math.hypot(deltaX, deltaY) > 4) {
+      dragState.didMove = true;
+      if (dragState.shouldSuppressTriggerClick) {
+        suppressTriggerClickRef.current = true;
+      }
+    }
+
+    if (dragState.didMove) {
+      event.preventDefault();
+    }
+
+    const rect = floatingRoot.getBoundingClientRect();
+    setDragPosition(
+      clampFloatingPosition(
+        {
+          x: dragState.startX + deltaX,
+          y: dragState.startY + deltaY,
+        },
+        {
+          viewportWidth: window.innerWidth,
+          viewportHeight: window.innerHeight,
+          elementWidth: rect.width,
+          elementHeight: rect.height,
+          margin: DEFAULT_FLOATING_MARGIN,
+        },
+      ),
+    );
+  };
+
+  const handleDragEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    const dragState = dragStateRef.current;
+
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    if (dragState.captureElement.hasPointerCapture(event.pointerId)) {
+      dragState.captureElement.releasePointerCapture(event.pointerId);
+    }
+
+    dragStateRef.current = null;
+  };
+
+  const handleTriggerClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (suppressTriggerClickRef.current) {
+      event.preventDefault();
+      event.stopPropagation();
+      suppressTriggerClickRef.current = false;
+      return;
+    }
+
+    setIsOpen((current) => !current);
+  };
+
   const canSend = inputValue.trim().length > 0 && !isStreaming;
 
   return (
-    <div data-ai-floating-root className="pointer-events-none fixed bottom-5 right-5 z-[120] flex flex-col items-end gap-3">
+    <div
+      ref={floatingRootRef}
+      data-ai-floating-root
+      className={`pointer-events-none fixed z-[120] flex flex-col items-end gap-3 ${
+        dragPosition ? '' : 'bottom-5 right-5'
+      }`}
+      style={
+        dragPosition
+          ? {
+              left: `${dragPosition.x}px`,
+              top: `${dragPosition.y}px`,
+            }
+          : undefined
+      }
+      onPointerMove={handleDragMove}
+      onPointerUp={handleDragEnd}
+      onPointerCancel={handleDragEnd}
+    >
       {isOpen ? (
         <section
           data-ai-floating-window
           className="pointer-events-auto flex h-[min(78dvh,680px)] w-[min(calc(100vw-2rem),380px)] flex-col overflow-hidden rounded-md border border-border bg-white/94 shadow-elevation-3 backdrop-blur-xl"
           aria-label="链小易 AI 悬浮窗口"
         >
-      <div className="flex items-center justify-between border-b border-border px-5 py-4">
+      <div
+        className="flex cursor-grab touch-none select-none items-center justify-between border-b border-border px-5 py-4 active:cursor-grabbing"
+        onPointerDown={beginDrag}
+      >
         <div>
-          <h3 className="text-base font-bold text-ink">链小易 AI</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-bold text-ink">链小易 AI</h3>
+            <Move className="h-3.5 w-3.5 text-ink-faint" aria-hidden="true" />
+          </div>
           <p className="text-[10px] font-semibold text-ink-muted">
             实时产业协作大脑
           </p>
@@ -415,7 +610,7 @@ export function AISidebar() {
                 disabled={isStreaming || isUploadingPdf}
               >
                 <option value="qwen">qwen（本地隐私专家）</option>
-                <option value="deepseek">deepseek（云端深度思考引擎）</option>
+                <option value="mimo">MiMo-V2.5-Pro（云端深度思考引擎）</option>
               </select>
             </label>
             <div className="flex flex-col gap-1 text-[10px] font-semibold text-ink-muted">
@@ -516,8 +711,14 @@ export function AISidebar() {
 
       <button
         type="button"
-        className="pointer-events-auto flex items-center gap-2 rounded-md border border-brand/25 bg-brand-solid px-4 py-3 text-sm font-bold text-white shadow-elevation-3 transition-transform hover:-translate-y-0.5 hover:bg-brand-solid-hover"
-        onClick={() => setIsOpen((current) => !current)}
+        className="pointer-events-auto flex touch-none cursor-grab select-none items-center gap-2 rounded-md border border-brand/25 bg-brand-solid px-4 py-3 text-sm font-bold text-white shadow-elevation-3 transition-transform hover:-translate-y-0.5 hover:bg-brand-solid-hover active:cursor-grabbing"
+        onPointerDown={(event) =>
+          beginDrag(event, {
+            allowInteractiveTarget: true,
+            shouldSuppressTriggerClick: true,
+          })
+        }
+        onClick={handleTriggerClick}
         title={isOpen ? '收起链小易 AI' : '打开链小易 AI'}
         aria-label={isOpen ? '收起链小易 AI' : '打开链小易 AI'}
         aria-expanded={isOpen}

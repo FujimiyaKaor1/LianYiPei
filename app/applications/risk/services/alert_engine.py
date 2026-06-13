@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 
@@ -45,6 +46,19 @@ ALERT_TYPE_CREDIT_ANOMALY = 'credit_anomaly'
 LEVEL_RED = 'red'
 LEVEL_YELLOW = 'yellow'
 LEVEL_BLUE = 'blue'
+
+
+def _get_int_env(name: str, default: int) -> int:
+    """Read a non-negative integer env var with a conservative fallback."""
+    raw = os.getenv(name, '').strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning("[AlertEngine] %s=%r is invalid, using %s", name, raw, default)
+        return default
+    return max(0, value)
 
 
 def _build_analysis_data(
@@ -529,9 +543,21 @@ def run_all_checks() -> List[Alert]:
     # 5. 按等级分发通知（红色/黄色推送，蓝色仅显示）
     try:
         from app.services.alert_notifier import notify_alert
+        red_wechat_limit = _get_int_env('WECHAT_RED_ALERT_PUSH_LIMIT', 5)
+        red_wechat_count = 0
         for alert in new_alerts:
-            if alert.level in (LEVEL_RED, LEVEL_YELLOW):
+            if alert.level == LEVEL_RED:
+                push_wechat = red_wechat_count < red_wechat_limit
+                notify_alert(alert, push_wechat=push_wechat)
+                if push_wechat:
+                    red_wechat_count += 1
+            elif alert.level == LEVEL_YELLOW:
                 notify_alert(alert)
+        if red_wechat_count >= red_wechat_limit and red_wechat_limit >= 0:
+            logger.info(
+                "[AlertEngine] 本轮红色预警微信推送达到上限: %s 条，其余红色预警仅站内通知",
+                red_wechat_limit,
+            )
         db.session.commit()
     except Exception as e:
         logger.error(f"[AlertEngine] 预警通知发送失败: {e}", exc_info=True)

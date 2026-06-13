@@ -8,6 +8,7 @@
 - Hermes 不可用或未配置时，链易配继续走原有微信模板消息、短信日志和站内消息，不阻断告警。
 - Hermes 可通过内部 API 查询预警列表和预警详情。
 - Hermes 可创建待确认动作，并在用户回复 `确认执行` 后执行。
+- 微信服务号/测试号回调已支持入站文字指令，后端会把文字映射到白名单业务动作。
 - 当前开放的动作：
   - `assign_alert`：派发预警处置任务。
   - `close_alert`：关闭预警并写入处置记录。
@@ -22,11 +23,12 @@ HERMES_API_SERVER_URL=http://127.0.0.1:8642/v1
 HERMES_API_SERVER_KEY=change-me
 HERMES_WEIXIN_TARGET=weixin
 
-HERMES_LIANYIPEI_BASE_URL=http://127.0.0.1:5100
+HERMES_LIANYIPEI_BASE_URL=http://127.0.0.1:5050
 HERMES_LIANYIPEI_TOKEN=change-me-strong-token
 HERMES_ACTION_CONFIRM_TTL_SECONDS=300
 HERMES_ALLOWED_REMOTE_ADDRS=127.0.0.1,::1,localhost
 HERMES_TRUST_PROXY_HEADERS=0
+WECHAT_CALLBACK_TOKEN=change-me-wechat-callback-token
 ```
 
 `HERMES_API_SERVER_KEY` 必须与 Hermes `API_SERVER_KEY` 一致。  
@@ -39,7 +41,7 @@ HERMES_TRUST_PROXY_HEADERS=0
 ```bash
 API_SERVER_ENABLED=true
 API_SERVER_KEY=change-me
-HERMES_LIANYIPEI_BASE_URL=http://127.0.0.1:5100
+HERMES_LIANYIPEI_BASE_URL=http://127.0.0.1:5050
 HERMES_LIANYIPEI_TOKEN=change-me-strong-token
 ```
 
@@ -73,6 +75,32 @@ POST /api/hermes/actions/execute
 ```bash
 HERMES_TRUST_PROXY_HEADERS=1
 ```
+
+## 微信入站回调
+
+微信公众平台 / 测试号后台填写：
+
+```text
+URL: https://你的公网域名/api/wechat/callback/service-account
+Token: 与 WECHAT_CALLBACK_TOKEN 一致
+```
+
+本地调试时需先用 ngrok、cloudflared、cpolar 等工具把 `http://127.0.0.1:5050` 暴露为公网 HTTPS，否则微信服务器无法访问本机。
+
+已支持的微信文字指令：
+
+```text
+帮助
+查预警 / 红色预警 / 黄色预警 / 蓝色预警
+查看 763812
+关闭 763812 原因说明
+已读 763812
+派发 763812 给 3060
+确认执行
+服务状态
+```
+
+为避免远程命令执行风险，微信入站不会执行任意 shell 命令，只会执行上述白名单业务动作。所有写操作都会先创建待确认动作，必须再次回复 `确认执行` 才会生效。
 
 ## 操作确认规则
 

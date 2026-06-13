@@ -1,10 +1,10 @@
-export type ModelChoice = 'qwen' | 'deepseek';
+export type ModelChoice = 'qwen' | 'mimo';
 
 const STORAGE_KEY = 'lianyipei_model_choice';
 const EVENT_NAME = 'lianyipei:model-choice-changed';
 
 function normalizeModelChoice(value: string | null | undefined): ModelChoice {
-  return value === 'deepseek' ? 'deepseek' : 'qwen';
+  return value === 'mimo' || value === 'deepseek' ? 'mimo' : 'qwen';
 }
 
 export function getStoredModelChoice(): ModelChoice {

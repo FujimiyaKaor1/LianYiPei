@@ -6,6 +6,7 @@ import {
   Award,
   CheckCircle2,
   ChevronRight,
+  FileCheck2,
   Factory,
   Gauge,
   LineChart,
@@ -20,15 +21,15 @@ import {
   api,
   type AlertData,
   type CreditScoreData,
+  type OrderStatistics,
   NETWORK_ERROR_MESSAGE,
 } from '@/src/services/api';
-import { CollaborationModal } from '@/src/components/CollaborationModal';
 import { useAuth } from '@/src/context/AuthContext';
+import { CollaborationModal } from '@/src/components/CollaborationModal';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [isCollaborationModalOpen, setIsCollaborationModalOpen] = useState(false);
   const [creditScore, setCreditScore] = useState<CreditScoreData | null>(null);
   const [creditLoading, setCreditLoading] = useState(true);
   const [creditError, setCreditError] = useState<string | null>(null);
@@ -39,6 +40,12 @@ export default function Dashboard() {
 
   const [matches, setMatches] = useState<any[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(true);
+
+  const [orderStats, setOrderStats] = useState<OrderStatistics | null>(null);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [quotesTotal, setQuotesTotal] = useState(0);
+  const [quotesLoading, setQuotesLoading] = useState(true);
+  const [isCollaborationOpen, setIsCollaborationOpen] = useState(false);
 
   const creditCacheKey = user?.id ? `credit_score_${user.id}` : '';
 
@@ -103,13 +110,37 @@ export default function Dashboard() {
     }
   };
 
+  const fetchOperations = async (showLoading = true) => {
+    if (showLoading) {
+      setOrdersLoading(true);
+      setQuotesLoading(true);
+    }
+    const [statsResult, quotesResult] = await Promise.allSettled([
+      api.getOrderStatistics(),
+      api.getQuotesList({ page: 1, per_page: 5 }),
+    ]);
+
+    if (statsResult.status === 'fulfilled') {
+      setOrderStats(statsResult.value.statistics);
+    }
+    if (quotesResult.status === 'fulfilled') {
+      setQuotesTotal(quotesResult.value.total || quotesResult.value.quotes?.length || 0);
+    }
+
+    setOrdersLoading(false);
+    setQuotesLoading(false);
+  };
+
   const refreshAll = async () => {
     setCreditLoading(true);
     setAlertsLoading(true);
+    setOrdersLoading(true);
+    setQuotesLoading(true);
     await Promise.allSettled([
       fetchCreditScore(false),
       fetchAlerts(false),
       fetchMatches(),
+      fetchOperations(false),
     ]);
   };
 
@@ -158,17 +189,60 @@ export default function Dashboard() {
   const visibleMatches = matches.slice(0, 4);
   const scoreLabel = creditScore?.level || '待评估';
   const supplyHealth = Math.max(42, Math.min(96, Math.round(scorePercent * 0.72 + 18)));
+  const pendingOrders = (orderStats?.pending || 0) + (orderStats?.in_progress || 0);
+  const completedOrders = orderStats?.completed || 0;
+  const operationsLoading = ordersLoading || quotesLoading;
+  const actionCards = [
+    {
+      label: '处理风险',
+      value: alertsLoading ? '...' : `${alerts.length} 条`,
+      note: '进入风险监测',
+      path: '/risk',
+      icon: AlertTriangle,
+      tone: alerts.length ? 'risk' : 'trust',
+    },
+    {
+      label: '推进订单',
+      value: ordersLoading ? '...' : `${pendingOrders} 单`,
+      note: '查看订单工作流',
+      path: '/orders',
+      icon: Factory,
+      tone: pendingOrders ? 'brand' : 'trust',
+    },
+    {
+      label: '寻找客商',
+      value: matchesLoading ? '...' : `${visibleMatches.length} 家`,
+      note: '打开智能匹配',
+      path: '/matching',
+      icon: Award,
+      tone: 'trust',
+    },
+    {
+      label: '维护报价',
+      value: quotesLoading ? '...' : `${quotesTotal} 条`,
+      note: '进入报价池',
+      path: '/quote-pool',
+      icon: LineChart,
+      tone: quotesTotal ? 'brand' : 'trust',
+    },
+    {
+      label: '真实性验证',
+      value: '凭证',
+      note: '上传交易凭证',
+      onClick: () => setIsCollaborationOpen(true),
+      icon: FileCheck2,
+      tone: 'brand',
+    },
+  ];
 
   return (
-    <>
-      <CollaborationModal
-        open={isCollaborationModalOpen}
-        onClose={() => setIsCollaborationModalOpen(false)}
-        enterpriseId={user?.id ?? null}
-        currentCreditScore={Number(creditScore?.credit_score || 70)}
-      />
-
-      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4">
+        <CollaborationModal
+          open={isCollaborationOpen}
+          onClose={() => setIsCollaborationOpen(false)}
+          enterpriseId={user?.id ?? null}
+          currentCreditScore={Number(creditScore?.credit_score || 70)}
+        />
         {(isInitialLoading || hasNetworkError) && (
           <div className="panel flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-2 text-xs font-medium text-ink-muted">
@@ -239,7 +313,7 @@ export default function Dashboard() {
                     {[
                       ['履约健康', `${supplyHealth}%`],
                       ['待处理预警', String(alerts.length)],
-                      ['推荐客商', String(matches.length)],
+                      ['待推进订单', operationsLoading ? '...' : String(pendingOrders)],
                     ].map(([label, value]) => (
                       <div key={label} className="rounded-md border border-white/10 bg-white/6 p-3">
                         <div className="metric-number text-lg font-bold">{value}</div>
@@ -253,12 +327,10 @@ export default function Dashboard() {
               <div className="flex flex-col bg-surface p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-xs font-bold text-ink-muted">合作闭环任务</p>
-                    <h3 className="mt-2 text-xl font-bold text-ink">验证交易真实性</h3>
+                    <p className="text-xs font-bold text-ink-muted">经营动作建议</p>
+                    <h3 className="mt-2 text-xl font-bold text-ink">先处理风险，再推进履约</h3>
                     <p className="mt-3 max-w-md text-sm leading-6 text-ink-muted">
-                      完成本季度 3 笔大宗采购的链上存证，验证后最高可获得
-                      <span className="font-bold text-brand"> +10 </span>
-                      信用分，并提升供应商曝光权重。
+                      根据当前信用、预警、订单和报价数据，把企业每天最该处理的经营动作集中到这里。
                     </p>
                   </div>
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-trust-soft text-trust">
@@ -266,25 +338,61 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="mt-6 grid grid-cols-3 gap-2">
-                  {[
-                    ['存证', '0/3'],
-                    ['审核', '待提交'],
-                    ['加权', '+10'],
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-md border border-border bg-surface-subtle p-3">
-                      <div className="metric-number text-sm font-bold text-ink">{value}</div>
-                      <div className="mt-1 text-[10px] font-medium text-ink-muted">{label}</div>
-                    </div>
-                  ))}
+                <div className="mt-5 grid grid-cols-2 gap-2">
+                  {actionCards.map((action) => {
+                    const ActionIcon = action.icon;
+                    return (
+                      <button
+                        key={action.label}
+                        type="button"
+                        onClick={() => {
+                          if ('onClick' in action && action.onClick) {
+                            action.onClick();
+                            return;
+                          }
+                          if ('path' in action && action.path) {
+                            navigate(action.path);
+                          }
+                        }}
+                        className="rounded-md border border-border bg-surface-subtle p-3 text-left transition-colors hover:border-border-strong hover:bg-surface"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="metric-number text-sm font-bold text-ink">
+                              {action.value}
+                            </div>
+                            <div className="mt-1 text-[10px] font-medium text-ink-muted">
+                              {action.label}
+                            </div>
+                          </div>
+                          <div
+                            className={cn(
+                              'flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
+                              action.tone === 'risk'
+                                ? 'bg-risk-soft text-risk'
+                                : action.tone === 'brand'
+                                  ? 'bg-brand-soft text-brand'
+                                  : 'bg-trust-soft text-trust',
+                            )}
+                          >
+                            <ActionIcon className="h-3.5 w-3.5" />
+                          </div>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-2 text-[10px] font-semibold text-ink-muted">
+                          <span>{action.note}</span>
+                          <ArrowRight className="h-3 w-3" />
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => setIsCollaborationModalOpen(true)}
+                  onClick={() => navigate('/fulfillment')}
                   className="btn-primary mt-auto w-full gap-2"
                 >
-                  发起交易验证
+                  查看履约看板
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
@@ -306,11 +414,11 @@ export default function Dashboard() {
                 tone: 'brand',
               },
               {
-                label: '风险队列',
-                value: alertsLoading ? '...' : String(alerts.length),
-                note: alertsError ? '同步失败' : '待核验预警',
-                icon: AlertTriangle,
-                tone: alerts.length ? 'risk' : 'trust',
+                label: '待推进订单',
+                value: ordersLoading ? '...' : String(pendingOrders),
+                note: `已完成 ${completedOrders} 单`,
+                icon: Factory,
+                tone: pendingOrders ? 'brand' : 'trust',
               },
               {
                 label: '匹配机会',
@@ -483,7 +591,6 @@ export default function Dashboard() {
             </div>
           </motion.div>
         </section>
-      </div>
-    </>
+    </div>
   );
 }

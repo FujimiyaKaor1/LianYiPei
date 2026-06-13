@@ -240,6 +240,8 @@ class Config:
     WECHAT_TEMPLATE_ID = os.environ.get('WECHAT_TEMPLATE_ID') or ''  # 模板消息ID
     # 模板 data 字段名，须与公众号后台模板详情中 {{xxx.DATA}} 的 xxx 一致；主文案,时间 两个键，逗号分隔
     WECHAT_TEMPLATE_DATA_KEYS = os.environ.get('WECHAT_TEMPLATE_DATA_KEYS') or 'thing1,time2'
+    # 服务号/测试号回调 Token，需与微信公众平台后台填写的 Token 一致
+    WECHAT_CALLBACK_TOKEN = os.environ.get('WECHAT_CALLBACK_TOKEN') or ''
 
     # Hermes 本机网关 / 链易配内部控制接口
     HERMES_API_SERVER_URL = (os.environ.get("HERMES_API_SERVER_URL") or "http://127.0.0.1:8642/v1").rstrip("/")

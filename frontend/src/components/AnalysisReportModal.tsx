@@ -30,11 +30,11 @@ export function AnalysisReportModal({ open, onClose }: AnalysisReportModalProps)
     setRefreshing(true);
     try {
       // 获取企业列表数据
-      const data = await api.fetchEnterpriseDirectory({ limit: 1000 });
+      const data = await api.fetchEnterpriseDirectory({ limit: 10000, include_self: true });
       const enterprises = data.enterprises || [];
       
       // 计算统计数据
-      const total = enterprises.length;
+      const total = data.total ?? enterprises.length;
       const active = enterprises.filter((e: { credit_score: number }) => (e.credit_score || 0) >= 60).length;
       const abnormal = enterprises.filter((e: { credit_score: number }) => (e.credit_score || 0) < 60).length;
       const dormant = total - active - abnormal;

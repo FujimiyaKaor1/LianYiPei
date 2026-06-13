@@ -775,7 +775,7 @@ def api_exchange_card(chat_id: int):
     InquiryChatService().send_message(
         chat_id=chat_id,
         sender_id=None,
-        content=f"双方已完成名片交换，正式达成合作！可前往签约页签署电子合同。",
+        content=f"双方已完成名片交换，正式达成合作！可前往订单工作流继续推进履约。",
         message_type="system",
         msg_metadata={"event": "card_exchanged"},
     )

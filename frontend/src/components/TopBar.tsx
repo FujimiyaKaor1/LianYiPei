@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Bell, LogOut, Moon, Search, Sun, User } from 'lucide-react';
 import { useAuth } from '@/src/context/AuthContext';
 import { useTheme } from '@/src/context/ThemeContext';
@@ -11,7 +12,8 @@ interface TopBarProps {
 }
 
 export function TopBar({ title, showSearch = true }: TopBarProps) {
-  const { user, loading, logout, setIsLoginModalOpen } = useAuth();
+  const { user, loading, logout, requestLogin } = useAuth();
+  const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const { showToast } = useToast();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -27,6 +29,8 @@ export function TopBar({ title, showSearch = true }: TopBarProps) {
       setUnreadCount(r.total || 0);
     }).catch(() => {});
   }, [user]);
+
+  const currentPath = `${location.pathname}${location.search}`;
 
   return (
     <header className="sticky top-0 z-30 flex h-[72px] flex-shrink-0 items-center justify-between border-b border-border bg-surface/86 px-6 backdrop-blur-xl">
@@ -85,7 +89,7 @@ export function TopBar({ title, showSearch = true }: TopBarProps) {
           ) : (
             <button
               type="button"
-              onClick={() => setIsLoginModalOpen(true)}
+              onClick={() => requestLogin(currentPath)}
               className="btn-primary btn-sm gap-1.5"
             >
               <User className="w-3.5 h-3.5" />
@@ -109,7 +113,13 @@ export function TopBar({ title, showSearch = true }: TopBarProps) {
 
           <button
             className="relative flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-ink-soft shadow-elevation-1 transition-colors hover:border-border-hover hover:text-ink"
-            onClick={() => showToast(unreadCount > 0 ? `${unreadCount} 条未读预警` : '暂无新预警', 'info')}
+            onClick={() => {
+              if (!user) {
+                requestLogin(currentPath);
+                return;
+              }
+              showToast(unreadCount > 0 ? `${unreadCount} 条未读预警` : '暂无新预警', 'info');
+            }}
             title="预警通知"
           >
             <Bell className="h-4.5 w-4.5" />

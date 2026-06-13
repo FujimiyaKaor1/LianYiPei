@@ -3,7 +3,7 @@
  * 
  * 功能：
  * 1. 显示AI商机洞察消息卡片
- * 2. 显示DeepSeek企业画像
+ * 2. 显示AI企业画像
  * 3. 提供意向报价按钮
  */
 import React, { useState, useEffect } from 'react';
@@ -119,7 +119,7 @@ export function AIBusinessInsightCard({
           </div>
           <span className="text-sm font-bold text-blue-900">AI商机洞察</span>
           <div className="ml-auto px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full">
-            DeepSeek
+            MiMo
           </div>
         </div>
 

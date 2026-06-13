@@ -41,7 +41,11 @@ def get_level_priority(level: str) -> str:
 
 # ── 通知分发 ──────────────────────────────────────────────────────────────
 
-def notify_alert(alert: Alert, recipients: Optional[List[int]] = None) -> None:
+def notify_alert(
+    alert: Alert,
+    recipients: Optional[List[int]] = None,
+    push_wechat: bool = True,
+) -> None:
     """
     根据预警等级分发通知。
     - 红色：微信推送 + 短信 + 站内消息
@@ -63,10 +67,14 @@ def notify_alert(alert: Alert, recipients: Optional[List[int]] = None) -> None:
 
     if level == LEVEL_RED:
         _send_hermes_alert(alert, recipients)
-        _send_wechat_push(alert, recipients)
+        if push_wechat:
+            _send_wechat_push(alert, recipients)
+        else:
+            logger.info(f"[AlertNotifier] 红色预警 {alert.id} 微信推送已按限流策略跳过")
         _send_sms(alert, recipients)
         _send_in_site_message(alert, recipients)
-        logger.info(f"[AlertNotifier] 红色预警 {alert.id} 已发送微信+短信+站内消息")
+        channel_label = "微信+短信+站内消息" if push_wechat else "短信+站内消息"
+        logger.info(f"[AlertNotifier] 红色预警 {alert.id} 已发送{channel_label}")
 
     elif level == LEVEL_YELLOW:
         _send_in_site_message(alert, recipients)

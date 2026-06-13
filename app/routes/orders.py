@@ -109,7 +109,10 @@ def create():
 @login_required
 def detail(order_id):
     """订单详情"""
-    order = OrderService.get_order_by_id(order_id)
+    order = OrderService.get_order_by_id(
+        order_id,
+        enterprise_id=None if current_user.is_admin else current_user.id,
+    )
     
     # 验证权限
     if order.enterprise_id != current_user.id and not current_user.is_admin:
@@ -123,7 +126,7 @@ def detail(order_id):
 @login_required
 def edit(order_id):
     """编辑订单"""
-    order = OrderService.get_order_by_id(order_id)
+    order = OrderService.get_order_by_id(order_id, enterprise_id=current_user.id)
     
     # 验证权限
     if order.enterprise_id != current_user.id:
@@ -148,6 +151,7 @@ def edit(order_id):
             # 更新订单
             OrderService.update_order(
                 order_id=order_id,
+                enterprise_id=current_user.id,
                 product_name=product_name,
                 quantity=quantity,
                 unit=unit,
@@ -170,7 +174,7 @@ def edit(order_id):
 @login_required
 def update_status(order_id):
     """更新订单状态"""
-    order = OrderService.get_order_by_id(order_id)
+    order = OrderService.get_order_by_id(order_id, enterprise_id=current_user.id)
     
     # 验证权限
     if order.enterprise_id != current_user.id:
@@ -187,7 +191,8 @@ def update_status(order_id):
         OrderService.update_order_status(
             order_id=order_id,
             status=status,
-            actual_delivery_date=actual_delivery_date
+            actual_delivery_date=actual_delivery_date,
+            enterprise_id=current_user.id,
         )
         
         return jsonify({'success': True, 'message': '状态更新成功'})
@@ -200,14 +205,14 @@ def update_status(order_id):
 @login_required
 def delete(order_id):
     """删除订单"""
-    order = OrderService.get_order_by_id(order_id)
+    order = OrderService.get_order_by_id(order_id, enterprise_id=current_user.id)
     
     # 验证权限
     if order.enterprise_id != current_user.id:
         return jsonify({'success': False, 'message': '无权删除此订单'}), 403
     
     try:
-        OrderService.delete_order(order_id)
+        OrderService.delete_order(order_id, enterprise_id=current_user.id)
         return jsonify({'success': True, 'message': '订单删除成功'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500

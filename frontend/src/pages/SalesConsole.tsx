@@ -1768,7 +1768,7 @@ export default function SalesConsole() {
           {[
             { name: '某大型通讯企业', project: '5G 基站精密连接器采购', status: '意向报价中', amount: '¥ 458,000.00', date: '截止日期：明天', icon: Factory, color: 'text-blue-500', bg: 'bg-blue-50' },
             { name: '东莞泰科电子', project: '高频线束定制打样', status: '线下打样中', amount: '待定', date: '进度：样品已寄出', icon: Cpu, color: 'text-orange-500', bg: 'bg-orange-50' },
-            { name: '华南仪器厂', project: '年度传感模块框架协议', status: '待签电子合同', amount: '¥ 2,240,000.00', date: '生效期：2024Q3', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-50' },
+            { name: '华南仪器厂', project: '年度传感模块框架协议', status: '待确认订单', amount: '¥ 2,240,000.00', date: '生效期：2024Q3', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-50' },
           ].map((item, i) => (
             <div key={i} className="group flex items-center justify-between gap-3 p-4 hover:bg-surface-container-low rounded-2xl transition-all border border-transparent hover:border-neutral-100">
               <div className="flex items-center gap-4 min-w-0 flex-1 cursor-pointer">

@@ -1,11 +1,19 @@
-import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/src/context/AuthContext';
 import type { SessionRole } from '@/src/lib/rbac';
-import { redirectPathForUnauthorizedRole } from '@/src/lib/rbac';
+import { GUEST_HOME_PATH, redirectPathForUnauthorizedRole } from '@/src/lib/rbac';
 
 export function RequireRole({ allow }: { allow: SessionRole[] }) {
-  const { user, loading } = useAuth();
+  const { user, loading, requestLogin } = useAuth();
+  const location = useLocation();
+  const nextPath = `${location.pathname}${location.search}`;
+
+  useEffect(() => {
+    if (!loading && !user) {
+      requestLogin(nextPath);
+    }
+  }, [loading, user, requestLogin, nextPath]);
 
   if (loading) {
     return (
@@ -16,8 +24,7 @@ export function RequireRole({ allow }: { allow: SessionRole[] }) {
   }
 
   if (!user) {
-    // 与 RequireAuth 配合：未登录时不再渲染 null（否则侧栏/布局下主区域全白）
-    return <Navigate to="/" replace />;
+    return <Navigate to={GUEST_HOME_PATH} replace />;
   }
 
   if (!allow.includes(user.role as SessionRole)) {

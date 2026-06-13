@@ -432,7 +432,7 @@ def api_check_card_exchange(quote_id: int):
     })
 
 
-# ── 企业画像（DeepSeek） ───────────────────────────────────────────────────
+# ── 企业画像（AI） ─────────────────────────────────────────────────────────
 
 @intent_quote_bp.route("/enterprise-profile/<int:enterprise_id>", methods=["GET"])
 @role_required("enterprise")

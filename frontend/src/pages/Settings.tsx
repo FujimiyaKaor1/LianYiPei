@@ -10,6 +10,7 @@ import {
   Save,
   MessageCircle,
   Send,
+  Mail,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
@@ -30,6 +31,7 @@ export default function Settings() {
   /** 测试推送：ok=微信成功，warn=仅站内送达，error=请求失败 */
   const [wechatTestFeedback, setWechatTestFeedback] = useState<'ok' | 'warn' | 'error' | null>(null);
   const [testLoading, setTestLoading] = useState(false);
+  const [emailTestLoading, setEmailTestLoading] = useState(false);
   // 手动绑定 OpenID（Demo 模式）
   const [bindOpenid, setBindOpenid] = useState('ozMV629-Tobt2qzP_wO698vS-HBM');
   const [bindLoading, setBindLoading] = useState(false);
@@ -139,6 +141,22 @@ export default function Settings() {
       setWechatTestFeedback('error');
     } finally {
       setTestLoading(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    setEmailTestLoading(true);
+    setWechatMsg('');
+    setWechatTestFeedback(null);
+    try {
+      const res = await api.testEmailPush();
+      setWechatMsg(res.message || '测试邮件已发送，请查收');
+      setWechatTestFeedback('ok');
+    } catch (e) {
+      setWechatMsg(e instanceof ApiError ? e.message : '测试邮件发送失败，请检查 SMTP 配置');
+      setWechatTestFeedback('error');
+    } finally {
+      setEmailTestLoading(false);
     }
   };
 
@@ -386,7 +404,7 @@ export default function Settings() {
                   </p>
                 )}
 
-                <div className="flex gap-3 pt-2">
+                <div className="flex flex-wrap gap-3 pt-2">
                   <button onClick={() => void handleSaveWechat()} disabled={wechatSaving}
                     className="flex items-center gap-2 px-5 py-3 bg-brand-solid text-white rounded-xl text-sm font-bold hover:bg-brand-solid-hover transition-all disabled:opacity-50">
                     {wechatSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
@@ -396,6 +414,11 @@ export default function Settings() {
                     className="flex items-center gap-2 px-5 py-3 bg-white border border-neutral-200 rounded-xl text-sm font-bold hover:border-brand-solid transition-all disabled:opacity-50">
                     {testLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     发送测试推送
+                  </button>
+                  <button onClick={() => void handleTestEmail()} disabled={emailTestLoading}
+                    className="flex items-center gap-2 px-5 py-3 bg-white border border-neutral-200 rounded-xl text-sm font-bold hover:border-brand-solid transition-all disabled:opacity-50">
+                    {emailTestLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                    发送测试邮件
                   </button>
                 </div>
               </div>

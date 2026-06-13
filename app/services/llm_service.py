@@ -88,5 +88,24 @@ def sse_event_from_plain_text(text: str) -> str:
     return f"data: {json.dumps(text, ensure_ascii=False)}\n\n"
 
 
+def _friendly_llm_error(exc: BaseException) -> str:
+    raw = str(exc) or type(exc).__name__
+    lowered = raw.lower()
+    if (
+        "11434" in raw
+        or "ollama" in lowered
+        or "connection refused" in lowered
+        or "failed to establish" in lowered
+    ):
+        return "本地 Ollama 未启动或模型未加载。请先启动 Ollama 并确认 bizmind 模型可用，或切换 MiMo 云端模型。"
+    if "mimo_api_key" in lowered:
+        return "云端 MiMo 未配置 API Key，请检查 MIMO_API_KEY 环境变量。"
+    if "401" in raw or "unauthorized" in lowered:
+        return "云端 MiMo 鉴权失败，请检查 MIMO_API_KEY、MIMO_BASE_URL 与账号权限。"
+    if "timeout" in lowered or "timed out" in lowered:
+        return "模型响应超时，请稍后重试，或切换另一种模型。"
+    return f"模型连接异常：{raw}"
+
+
 def sse_event_from_error(exc: BaseException) -> str:
-    return f"data: {json.dumps({'error': str(exc)}, ensure_ascii=False)}\n\n"
+    return f"data: {json.dumps({'error': _friendly_llm_error(exc)}, ensure_ascii=False)}\n\n"

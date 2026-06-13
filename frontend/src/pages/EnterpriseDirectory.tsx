@@ -4,6 +4,8 @@ import { cn } from '@/src/lib/utils';
 import { DIRECTORY_INDUSTRIES, DIRECTORY_PROVINCES } from '@/src/lib/enterpriseDirectoryFilters';
 import { api, type EnterpriseDirectoryItem } from '@/src/services/api';
 
+const DIRECTORY_PAGE_SIZE = 120;
+
 function useDebounced<T>(value: T, ms: number): T {
   const [d, setD] = useState(value);
   useEffect(() => {
@@ -62,11 +64,19 @@ export default function EnterpriseDirectory() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const [rows, setRows] = useState<EnterpriseDirectoryItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (nextPage = 1, append = false) => {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
     try {
       const res = await api.fetchEnterpriseDirectory({
@@ -74,19 +84,29 @@ export default function EnterpriseDirectory() {
         industry: industry || undefined,
         q: debouncedQ.trim() || undefined,
         min_credit: minCredit === '' ? undefined : minCredit,
-        limit: 120,
+        page: nextPage,
+        per_page: DIRECTORY_PAGE_SIZE,
       });
-      setRows(res.enterprises || []);
+      setRows((prev) => (append ? [...prev, ...(res.enterprises || [])] : (res.enterprises || [])));
+      setTotal(res.total ?? res.count ?? 0);
+      setPage(res.page ?? nextPage);
+      setHasMore(Boolean(res.has_more));
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败');
-      setRows([]);
+      if (!append) {
+        setRows([]);
+        setTotal(0);
+        setPage(1);
+        setHasMore(false);
+      }
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [province, industry, debouncedQ, minCredit]);
 
   useEffect(() => {
-    void load();
+    void load(1, false);
   }, [load]);
 
   const clearAll = () => {
@@ -191,7 +211,12 @@ export default function EnterpriseDirectory() {
           <p className="text-sm font-medium text-neutral-500">
             {loading ? '加载中…' : (
               <>
-                发现 <span className="text-neutral-900 font-bold">{rows.length}</span> 家合作企业
+                发现 <span className="text-neutral-900 font-bold">{total}</span> 家合作企业
+                {total > rows.length ? (
+                  <span className="ml-2 text-xs text-neutral-400">
+                    已加载 {rows.length} 家
+                  </span>
+                ) : null}
               </>
             )}
           </p>
@@ -222,53 +247,67 @@ export default function EnterpriseDirectory() {
           )}
 
           {rows.length > 0 && (
-            <ul className="grid gap-6 sm:grid-cols-1 xl:grid-cols-2 pb-8 px-1">
-            {rows.map((ent) => (
-              <li
-                key={ent.id}
-                className="group relative rounded-3xl border border-transparent bg-white p-6 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:-translate-y-1 transition-all duration-300"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-neutral-50 text-neutral-400 group-hover:bg-brand-solid group-hover:text-white flex items-center justify-center shrink-0 transition-colors duration-300">
-                    <Building2 className="w-6 h-6" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-lg font-semibold text-neutral-800 truncate group-hover:text-neutral-900 transition-colors" title={ent.name}>
-                        {ent.name}
-                      </h3>
-                      <div className="shrink-0 bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full font-bold text-[10px] tracking-tight uppercase">
-                        信用 {Math.round(ent.credit_score)}
-                      </div>
+            <>
+              <ul className="grid gap-6 sm:grid-cols-1 xl:grid-cols-2 pb-8 px-1">
+              {rows.map((ent) => (
+                <li
+                  key={ent.id}
+                  className="group relative rounded-3xl border border-transparent bg-white p-6 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:-translate-y-1 transition-all duration-300"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-neutral-50 text-neutral-400 group-hover:bg-brand-solid group-hover:text-white flex items-center justify-center shrink-0 transition-colors duration-300">
+                      <Building2 className="w-6 h-6" />
                     </div>
-                    
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-neutral-400">
-                      <span className="inline-flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5" />
-                        <span>
-                          {[ent.province, ent.city].filter(Boolean).join(' ') || ent.address || '地区未填'}
-                        </span>
-                      </span>
-                      {ent.industry_code ? (
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-1 h-1 rounded-full bg-neutral-200" />
-                          <span className="font-medium">{ent.industry_code}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="text-lg font-semibold text-neutral-800 truncate group-hover:text-neutral-900 transition-colors" title={ent.name}>
+                          {ent.name}
+                        </h3>
+                        <div className="shrink-0 bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full font-bold text-[10px] tracking-tight uppercase">
+                          信用 {Math.round(ent.credit_score)}
                         </div>
-                      ) : null}
-                    </div>
+                      </div>
 
-                    {ent.business_scope ? (
-                      <p className="text-sm text-neutral-500 mt-4 line-clamp-2 leading-relaxed group-hover:text-neutral-600 transition-colors">
-                        {ent.business_scope}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-neutral-300 mt-4 italic">暂无经营范围描述</p>
-                    )}
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-neutral-400">
+                        <span className="inline-flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5" />
+                          <span>
+                            {[ent.province, ent.city].filter(Boolean).join(' ') || ent.address || '地区未填'}
+                          </span>
+                        </span>
+                        {ent.industry_code ? (
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-1 h-1 rounded-full bg-neutral-200" />
+                            <span className="font-medium">{ent.industry_code}</span>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {ent.business_scope ? (
+                        <p className="text-sm text-neutral-500 mt-4 line-clamp-2 leading-relaxed group-hover:text-neutral-600 transition-colors">
+                          {ent.business_scope}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-neutral-300 mt-4 italic">暂无经营范围描述</p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+                </li>
+              ))}
+            </ul>
+            {hasMore && (
+              <div className="pb-8 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => void load(page + 1, true)}
+                  disabled={loadingMore}
+                  className="px-8 py-3 rounded-xl bg-brand-solid text-white text-sm font-bold hover:bg-brand-solid-hover transition-all disabled:opacity-50"
+                >
+                  {loadingMore ? '加载中…' : `继续加载（${rows.length} / ${total}）`}
+                </button>
+              </div>
+            )}
+          </>
         )}
         </div>
       </section>

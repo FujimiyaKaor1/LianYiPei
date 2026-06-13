@@ -1,19 +1,21 @@
 import React, { useEffect } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/src/context/AuthContext';
+import { GUEST_HOME_PATH } from '@/src/lib/rbac';
 
 /**
  * 路由守卫：未登录时触发登录弹窗（Cookie 会话由 /api/session 判定）。
  */
 export function RequireAuth() {
-  const { user, loading, setIsLoginModalOpen } = useAuth();
+  const { user, loading, requestLogin } = useAuth();
   const location = useLocation();
+  const nextPath = `${location.pathname}${location.search}`;
 
   useEffect(() => {
     if (!loading && !user) {
-      setIsLoginModalOpen(true);
+      requestLogin(nextPath);
     }
-  }, [user, loading, setIsLoginModalOpen, location.pathname]);
+  }, [user, loading, requestLogin, nextPath]);
 
   if (loading) {
     return (
@@ -23,6 +25,9 @@ export function RequireAuth() {
     );
   }
 
-  // 无论是否登录都渲染 Outlet，未登录时通过 useEffect 打开全局弹窗覆盖在上面
+  if (!user) {
+    return <Navigate to={GUEST_HOME_PATH} replace />;
+  }
+
   return <Outlet />;
 }

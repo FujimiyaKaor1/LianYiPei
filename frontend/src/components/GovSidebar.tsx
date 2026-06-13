@@ -30,7 +30,7 @@ export function GovSidebar() {
 
   return (
     <aside className="sidebar-width sticky top-0 flex h-screen flex-shrink-0 flex-col border-r border-white/10 bg-sidebar-bg text-sidebar-text">
-      <div className="sidebar-logo-row flex h-[72px] flex-shrink-0 items-center gap-3 border-b border-sidebar-divider px-5">
+      <div className="sidebar-logo-row flex h-[84px] flex-shrink-0 items-center gap-3 border-b border-sidebar-divider px-5">
         <BrandLogo sidebar subtitle="产业监管驾驶舱" />
       </div>
 

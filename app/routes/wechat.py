@@ -1,7 +1,11 @@
 """
 微信推送相关路由
 """
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
+import hashlib
+import hmac
+from datetime import datetime
+
+from flask import Blueprint, current_app, make_response, render_template, request, jsonify, redirect, url_for, flash
 from flask_login import login_required, current_user
 from app.services.wechat_push_service import wechat_push_service
 from app.models import db, Enterprise
@@ -11,6 +15,33 @@ logger = logging.getLogger(__name__)
 
 # 使用 /api/wechat 前缀，与前端 Vite 代理 /api 一致，开发环境无需单独代理 /wechat
 bp = Blueprint('wechat', __name__, url_prefix='/api/wechat')
+
+
+def _wechat_callback_token() -> str:
+    return (current_app.config.get('WECHAT_CALLBACK_TOKEN') or '').strip()
+
+
+def _verify_wechat_signature() -> bool:
+    token = _wechat_callback_token()
+    if not token:
+        logger.warning('WECHAT_CALLBACK_TOKEN 未配置，跳过微信回调签名校验')
+        return True
+
+    signature = (request.args.get('signature') or '').strip()
+    timestamp = (request.args.get('timestamp') or '').strip()
+    nonce = (request.args.get('nonce') or '').strip()
+    if not signature or not timestamp or not nonce:
+        return False
+
+    raw = ''.join(sorted([token, timestamp, nonce]))
+    expected = hashlib.sha1(raw.encode('utf-8')).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
+def _xml_response(body: str, status: int = 200):
+    resp = make_response(body, status)
+    resp.headers['Content-Type'] = 'application/xml; charset=utf-8'
+    return resp
 
 
 @bp.route('/settings')
@@ -197,6 +228,66 @@ def test_push():
         }), 500
 
 
+@bp.route('/test-email', methods=['POST'])
+@login_required
+def test_email():
+    """发送测试邮件到当前登录企业在个人账户中保存的邮箱。"""
+    try:
+        from app.services.email_service import send_email
+
+        ent = Enterprise.query.get(current_user.id)
+        if not ent:
+            return jsonify({'success': False, 'message': '用户不存在'}), 404
+
+        extras = dict(ent.extras or {})
+        to_email = (extras.get('email') or '').strip()
+        if not to_email or '@' not in to_email:
+            return jsonify({
+                'success': False,
+                'message': '当前账户未绑定有效邮箱，请先在「个人账户」中填写邮箱',
+            }), 400
+
+        send_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        subject = '链易配 - 测试邮件'
+        text_body = (
+            '您好！\n\n'
+            '这是一封来自链易配平台的测试邮件。\n'
+            '如果您收到此邮件，说明邮件推送配置成功。\n\n'
+            f'发送时间：{send_time}\n'
+            '祝您使用愉快！\n\n'
+            '—— 链易配平台'
+        )
+        html_body = f'''
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:32px 24px;
+                    background:#f9fafb;border-radius:12px;border:1px solid #e5e7eb;">
+          <h2 style="color:#2563eb;margin-bottom:20px;">链易配 - 测试邮件</h2>
+          <p style="color:#374151;line-height:1.8;">您好！</p>
+          <p style="color:#374151;line-height:1.8;">这是一封来自<strong>链易配平台</strong>的测试邮件。</p>
+          <p style="color:#374151;line-height:1.8;">如果您收到此邮件，说明<strong>邮件推送配置成功</strong>。</p>
+          <div style="margin:24px 0;padding:16px;background:#eff6ff;border-radius:8px;border-left:4px solid #2563eb;">
+            <p style="color:#1d4ed8;font-size:13px;margin:0;">发送时间：{send_time}</p>
+          </div>
+          <p style="color:#9ca3af;font-size:12px;">—— 链易配平台</p>
+        </div>
+        '''
+
+        ok, err = send_email(to_email, subject, text_body, html_body)
+        if ok:
+            return jsonify({
+                'success': True,
+                'message': f'测试邮件已发送至 {to_email}，请查收',
+            })
+
+        return jsonify({
+            'success': False,
+            'message': f'发送失败：{err}',
+            'hint': '请检查 .env 中 SMTP_* 配置是否正确；QQ/163 邮箱需使用「授权码」而非登录密码',
+        }), 500
+    except Exception as e:
+        logger.error('Error testing email: %s', e, exc_info=True)
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 @bp.route('/callback/work-wechat', methods=['GET', 'POST'])
 def work_wechat_callback():
     """企业微信回调接口（用于验证和接收消息）"""
@@ -221,16 +312,37 @@ def work_wechat_callback():
 def service_account_callback():
     """微信服务号回调接口（用于验证和接收消息）"""
     if request.method == 'GET':
-        # 验证URL
-        signature = request.args.get('signature', '')
-        timestamp = request.args.get('timestamp', '')
-        nonce = request.args.get('nonce', '')
         echostr = request.args.get('echostr', '')
-        
-        # TODO: 实现签名验证逻辑
+
+        if not _verify_wechat_signature():
+            return 'invalid signature', 403
         return echostr
     
     elif request.method == 'POST':
-        # 接收微信服务号推送的消息
-        # TODO: 实现消息处理逻辑
-        return 'success'
+        if not _verify_wechat_signature():
+            logger.warning('微信服务号回调签名校验失败 remote=%s', request.remote_addr)
+            return 'invalid signature', 403
+
+        try:
+            from app.services.wechat_inbound_service import (
+                WeChatInboundError,
+                build_text_reply,
+                handle_wechat_message,
+                parse_wechat_xml,
+            )
+
+            incoming = parse_wechat_xml(request.get_data() or b'')
+            reply = handle_wechat_message(incoming)
+            return _xml_response(
+                build_text_reply(
+                    to_user=incoming.get('from_user', ''),
+                    from_user=incoming.get('to_user', ''),
+                    content=reply,
+                )
+            )
+        except WeChatInboundError as e:
+            logger.warning('微信服务号回调 XML 无效: %s', e)
+            return 'success'
+        except Exception as e:
+            logger.error('微信服务号入站处理失败: %s', e, exc_info=True)
+            return 'success'
