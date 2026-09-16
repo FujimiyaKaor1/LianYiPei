@@ -9,6 +9,9 @@ type PanelMessage = { id: string; role: 'user' | 'assistant'; content: string; i
 
 const SESSION_KEY = `${SESSION_STORAGE_PREFIX}chain-xiaoyi-session`;
 const POSITION_KEY = `${SESSION_STORAGE_PREFIX}chain-xiaoyi-position`;
+const ENTRY_POSITION_KEY = `${SESSION_STORAGE_PREFIX}chain-xiaoyi-entry-position`;
+
+type PanelPosition = { right: number; bottom: number };
 
 function readSession() {
   try {
@@ -19,11 +22,11 @@ function readSession() {
   }
 }
 
-function readPosition() {
+function readPosition(key: string): PanelPosition {
   try {
-    const raw = localStorage.getItem(POSITION_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return { right: 20, bottom: 20 };
-    const parsed = JSON.parse(raw) as { right?: number; bottom?: number };
+    const parsed = JSON.parse(raw) as Partial<PanelPosition>;
     return {
       right: typeof parsed.right === 'number' ? parsed.right : 20,
       bottom: typeof parsed.bottom === 'number' ? parsed.bottom : 20,
@@ -46,8 +49,11 @@ export function ChainXiaoYiPanel() {
   const [lastIntent, setLastIntent] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
-  const [position, setPosition] = useState(readPosition);
+  const [position, setPosition] = useState(() => readPosition(POSITION_KEY));
+  const [entryPosition, setEntryPosition] = useState(() => readPosition(ENTRY_POSITION_KEY));
   const dragRef = useRef<{ x: number; y: number; right: number; bottom: number } | null>(null);
+  const entryDragRef = useRef<{ x: number; y: number; right: number; bottom: number; moved: boolean } | null>(null);
+  const suppressEntryClick = useRef(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -128,8 +134,43 @@ export function ChainXiaoYiPanel() {
 
   const stopDrag = () => { dragRef.current = null; };
 
+  const startEntryDrag = (event: PointerEvent<HTMLButtonElement>) => {
+    suppressEntryClick.current = false;
+    entryDragRef.current = { x: event.clientX, y: event.clientY, right: entryPosition.right, bottom: entryPosition.bottom, moved: false };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveEntryDrag = (event: PointerEvent<HTMLButtonElement>) => {
+    if (!entryDragRef.current) return;
+    const deltaX = event.clientX - entryDragRef.current.x;
+    const deltaY = event.clientY - entryDragRef.current.y;
+    if (Math.abs(deltaX) > 4 || Math.abs(deltaY) > 4) {
+      entryDragRef.current.moved = true;
+      suppressEntryClick.current = true;
+    }
+    const nextPosition = {
+      right: Math.max(8, Math.min(Math.max(8, window.innerWidth - 120), entryDragRef.current.right - deltaX)),
+      bottom: Math.max(8, Math.min(Math.max(8, window.innerHeight - 80), entryDragRef.current.bottom - deltaY)),
+    };
+    setEntryPosition(nextPosition);
+    localStorage.setItem(ENTRY_POSITION_KEY, JSON.stringify(nextPosition));
+  };
+
+  const stopEntryDrag = (cancelled = false) => {
+    entryDragRef.current = null;
+    if (cancelled) suppressEntryClick.current = false;
+  };
+
+  const openFromEntry = () => {
+    if (suppressEntryClick.current) {
+      suppressEntryClick.current = false;
+      return;
+    }
+    setOpen(true);
+  };
+
   return <>
-    {!open && <button type="button" aria-label="打开链小易" onClick={() => setOpen(true)} className="fixed bottom-5 right-5 z-[80] flex items-center gap-2 rounded-full bg-public-brand px-4 py-3 text-sm font-bold text-white shadow-[0_12px_35px_rgba(36,107,219,.3)] transition hover:-translate-y-0.5"><Sparkles className="h-4 w-4" />链小易</button>}
+    {!open && <button type="button" aria-label="打开链小易" onClick={openFromEntry} onPointerDown={startEntryDrag} onPointerMove={moveEntryDrag} onPointerUp={() => stopEntryDrag()} onPointerCancel={() => stopEntryDrag(true)} style={{ right: entryPosition.right, bottom: entryPosition.bottom, touchAction: 'none' }} className="fixed z-[80] flex cursor-grab items-center gap-2 rounded-full bg-public-brand px-4 py-3 text-sm font-bold text-white shadow-[0_12px_35px_rgba(36,107,219,.3)] transition hover:-translate-y-0.5 active:cursor-grabbing"><Sparkles className="h-4 w-4" />链小易</button>}
     {open && <div ref={panelRef} onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={stopDrag} onPointerCancel={stopDrag} style={{ right: position.right, bottom: position.bottom }} className="fixed z-[80] flex h-[min(680px,calc(100vh-40px))] w-[min(390px,calc(100vw-24px))] flex-col overflow-hidden rounded-2xl border border-public-border bg-white shadow-[0_18px_60px_rgba(20,33,61,.22)]">
       <div className="flex cursor-move items-center gap-3 bg-public-brand px-4 py-3 text-white" title="拖动链小易窗口"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15"><Bot className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="text-sm font-black">链小易</p><p className="text-[10px] text-white/75">统一处理找厂、询价和业务协同 · 可拖动窗口</p></div><button data-no-drag type="button" onClick={() => setOpen(false)} aria-label="收起链小易" className="cursor-pointer rounded-lg p-1.5 hover:bg-white/15"><Minus className="h-4 w-4" /></button><button data-no-drag type="button" onClick={() => setOpen(false)} aria-label="关闭链小易" className="cursor-pointer rounded-lg p-1.5 hover:bg-white/15"><X className="h-4 w-4" /></button></div>
       <div className="border-b border-public-border bg-public-bg px-4 py-2 text-[11px] text-public-muted">{modelStatus?.message || '正在检查智能模型状态…'}</div>
