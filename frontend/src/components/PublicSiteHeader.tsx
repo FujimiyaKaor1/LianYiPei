@@ -19,7 +19,7 @@ export function PublicSiteHeader({ onLogin }: { onLogin?: () => void }) {
           <Link className="flex items-center gap-1 transition hover:text-public-brand" to="/aia"><Sparkles className="h-3.5 w-3.5" /> AI 找工厂</Link>
           <Link className="transition hover:text-public-brand" to="/agent-market">AI 智能体</Link>
           <EnterpriseNavMenu />
-          <a className="transition hover:text-public-brand" href="/#discover">产业带</a>
+          <Link className="transition hover:text-public-brand" to="/industry-news">行业资讯</Link>
           <a className="transition hover:text-public-brand" href="/#services">开放平台</a>
           <a className="transition hover:text-public-brand" href="/#services">服务</a>
         </nav>
