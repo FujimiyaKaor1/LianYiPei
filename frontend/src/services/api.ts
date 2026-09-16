@@ -271,6 +271,11 @@ export interface IndustryNewsItem {
   source_name: string; source_url: string; published_at?: string | null; fetched_at?: string | null;
   cover_image?: string | null; tags: string[]; is_external: boolean; is_demo: boolean;
   content_excerpt?: string;
+  industry_tags?: string[];
+  chain_stage?: string | null;
+  related_enterprises?: { id: number; name: string }[];
+  related_product_ids?: number[];
+  relevance_score?: number;
 }
 export interface IndustryNewsListResponse { items: IndustryNewsItem[]; total: number; page: number; per_page: number; pages: number; has_more: boolean; updated_at?: string | null; source: string; sync_status: string; }
 

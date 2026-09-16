@@ -1,8 +1,12 @@
 from datetime import datetime
 
 from app import db
-from app.models import IndustryNewsArticle, IndustryNewsSource
-from app.services.industry_news_service import parse_feed, validate_feed_url
+from app.models import Enterprise, IndustryNewsArticle, IndustryNewsSource
+from app.services.industry_news_service import (
+    build_news_record,
+    parse_feed,
+    validate_feed_url,
+)
 
 
 def test_public_news_hides_unpublished_and_paginates(client, _db):
@@ -40,3 +44,49 @@ def test_feed_parser_and_security(monkeypatch):
 
 def test_news_source_management_requires_admin(client, _db):
     assert client.get("/admin/api/news/sources").status_code == 302
+
+
+def test_newsapi_record_is_persistable_and_related_to_enterprise(_db):
+    enterprise = Enterprise(name="成都芯片制造有限公司", role="enterprise", tech_keywords="芯片,晶圆", business_scope="芯片制造")
+    db.session.add(enterprise)
+    db.session.commit()
+    record = build_news_record({
+        "title": "成都芯片制造有限公司扩建晶圆产线",
+        "description": "企业宣布新增芯片制造产能，完善供应链布局。",
+        "url": "https://example.com/news/chip-1",
+        "publishedAt": "2026-09-15T08:00:00Z",
+        "source": {"name": "行业媒体"},
+    })
+    assert record["relevance_score"] >= 70
+    assert enterprise.id in record["related_enterprise_ids"]
+    assert record["chain_stage"] in {"核心零部件", "制造加工", "上游原材料", "下游应用"}
+
+
+def test_irrelevant_news_is_not_publishable(_db):
+    record = build_news_record({
+        "title": "明星发布全新综艺节目",
+        "description": "娱乐新闻和节目资讯。",
+        "url": "https://example.com/news/entertainment",
+        "publishedAt": "2026-09-15T08:00:00Z",
+        "source": {"name": "娱乐媒体"},
+    })
+    assert record["relevance_score"] < 60
+    assert record["is_published"] is False
+
+
+def test_newsapi_list_persists_items_and_detail_uses_same_slug(client, _db, monkeypatch):
+    monkeypatch.setattr("app.routes.api.fetch_newsapi", lambda **kwargs: {"status": "ok", "totalResults": 1, "articles": [{
+        "title": "制造企业扩建芯片产线", "description": "企业新增制造产能并完善供应链。",
+        "url": "https://example.com/news/persisted", "publishedAt": "2026-09-15T08:00:00Z",
+        "source": {"name": "行业协会"},
+    }]})
+    response = client.get("/api/public/industry-news")
+    data = response.get_json()
+    assert response.status_code == 200
+    assert len(data["items"]) == 1
+    assert data["items"][0]["slug"]
+    detail = client.get(f"/api/public/industry-news/{data['items'][0]['slug']}")
+    assert detail.status_code == 200
+    article = detail.get_json()["article"]
+    assert article["title"] == "制造企业扩建芯片产线"
+    assert article["chain_stage"]

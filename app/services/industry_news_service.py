@@ -15,14 +15,97 @@ import xml.etree.ElementTree as ET
 import requests
 
 from app import db
-from app.models import IndustryNewsArticle, IndustryNewsSource, IndustryNewsSyncRun
+from app.models import Enterprise, IndustryNewsArticle, IndustryNewsSource, IndustryNewsSyncRun, Product
 
 MAX_FEED_BYTES = 2 * 1024 * 1024
 ALLOWED_CATEGORIES = ("政策法规", "产业趋势", "供应链", "技术创新", "企业动态", "出海与贸易")
+RELEVANCE_THRESHOLD = 60
+CHAIN_TERMS = {
+    "原材料": ("原材料", "材料", "钢材", "铝材", "化工", "矿产"),
+    "核心零部件": ("芯片", "晶圆", "零部件", "元器件", "电池", "传感器", "模组"),
+    "设备": ("设备", "机床", "工业机器人", "自动化", "生产线"),
+    "制造加工": ("制造", "工厂", "产线", "生产", "加工", "产能", "扩建"),
+    "物流仓储": ("物流", "仓储", "运输", "供应链"),
+    "下游应用": ("汽车", "新能源", "家电", "电子产品", "医疗器械"),
+    "出口贸易": ("出口", "外贸", "跨境", "关税", "贸易"),
+}
+MANUFACTURING_TERMS = ("制造", "工业", "工厂", "供应链", "产能", "生产", "加工", "设备", "芯片", "材料", "零部件", "汽车", "新能源", "出口", "产线")
+EXCLUDED_TERMS = ("明星", "综艺", "演唱会", "球赛", "电影", "电视剧", "游戏娱乐")
+AUTHORITATIVE_SOURCES = ("政府", "工信", "协会", "证券", "公告", "新华社", "人民日报", "财经")
+
+
+def _news_text(item: dict) -> str:
+    return _clean(f"{item.get('title') or ''} {item.get('description') or item.get('summary') or ''}", 4000)
+
+
+def build_news_record(item: dict) -> dict:
+    """Normalize a NewsAPI item and associate it with public enterprise data."""
+    title = _clean(str(item.get("title") or ""), 500)
+    summary = _clean(str(item.get("description") or item.get("summary") or ""), 2000)
+    url = urldefrag(str(item.get("url") or "").strip())[0]
+    text = f"{title} {summary}".lower()
+    matched_chain = [stage for stage, terms in CHAIN_TERMS.items() if any(term.lower() in text for term in terms)]
+    manufacturing_hits = sum(term.lower() in text for term in MANUFACTURING_TERMS)
+    score = min(100, (35 if matched_chain else 0) + min(20, manufacturing_hits * 5))
+    source_name = str((item.get("source") or {}).get("name") or "NewsAPI 来源")[:120]
+    if any(term in source_name for term in AUTHORITATIVE_SOURCES):
+        score += 10
+    if any(term in text for term in EXCLUDED_TERMS) and not matched_chain:
+        score = max(0, score - 50)
+    related_enterprise_ids = []
+    related_product_ids = []
+    for enterprise in Enterprise.query.filter(Enterprise.role == "enterprise").all():
+        enterprise_terms = [enterprise.name, enterprise.tech_keywords or "", enterprise.business_scope or ""]
+        if any(term and term.lower() in text for term in enterprise_terms):
+            related_enterprise_ids.append(enterprise.id)
+            products = Product.query.filter(Product.enterprise_id == enterprise.id).all()
+            related_product_ids.extend(product.id for product in products if product.name and product.name.lower() in text)
+    if related_enterprise_ids:
+        score = min(100, score + 30)
+    if matched_chain and any(term in text for term in ("企业", "公司", "集团", "工厂")):
+        score = min(100, score + 5)
+    digest = hashlib.sha256((url + "\n" + title + "\n" + summary).encode()).hexdigest()
+    return {
+        "title": title, "summary": summary, "source_url": url, "canonical_url": url,
+        "source_name": source_name, "published_at": _parse_date(str(item.get("publishedAt") or item.get("published") or "")),
+        "provider_article_id": str(item.get("url") or digest)[:255], "content_hash": digest,
+        "category": "企业动态" if related_enterprise_ids else ("出海与贸易" if "出口贸易" in matched_chain else "产业趋势"),
+        "content_excerpt": summary,
+        "cover_image_url": str(item.get("urlToImage") or "")[:1000] if str(item.get("urlToImage") or "").startswith("https://") else None,
+        "industry_tags": matched_chain + (["制造业"] if manufacturing_hits else []),
+        "chain_stage": matched_chain[0] if matched_chain else None,
+        "related_enterprise_ids": list(dict.fromkeys(related_enterprise_ids)),
+        "related_product_ids": list(dict.fromkeys(related_product_ids)),
+        "relevance_score": min(100, score), "relevance_status": "approved" if score >= RELEVANCE_THRESHOLD else "rejected",
+        "is_published": score >= RELEVANCE_THRESHOLD, "is_demo": False,
+    }
+
+
+def persist_newsapi_articles(items: list[dict]) -> list[IndustryNewsArticle]:
+    """Persist provider results before they are exposed, making detail URLs stable."""
+    saved = []
+    for item in items:
+        record = build_news_record(item)
+        if not record["source_url"] or not record["title"]:
+            continue
+        article = IndustryNewsArticle.query.filter(
+            (IndustryNewsArticle.canonical_url == record["canonical_url"]) |
+            (IndustryNewsArticle.content_hash == record["content_hash"])
+        ).first()
+        if article is None:
+            article = IndustryNewsArticle(slug=_slug(record["title"], record["content_hash"]), **record)
+            db.session.add(article)
+        else:
+            for key, value in record.items():
+                if hasattr(article, key) and key not in {"is_published"}:
+                    setattr(article, key, value)
+        saved.append(article)
+    db.session.commit()
+    return saved
 
 
 def fetch_newsapi(keyword: str = "制造业 OR manufacturing", page: int = 1, page_size: int = 12) -> dict:
-    """Read-only NewsAPI adapter; credentials stay server-side and results are not persisted."""
+    """Read-only NewsAPI adapter; credentials stay server-side."""
     api_key = (os.getenv("NEWSAPI_API_KEY") or "").strip()
     if not api_key:
         return {"articles": [], "totalResults": 0, "configured": False}

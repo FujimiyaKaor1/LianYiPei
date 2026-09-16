@@ -78,13 +78,24 @@ def sync_news_source(source_id):
     return jsonify({'success': run.status == 'success', 'status': run.status, 'created_count': run.created_count, 'duplicate_count': run.duplicate_count, 'error': run.error_message})
 
 
+@admin_panel_bp.route('/api/news/sync', methods=['POST'])
+@role_required('admin')
+def sync_all_news_sources():
+    runs = [sync_source(row) for row in IndustryNewsSource.query.filter_by(enabled=True).all()]
+    return jsonify({'success': all(run.status == 'success' for run in runs), 'runs': [{'source_id': run.source_id, 'status': run.status, 'created_count': run.created_count, 'error': run.error_message} for run in runs]})
+
+
 @admin_panel_bp.route('/api/news/articles', methods=['GET'])
 @role_required('admin')
 def admin_news_articles():
     page = max(request.args.get('page', 1, type=int), 1); per_page = min(max(request.args.get('per_page', 20, type=int), 1), 100)
-    query = IndustryNewsArticle.query.order_by(IndustryNewsArticle.created_at.desc(), IndustryNewsArticle.id.desc())
+    query = IndustryNewsArticle.query
+    relevance_status = (request.args.get('relevance_status') or '').strip()
+    if relevance_status in ('approved', 'pending', 'rejected'):
+        query = query.filter_by(relevance_status=relevance_status)
+    query = query.order_by(IndustryNewsArticle.created_at.desc(), IndustryNewsArticle.id.desc())
     total = query.count(); rows = query.offset((page - 1) * per_page).limit(per_page).all()
-    return jsonify({'items': [{'id': row.id, 'slug': row.slug, 'title': row.title, 'category': row.category, 'source_name': row.source_name, 'source_url': row.source_url, 'is_published': row.is_published, 'is_featured': row.is_featured, 'fetched_at': row.fetched_at.isoformat() if row.fetched_at else None} for row in rows], 'total': total, 'page': page, 'per_page': per_page})
+    return jsonify({'items': [{'id': row.id, 'slug': row.slug, 'title': row.title, 'category': row.category, 'source_name': row.source_name, 'source_url': row.source_url, 'industry_tags': row.industry_tags or [], 'chain_stage': row.chain_stage, 'related_enterprise_ids': row.related_enterprise_ids or [], 'relevance_score': row.relevance_score, 'relevance_status': row.relevance_status, 'is_published': row.is_published, 'is_featured': row.is_featured, 'fetched_at': row.fetched_at.isoformat() if row.fetched_at else None} for row in rows], 'total': total, 'page': page, 'per_page': per_page})
 
 
 @admin_panel_bp.route('/api/news/articles/<int:article_id>', methods=['PATCH'])
@@ -93,6 +104,9 @@ def update_news_article(article_id):
     row = IndustryNewsArticle.query.get_or_404(article_id); data = request.get_json(silent=True) or {}
     if 'category' in data and data['category'] in ALLOWED_CATEGORIES: row.category = data['category']
     if 'tags' in data and isinstance(data['tags'], list): row.tags = [str(x)[:40] for x in data['tags'][:20]]
+    if 'industry_tags' in data and isinstance(data['industry_tags'], list): row.industry_tags = [str(x)[:40] for x in data['industry_tags'][:20]]
+    if 'chain_stage' in data: row.chain_stage = str(data['chain_stage'])[:40]
+    if 'related_enterprise_ids' in data and isinstance(data['related_enterprise_ids'], list): row.related_enterprise_ids = [int(x) for x in data['related_enterprise_ids'][:20] if str(x).isdigit()]
     for field in ('is_published', 'is_featured'):
         if field in data: setattr(row, field, bool(data[field]))
     db.session.commit(); return jsonify({'success': True})

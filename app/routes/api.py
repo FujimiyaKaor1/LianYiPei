@@ -18,7 +18,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.authz import role_required, user_effective_role, user_session_role
 from app.models import Enterprise, Inquiry, Product, Quote, Transaction, IndustryNewsArticle, IndustryNewsSource
-from app.services.industry_news_service import ALLOWED_CATEGORIES, fetch_newsapi
+from app.services.industry_news_service import ALLOWED_CATEGORIES, fetch_newsapi, persist_newsapi_articles
 from app.services import map_service
 from app.services import finance_service
 from app.services.fulfillment_dashboard import get_active_fulfillments, get_dashboard_payload
@@ -47,6 +47,10 @@ def _news_item(article):
         "published_at": article.published_at.isoformat() if article.published_at else None,
         "fetched_at": article.fetched_at.isoformat() if article.fetched_at else None,
         "cover_image": article.cover_image_url, "tags": article.tags or [],
+        "industry_tags": article.industry_tags or article.tags or [], "chain_stage": article.chain_stage,
+        "related_enterprises": [{"id": enterprise_id, "name": ent.name} for enterprise_id in (article.related_enterprise_ids or [])
+                                if (ent := Enterprise.query.filter(Enterprise.id == enterprise_id, Enterprise.role == "enterprise").first())],
+        "related_product_ids": article.related_product_ids or [], "relevance_score": article.relevance_score,
         "is_external": True, "is_demo": bool(article.is_demo),
     }
 
@@ -68,20 +72,15 @@ def api_public_industry_news():
     if total == 0 and not category and not source:
         try:
             remote = fetch_newsapi(keyword=keyword or "制造业 OR manufacturing", page=page, page_size=per_page)
-            remote_items = []
-            for index, item in enumerate(remote.get("articles") or []):
-                url = str(item.get("url") or "")
-                title = str(item.get("title") or "").strip()
-                if not (url.startswith("https://") and title): continue
-                digest = __import__("hashlib").sha256(url.encode()).hexdigest()
-                remote_items.append({"id": f"newsapi-{digest[:10]}-{index}", "slug": digest[:18], "title": title,
-                    "summary": str(item.get("description") or "").strip(), "category": "产业趋势",
-                    "source_name": ((item.get("source") or {}).get("name") or "NewsAPI 来源"), "source_url": url,
-                    "published_at": item.get("publishedAt"), "fetched_at": datetime.utcnow().isoformat(),
-                    "cover_image": item.get("urlToImage") if str(item.get("urlToImage") or "").startswith("https://") else None,
-                    "tags": ["制造业"], "is_external": True, "is_demo": False})
-            return jsonify({"items": remote_items, "total": int(remote.get("totalResults") or len(remote_items)), "page": page, "per_page": per_page,
-                            "pages": (int(remote.get("totalResults") or 0) + per_page - 1) // per_page, "has_more": page * per_page < int(remote.get("totalResults") or 0),
+            remote_articles = persist_newsapi_articles(remote.get("articles") or [])
+            # Re-query the database: only persisted, screened rows are exposed and
+            # their slugs are guaranteed to work in the detail endpoint.
+            query = IndustryNewsArticle.query.filter(IndustryNewsArticle.is_published.is_(True))
+            if keyword: query = query.filter(or_(IndustryNewsArticle.title.contains(keyword), IndustryNewsArticle.summary.contains(keyword)))
+            total = query.count()
+            cached_items = query.order_by(IndustryNewsArticle.published_at.desc(), IndustryNewsArticle.id.desc()).offset((page - 1) * per_page).limit(per_page).all()
+            return jsonify({"items": [_news_item(article) for article in cached_items], "total": total, "page": page, "per_page": per_page,
+                            "pages": (total + per_page - 1) // per_page if total else 0, "has_more": page * per_page < total,
                             "updated_at": datetime.utcnow().isoformat(), "source": "newsapi", "sync_status": "live"})
         except Exception as exc:
             _logger.warning("NewsAPI fallback unavailable: %s", type(exc).__name__)
@@ -94,7 +93,9 @@ def api_public_industry_news():
 @api_bp.route("/public/industry-news/<string:slug>", methods=["GET"])
 def api_public_industry_news_detail(slug):
     article = IndustryNewsArticle.query.filter_by(slug=slug, is_published=True).first()
-    if not article: return jsonify({"error": "资讯不存在"}), 404
+    if not article:
+        hidden = IndustryNewsArticle.query.filter_by(slug=slug).first()
+        return jsonify({"error": "新闻已下架" if hidden else "新闻暂未同步或链接已失效", "status": "unpublished" if hidden else "not_found"}), 404
     related = IndustryNewsArticle.query.filter(IndustryNewsArticle.is_published.is_(True), IndustryNewsArticle.id != article.id, IndustryNewsArticle.category == article.category).order_by(IndustryNewsArticle.published_at.desc(), IndustryNewsArticle.id.desc()).limit(4).all()
     return jsonify({"article": _news_item(article) | {"content_excerpt": article.content_excerpt or ""}, "related": [_news_item(item) for item in related]})
 
