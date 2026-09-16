@@ -7,14 +7,12 @@ export function PublicSiteHeader({ onLogin }: { onLogin?: () => void }) {
   return (
     <header className="public-site-header sticky top-0 z-40 border-b border-public-border/80 bg-white/95 backdrop-blur-xl">
       <div className="mx-auto flex h-[70px] max-w-[1320px] items-center gap-6 px-4 md:px-8">
-        <Link to="/" aria-label="返回链易配首页">
-          <BrandLogo
-            subtitle="制造业 AI 找厂平台"
-            markClassName="h-9 w-9 rounded-lg"
-            titleClassName="text-[18px] font-black text-public-text"
-            subtitleClassName="text-[10px] text-public-muted"
-          />
-        </Link>
+        <BrandLogo
+          subtitle="制造业 AI 找厂平台"
+          markClassName="h-9 w-9 rounded-lg"
+          titleClassName="text-[18px] font-black text-public-text"
+          subtitleClassName="text-[10px] text-public-muted"
+        />
         <nav className="hidden flex-1 items-center gap-6 text-sm font-semibold text-public-muted lg:flex" aria-label="公共平台导航">
           <Link className="transition hover:text-public-brand" to="/">首页</Link>
           <Link className="transition hover:text-public-brand" to="/search">搜索工厂</Link>

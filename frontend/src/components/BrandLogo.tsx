@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/src/lib/utils';
+import { Link } from 'react-router-dom';
 
 interface BrandLogoProps {
   subtitle?: string;
@@ -23,7 +24,11 @@ export function BrandLogo({
   subtitleClassName,
 }: BrandLogoProps) {
   return (
-    <div className={cn('flex min-w-0 items-center gap-3', className)}>
+    <Link
+      to="/"
+      aria-label="返回链易配首页"
+      className={cn('flex min-w-0 items-center gap-3', className)}
+    >
       <div
         className={cn(
           'flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-sidebar-divider bg-white shadow-elevation-1',
@@ -49,6 +54,6 @@ export function BrandLogo({
           </span>
         </div>
       )}
-    </div>
+    </Link>
   );
 }
