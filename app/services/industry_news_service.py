@@ -4,18 +4,37 @@ from __future__ import annotations
 import hashlib
 import html
 import ipaddress
+import json
+import os
 import re
 import socket
 from datetime import datetime, timezone
-from urllib.parse import urldefrag, urlparse
+from urllib.parse import urlencode, urldefrag, urlparse
 from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
+import requests
 
 from app import db
 from app.models import IndustryNewsArticle, IndustryNewsSource, IndustryNewsSyncRun
 
 MAX_FEED_BYTES = 2 * 1024 * 1024
 ALLOWED_CATEGORIES = ("政策法规", "产业趋势", "供应链", "技术创新", "企业动态", "出海与贸易")
+
+
+def fetch_newsapi(keyword: str = "制造业 OR manufacturing", page: int = 1, page_size: int = 12) -> dict:
+    """Read-only NewsAPI adapter; credentials stay server-side and results are not persisted."""
+    api_key = (os.getenv("NEWSAPI_API_KEY") or "").strip()
+    if not api_key:
+        return {"articles": [], "totalResults": 0, "configured": False}
+    query = urlencode({"q": keyword[:100], "language": "zh", "sortBy": "publishedAt", "page": page, "pageSize": page_size, "apiKey": api_key})
+    response = requests.get("https://newsapi.org/v2/everything?" + query, headers={"User-Agent": "ChainYiPei-News/1.0"}, timeout=8)
+    response.raise_for_status()
+    if len(response.content) > MAX_FEED_BYTES:
+        raise ValueError("NewsAPI 响应超过大小限制")
+    data = response.json()
+    if data.get("status") != "ok":
+        raise ValueError("NewsAPI 暂时不可用")
+    return data | {"configured": True}
 
 
 def validate_feed_url(value: str) -> str:
