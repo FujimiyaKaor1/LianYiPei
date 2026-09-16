@@ -43,7 +43,7 @@ NEO4J_PASSWORD=你的密码
 
 ```bash
 # 在项目根目录执行
-python scripts/seed_all_data.py
+python scripts/seed/seed_all_data.py
 ```
 
 将自动完成：
@@ -57,20 +57,20 @@ python scripts/seed_all_data.py
 清空所有数据并重新导入：
 
 ```bash
-python scripts/fresh_init.py
+python scripts/seed/fresh_init.py
 ```
 
 ### 方式三：分步执行
 
 ```bash
 # 1. 仅创建 MySQL 表（无数据）
-python scripts/init_db.py
+python scripts/db/init_db.py
 
 # 2. 仅导入 Neo4j 图谱
-python scripts/import_graph.py
+python scripts/seed/import_graph.py
 
 # 3. 仅生成 MySQL 测试数据（旧脚本，数据较少）
-python scripts/generate_test_data.py
+python scripts/seed/generate_test_data.py
 ```
 
 ### 已有数据库的迁移
@@ -78,7 +78,7 @@ python scripts/generate_test_data.py
 若数据库已存在，需要添加新字段时：
 
 ```bash
-python scripts/migrate_db.py
+python scripts/migrate/migrate_db.py
 ```
 
 ---
@@ -109,7 +109,7 @@ python scripts/migrate_db.py
 
 | 账号 | 密码 | 说明 |
 |-----|------|------|
-| admin | admin123 | 管理员（政府大屏、预警设置） |
+| admin | admin | 管理员（政府大屏、预警设置） |
 | 任意企业名 | 123456 | 如：成都精密机械制造有限公司 |
 
 ---
@@ -129,7 +129,7 @@ python scripts/migrate_db.py
 然后执行：
 
 ```bash
-python scripts/import_graph.py
+python scripts/seed/import_graph.py
 ```
 
 ### 2. 修改进口依赖度（MySQL）
@@ -145,7 +145,7 @@ VALUES ('某产品', 0.75, '日本,德国', '8486', '海关总署');
 
 ### 3. 批量导入企业
 
-可参考 `scripts/seed_all_data.py` 中的 `ENTERPRISES` 结构，按需扩展后重新运行种子脚本（或在清空后使用 `fresh_init.py`）。
+可参考 `scripts/seed/seed_all_data.py` 中的 `ENTERPRISES` 结构，按需扩展后重新运行种子脚本（或在清空后使用 `scripts/seed/fresh_init.py`）。
 
 ---
 
@@ -158,7 +158,7 @@ A: 确认 Neo4j Desktop 已启动，数据库处于 Running 状态，端口 7687
 A: 检查 `.env` 中的 `DATABASE_URL`，用户名、密码、数据库名是否正确。
 
 **Q: 如何只更新 Neo4j，不碰 MySQL？**  
-A: 执行 `python scripts/import_graph.py`。
+A: 执行 `python scripts/seed/import_graph.py`。
 
 **Q: 已有数据，不想被清空？**  
-A: `seed_all_data.py` 在检测到已有企业数据时会跳过企业/产品/供需种子，只创建缺失的管理员。如需完全避免覆盖，不要运行 `fresh_init.py`。
+A: `scripts/seed/seed_all_data.py` 在检测到已有企业数据时会跳过企业/产品/供需种子，只创建缺失的管理员。如需完全避免覆盖，不要运行 `scripts/seed/fresh_init.py`。

@@ -43,8 +43,8 @@ if __name__ == '__main__' and os.getenv("RUN_LEGACY_SCHEDULER", "").strip().lowe
 if __name__ == '__main__':
     import sys, socket
 
-    def _find_port(preferred=5000, fallback=5050):
-        """自适应端口选择：macOS 上 5000 常被 AirPlay Receiver 占用。"""
+    def _find_port(preferred=5050, fallback=5000):
+        """前端开发代理固定指向 5050；环境变量可显式覆盖。"""
         for port in (preferred, fallback):
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -55,7 +55,8 @@ if __name__ == '__main__':
                 continue
         return 5100  # 最后兜底端口
 
-    PORT = _find_port()
+    configured_port = int(os.getenv("APP_PORT", "5050"))
+    PORT = _find_port(preferred=configured_port, fallback=5000)
     PLATFORM = 'macOS' if sys.platform == 'darwin' else 'Windows'
     print(f'[链易配] 启动于 http://localhost:{PORT} (平台: {PLATFORM})')
     # disable=True：避免 Windows 上 stat reloader 触发 OSError 10038

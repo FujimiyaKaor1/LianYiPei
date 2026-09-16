@@ -1,0 +1,2 @@
+# Local diagram generation environment for the architecture deliverables.
+Pillow>=10.0

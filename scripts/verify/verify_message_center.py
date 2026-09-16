@@ -20,7 +20,7 @@ def test_message_center():
         # 获取测试企业
         enterprise = Enterprise.query.filter_by(role='enterprise').first()
         if not enterprise:
-            print("❌ 未找到测试企业，请先运行 seed_data.py")
+            print("❌ 未找到测试企业，请先运行 scripts/seed/seed_all_data.py")
             return False
         
         print(f"\n✓ 使用测试企业: {enterprise.name} (ID: {enterprise.id})")

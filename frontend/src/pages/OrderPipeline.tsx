@@ -65,6 +65,7 @@ const FALLBACK_MOCK_ORDERS: OrderItem[] = [
 ];
 
 const TOAST_MESSAGE = '订单状态已更新，产能日历已同步。';
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === 'true';
 
 function getInitials(name: string): string {
   if (!name) return '??';
@@ -174,33 +175,44 @@ export default function OrderPipeline() {
       ]);
       const list = ordersRes.orders || [];
       if (list.length === 0) {
-        setUsingClientMock(true);
-        setFallbackMode(true);
-        setOrders(FALLBACK_MOCK_ORDERS);
-        setStats({
-          total: FALLBACK_MOCK_ORDERS.length,
-          pending: FALLBACK_MOCK_ORDERS.filter((o) => o.status === 'pending').length,
-          in_progress: FALLBACK_MOCK_ORDERS.filter((o) => o.status === 'in_progress').length,
-          completed: FALLBACK_MOCK_ORDERS.filter((o) => o.status === 'completed').length,
-          cancelled: 0,
-        });
+        if (DEMO_MODE) {
+          setUsingClientMock(true);
+          setFallbackMode(true);
+          setOrders(FALLBACK_MOCK_ORDERS);
+          setStats({
+            total: FALLBACK_MOCK_ORDERS.length,
+            pending: FALLBACK_MOCK_ORDERS.filter((o) => o.status === 'pending').length,
+            in_progress: FALLBACK_MOCK_ORDERS.filter((o) => o.status === 'in_progress').length,
+            completed: FALLBACK_MOCK_ORDERS.filter((o) => o.status === 'completed').length,
+            cancelled: 0,
+          });
+        } else {
+          setOrders([]);
+          setStats({ total: 0, pending: 0, in_progress: 0, completed: 0, cancelled: 0 });
+        }
       } else {
         setOrders(list);
         setStats(statsRes.statistics || null);
       }
     } catch (error) {
       console.error('OrderPipeline loadData failed:', error);
-      setErrorText('');
-      setFallbackMode(true);
-      setUsingClientMock(true);
-      setOrders(FALLBACK_MOCK_ORDERS);
-      setStats({
-        total: FALLBACK_MOCK_ORDERS.length,
-        pending: FALLBACK_MOCK_ORDERS.filter((o) => o.status === 'pending').length,
-        in_progress: FALLBACK_MOCK_ORDERS.filter((o) => o.status === 'in_progress').length,
-        completed: FALLBACK_MOCK_ORDERS.filter((o) => o.status === 'completed').length,
-        cancelled: FALLBACK_MOCK_ORDERS.filter((o) => o.status === 'cancelled').length,
-      });
+      if (DEMO_MODE) {
+        setErrorText('');
+        setFallbackMode(true);
+        setUsingClientMock(true);
+        setOrders(FALLBACK_MOCK_ORDERS);
+        setStats({
+          total: FALLBACK_MOCK_ORDERS.length,
+          pending: FALLBACK_MOCK_ORDERS.filter((o) => o.status === 'pending').length,
+          in_progress: FALLBACK_MOCK_ORDERS.filter((o) => o.status === 'in_progress').length,
+          completed: FALLBACK_MOCK_ORDERS.filter((o) => o.status === 'completed').length,
+          cancelled: FALLBACK_MOCK_ORDERS.filter((o) => o.status === 'cancelled').length,
+        });
+      } else {
+        setErrorText(error instanceof Error ? error.message : NETWORK_ERROR_MESSAGE);
+        setOrders([]);
+        setStats({ total: 0, pending: 0, in_progress: 0, completed: 0, cancelled: 0 });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -419,6 +431,12 @@ export default function OrderPipeline() {
           >
             重试连接
           </button>
+        </div>
+      ) : null}
+
+      {!isLoading && !errorText && orders.length === 0 ? (
+        <div className="mx-6 mb-3 rounded-md border border-dashed border-border bg-surface-subtle px-4 py-5 text-center text-xs font-semibold text-ink-muted md:mx-8">
+          当前暂无真实订单。开启演示模式（`VITE_DEMO_MODE=true`）后才会加载演示订单。
         </div>
       ) : null}
 

@@ -1,7 +1,6 @@
 import React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import { AISidebar } from './AISidebar';
 import { TopBar } from './TopBar';
 
 export function Layout() {
@@ -11,7 +10,7 @@ export function Layout() {
     switch (path) {
       case '/': return '企业看板';
       case '/dashboard': return '企业看板';
-      case '/enterprise-directory': return '企业名录筛选';
+      case '/workspace/enterprise-directory': return '企业名录筛选';
       case '/matching': return '智能供需匹配';
       case '/analytics':
       case '/sales-console':
@@ -37,7 +36,6 @@ export function Layout() {
           <Outlet />
         </div>
       </main>
-      <AISidebar />
     </div>
   );
 }

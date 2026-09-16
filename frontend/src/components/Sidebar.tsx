@@ -32,7 +32,7 @@ const navGroups = [
   {
     label: '供需协同',
     items: [
-      { icon: SlidersHorizontal, label: '企业名录筛选', path: '/enterprise-directory' },
+      { icon: SlidersHorizontal, label: '企业名录筛选', path: '/workspace/enterprise-directory' },
       { icon: Network, label: '供需匹配', path: '/matching' },
       { icon: Star, label: '收藏客商', path: '/favorites' },
       { icon: Users, label: '集采拼单', path: '/group-purchase' },

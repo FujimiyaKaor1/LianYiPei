@@ -1837,7 +1837,7 @@ export default function SalesConsole() {
             {[
               { icon: TrendingUp, label: '优先抢单', path: '/matching' },
               { icon: Wallet, label: '账期保理', path: '/assets' },
-              { icon: Award, label: '优质商机', path: '/enterprise-directory' },
+              { icon: Award, label: '优质商机', path: '/workspace/enterprise-directory' },
               { icon: Zap, label: 'AI 营销', path: '/sales-console' },
             ].map((item, i) => (
               <button

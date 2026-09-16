@@ -188,13 +188,20 @@ EXTERNAL_INTERFACES = build_external_interfaces()
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-12345'
+    PUBLIC_DATA_MODE = (os.environ.get('PUBLIC_DATA_MODE') or 'demo').strip().lower()
 
     # 本地联调：顶层 /api/… 可通过 request_loader 自动登录，生产默认关闭。
     DISABLE_API_AUTH = _env_bool("DISABLE_API_AUTH", False)
     DEV_API_LOGIN_ENTERPRISE_ID = int(os.environ.get("DEV_API_LOGIN_ENTERPRISE_ID") or 123)
 
     # 生产部署时建议仅在一个独立进程启用调度器，避免 Gunicorn 多 worker 重复跑任务。
-    SCHEDULER_ENABLED = _env_bool("SCHEDULER_ENABLED", True)
+    # LIANYIPEI_SCHEDULER_ENABLED 是进程级覆盖项，供 Supervisor 将 Web 与调度器拆开运行。
+    # 之所以单独提供覆盖项，是因为本项目会以 override=True 读取根目录 .env，普通
+    # Supervisor environment 中的 SCHEDULER_ENABLED 会被 .env 覆盖。
+    SCHEDULER_ENABLED = _env_bool(
+        "LIANYIPEI_SCHEDULER_ENABLED",
+        _env_bool("SCHEDULER_ENABLED", True),
+    )
     SCHEDULER_LOCK_FILE = os.environ.get("SCHEDULER_LOCK_FILE") or "/tmp/lianyipei-scheduler.lock"
 
     # 为扩展注入的 /hybridaction/* JSONP 探测提供空响应；与业务无关，可减少本地 404

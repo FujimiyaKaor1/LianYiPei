@@ -130,3 +130,23 @@ Use semantic tokens, not raw brand colors in components.
 - Do not introduce remote fonts or third-party tracking scripts.
 - Do not expose real credentials or API keys in frontend bundles.
 - Every major visual change must pass `npm run lint` and be checked in a browser screenshot.
+
+## Public acquisition surface
+
+公共页面（首页、搜索、AI 找厂、公开工厂详情和 Agent 市场）使用独立的浅蓝信息架构，服务于“找厂—核验—联系”的转化路径；企业工作台、政府大屏和运营后台继续使用各自的数据密集布局。
+
+```css
+--public-bg: #F3F9FF;
+--public-surface: #FFFFFF;
+--public-brand: #246BDB;
+--public-brand-soft: #E7F1FF;
+--public-text: #14213D;
+--public-muted: #6B7A90;
+--public-border: #DBE9F7;
+```
+
+- 首页首屏以居中搜索框为第一视觉焦点，文案使用链易配自己的品牌表达，不复制其他平台名称、规模和商业口号。
+- 公共页面卡片使用 8—12px 圆角、浅边界和轻阴影；减少深色大卡片、紫色渐变和装饰性内容。
+- 统计、产业带、工厂结果必须同时展示数据来源、更新时间和“演示数据”状态；没有真实数据时不包装为全国规模。
+- 联系、收藏、导出、批量询价等动作在匿名状态下进入登录流程；公开接口只返回脱敏企业摘要。
+- 移动端优先保证搜索框、筛选器、工厂详情和联系按钮可操作，桌面端再增加产业带和服务分栏。

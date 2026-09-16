@@ -147,6 +147,144 @@ export interface EnterpriseDirectoryResponse {
   enterprises: EnterpriseDirectoryItem[];
 }
 
+export type PublicResourceKind = 'enterprise' | 'product' | 'supply' | 'demand';
+
+export interface PublicResourceItem {
+  kind: PublicResourceKind;
+  id: number;
+  title: string;
+  subtitle: string;
+  tags: string[];
+  verification_status?: string | null;
+  source?: string | null;
+  updated_at?: string | null;
+  is_demo?: boolean;
+  public_signals: {
+    credit_level?: string;
+    data_updated_at?: string | null;
+    enterprise_id?: number | null;
+    status?: string;
+    created_at?: string | null;
+    verification_status?: string;
+    source?: string;
+    is_demo?: boolean;
+    is_export?: boolean;
+    has_decision_maker?: boolean;
+    is_little_giant?: boolean;
+    is_green_factory?: boolean;
+    registered_capital?: number;
+  };
+  requires_login_for_action: boolean;
+}
+
+export interface PublicHomeResponse {
+  stats: {
+    enterprise_count: number;
+    product_count: number;
+    active_supply_count: number;
+    active_demand_count: number;
+    completed_transaction_count: number;
+    graph_node_count: number;
+    verified_count: number;
+  };
+  featured_enterprises: PublicResourceItem[];
+  featured_products: PublicResourceItem[];
+  latest_inquiries: PublicResourceItem[];
+  industries: { key: string; label: string }[];
+  regions: { key: string; label: string; count: number }[];
+  industrial_belts: { key: string; label: string; count: number }[];
+  public_services: { key: string; title: string; summary: string }[];
+  data_freshness: { mode: string; is_demo: boolean; label: string; updated_at: string };
+  data_status: { mode: string; message: string };
+}
+
+export interface PublicSearchResponse {
+  query: string;
+  type: 'all' | PublicResourceKind;
+  province: string;
+  city?: string;
+  industry: string;
+  sort?: string;
+  filters?: Record<string, string | number | boolean | null>;
+  page: number;
+  per_page: number;
+  total: number;
+  pages: number;
+  has_more: boolean;
+  results: PublicResourceItem[];
+}
+
+export interface PublicEnterpriseDetail {
+  enterprise: {
+    id: number;
+    name: string;
+    region: string;
+    business_scope: string;
+    industry_code: string;
+    business_status: string;
+    registered_capital: number;
+    credit_level: string;
+    capacity_summary: string;
+    tags: string[];
+    public_signals: PublicResourceItem['public_signals'];
+    data_updated_at?: string | null;
+  };
+  products: PublicResourceItem[];
+  actions: { requires_login: boolean; available: string[] };
+}
+
+export interface PublicAgentMarketResponse {
+  groups: {
+    title: string;
+    summary: string;
+    demo: boolean;
+    agents: string[];
+  }[];
+  layers: { key: string; title: string; description: string }[];
+}
+
+export interface PublicAiFindResponse {
+  query: string;
+  product: string;
+  parsed_intent: Record<string, unknown>;
+  results: (PublicResourceItem & { score: number; reason: string })[];
+  has_more: boolean;
+}
+
+export interface ChainXiaoYiModelStatus {
+  local_enabled: boolean;
+  cloud_enabled: boolean;
+  local_model: string;
+  cloud_provider: string;
+  cloud_model: string;
+  active_provider: 'rules' | 'local' | 'deepseek' | string;
+  is_configured: boolean;
+  message: string;
+}
+
+export interface ChainXiaoYiSession {
+  id: number;
+  token?: string | null;
+  title: string;
+  surface: string;
+  status: string;
+}
+
+export interface ChainXiaoYiTask {
+  id: number;
+  type: string;
+  status: string;
+  requires_approval: boolean;
+}
+
+export interface ChainXiaoYiMessageResponse {
+  success: boolean;
+  reply: string;
+  intent: Record<string, unknown>;
+  model_status: ChainXiaoYiModelStatus;
+  task: ChainXiaoYiTask;
+}
+
 export interface SalesMessageItem {
   id: number;
   type: string;
@@ -285,6 +423,7 @@ export interface GroupPurchasesResponse {
 
 export interface QuoteListItem {
   id: number;
+  inquiry_id: number;
   product_name: string;
   supplier_name: string;
   price: number;
@@ -627,6 +766,7 @@ function messageFromErrorBody(payload: unknown): string | null {
 export type RequestOptions = {
   /** 毫秒；<=0 表示不设客户端超时（不推荐用于一般接口） */
   timeoutMs?: number;
+  headers?: HeadersInit;
 };
 
 async function request<T>(
@@ -648,6 +788,7 @@ async function request<T>(
       signal: timeoutMs > 0 ? controller.signal : init?.signal,
       headers: {
         'Content-Type': 'application/json',
+        ...(options?.headers || {}),
         ...(init?.headers || {}),
       },
     });
@@ -691,6 +832,45 @@ async function request<T>(
 }
 
 export const api = {
+  createChainXiaoYiSession(surface = 'public') {
+    return request<{ success: boolean; session: ChainXiaoYiSession; model_status: ChainXiaoYiModelStatus }>(
+      '/api/chain-xiaoyi/sessions',
+      { method: 'POST', body: JSON.stringify({ surface }) },
+    );
+  },
+
+  sendChainXiaoYiMessage(sessionId: number, content: string, token?: string) {
+    return request<ChainXiaoYiMessageResponse>(
+      `/api/chain-xiaoyi/sessions/${sessionId}/messages`,
+      { method: 'POST', body: JSON.stringify({ content }) },
+      { timeoutMs: 60_000, headers: token ? { 'X-Chain-Xiaoyi-Token': token } : undefined },
+    );
+  },
+
+  createChainXiaoYiDemandDraft(sessionId: number, intent: Record<string, unknown>, token?: string) {
+    return request<{ success: boolean; inquiry: { id: number; status: string; product_name: string; quantity?: number; unit?: string } }>(
+      `/api/chain-xiaoyi/sessions/${sessionId}/demand-draft`,
+      { method: 'POST', body: JSON.stringify({ intent }) },
+      { headers: token ? { 'X-Chain-Xiaoyi-Token': token } : undefined },
+    );
+  },
+
+  fetchChainXiaoYiModelStatus() {
+    return request<{ success: boolean } & ChainXiaoYiModelStatus>('/api/chain-xiaoyi/model-status');
+  },
+
+  async previewChainXiaoYiFile(sessionId: number, file: File, token?: string) {
+    const form = new FormData();
+    form.set('file', file);
+    const response = await fetch(`/api/chain-xiaoyi/sessions/${sessionId}/files`, {
+      method: 'POST', credentials: 'include', body: form,
+      headers: token ? { 'X-Chain-Xiaoyi-Token': token } : undefined,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new ApiError(messageFromErrorBody(payload) || NETWORK_ERROR_MESSAGE);
+    return payload as { success: boolean; file: { id: number; filename: string; status: string; detected_kind: string; preview: Record<string, unknown>; errors: string[] } };
+  },
+
   fetchCreditScore(enterpriseId: number | string) {
     return request<CreditScoreData>(`/api/credit/score/${enterpriseId}`);
   },
@@ -769,6 +949,61 @@ export const api = {
     const suffix = query.toString();
     const url = suffix ? `/api/enterprises/directory?${suffix}` : '/api/enterprises/directory';
     return request<EnterpriseDirectoryResponse>(url);
+  },
+
+  fetchPublicHome() {
+    return request<PublicHomeResponse>('/api/public/home');
+  },
+
+  searchPublicResources(params?: {
+    q?: string;
+    type?: 'all' | PublicResourceKind;
+    province?: string;
+    city?: string;
+    industry?: string;
+    sort?: string;
+    is_export?: boolean;
+    has_decision_maker?: boolean;
+    is_little_giant?: boolean;
+    is_green_factory?: boolean;
+    company_status?: string;
+    min_registered_capital?: number;
+    page?: number;
+    per_page?: number;
+  }) {
+    const query = new URLSearchParams();
+    if (params?.q) query.set('q', params.q);
+    if (params?.type) query.set('type', params.type);
+    if (params?.province) query.set('province', params.province);
+    if (params?.city) query.set('city', params.city);
+    if (params?.industry) query.set('industry', params.industry);
+    if (params?.sort) query.set('sort', params.sort);
+    if (params?.is_export) query.set('is_export', '1');
+    if (params?.has_decision_maker) query.set('has_decision_maker', '1');
+    if (params?.is_little_giant) query.set('is_little_giant', '1');
+    if (params?.is_green_factory) query.set('is_green_factory', '1');
+    if (params?.company_status) query.set('company_status', params.company_status);
+    if (params?.min_registered_capital !== undefined) query.set('min_registered_capital', String(params.min_registered_capital));
+    if (params?.page !== undefined) query.set('page', String(params.page));
+    if (params?.per_page !== undefined) query.set('per_page', String(params.per_page));
+    const suffix = query.toString();
+    return request<PublicSearchResponse>(suffix ? `/api/public/search?${suffix}` : '/api/public/search');
+  },
+
+  fetchPublicEnterprise(enterpriseId: number) {
+    return request<PublicEnterpriseDetail>(`/api/public/enterprises/${enterpriseId}`);
+  },
+
+  fetchPublicAgentMarket() {
+    return request<PublicAgentMarketResponse>('/api/public/agent-market');
+  },
+
+  publicAiFind(query: string, payload?: { quantity?: number; industry_code?: string }) {
+    return request<PublicAiFindResponse>('/api/public/ai-find', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, ...payload }),
+    });
   },
 
   fetchSalesMessages(params?: {

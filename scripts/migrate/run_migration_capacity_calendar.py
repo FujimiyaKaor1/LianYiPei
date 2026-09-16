@@ -1,5 +1,4 @@
-cd d:\大学\创赛\链易配\frontend
-npm run dev"""
+"""
 数据库迁移脚本：添加产能日历公开范围字段
 """
 from app import create_app, db

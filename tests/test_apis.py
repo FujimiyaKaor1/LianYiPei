@@ -4,17 +4,12 @@ API 测试脚本
 
 测试新的API接口是否正常工作。
 """
-import sys
-import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
-
 from app import create_app, db
 from app.models import Enterprise
 
 
-def test_apis():
-    app = create_app()
+def test_apis(app, _db):
+    """使用 pytest 测试应用，避免创建默认应用污染全局登录管理器。"""
     with app.app_context():
         print("[测试] 检查数据库连接...")
         
@@ -71,4 +66,4 @@ def test_apis():
 
 
 if __name__ == "__main__":
-    test_apis()
+    test_apis(create_app(), None)

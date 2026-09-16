@@ -477,6 +477,7 @@ def list_quotes():
         supplier = Enterprise.query.get(qt.supplier_id)
         result.append({
             'id': qt.id,
+            'inquiry_id': qt.inquiry_id,
             'product_name': qt.product_name,
             'supplier_name': supplier.name if supplier else '未知',
             'price': qt.price,

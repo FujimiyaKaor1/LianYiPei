@@ -23,13 +23,13 @@
 | `IntentQuote` | 意向报价记录 | ✅ 已添加 |
 | `BusinessCard` | 名片交换记录 | ✅ 已添加 |
 
-### 2.2 服务层（`app/services/`）
+### 2.2 服务层（主实现位于 `app/applications/`）
 
 | 文件 | 说明 |
 |:---|:---|
-| `favorite_service.py` | 收藏服务：添加/移除/列表/批量询价 |
-| `intent_quote_service.py` | 意向报价服务：创建/发送/确认/AI建议 |
-| `deepseek_profile_service.py` | DeepSeek企业画像服务：生成公开画像 |
+| `app/services/favorite_service.py` | 收藏服务：添加/移除/列表/批量询价 |
+| `app/applications/fulfillment/services/intent_quote_service.py` | 意向报价服务：创建/发送/确认/AI建议 |
+| `app/applications/enterprise/services/deepseek_service.py` | DeepSeek企业画像服务：生成公开画像 |
 
 ### 2.3 API路由（`app/routes/`）
 
@@ -42,7 +42,7 @@
 
 | 文件 | 说明 |
 |:---|:---|
-| `scripts/migrate_new_tables.py` | 数据库迁移脚本 |
+| `migrations/versions/` | 数据库迁移脚本 |
 
 ---
 

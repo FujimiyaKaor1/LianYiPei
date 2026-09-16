@@ -33,18 +33,18 @@ def main():
     print("=" * 55)
 
     # 1. 创建数据库
-    if not run("python scripts/create_db.py", "创建 MySQL 数据库"):
+    if not run("python scripts/db/create_db.py", "创建 MySQL 数据库"):
         print("\n请检查 MySQL 是否启动，.env 中 DATABASE_URL 是否正确")
         return
 
     # 2. 初始化数据
-    if not run("python scripts/seed_all_data.py", "初始化数据"):
+    if not run("python scripts/seed/seed_all_data.py", "初始化数据"):
         print("\n数据初始化失败，请检查 Neo4j 是否启动")
         print("（Neo4j 失败时可忽略，MySQL 数据仍会导入）")
 
     print("\n" + "=" * 55)
     print("  启动应用: python run.py")
-    print("  访问: http://localhost:5000")
+    print("  访问: 前端 http://localhost:3000（后端 http://localhost:5050）")
     print("  政府账号: admin / admin  |  企业账号: test_ent / 123456")
     print("=" * 55)
 
@@ -81,7 +81,7 @@ def main():
         )
 
     # 3.2 启动主应用（默认 5000）
-    main_port = int(os.environ.get("APP_PORT", "5000"))
+    main_port = int(os.environ.get("APP_PORT", "5050"))
     main_host = os.environ.get("APP_HOST", "127.0.0.1")
 
     print(f"\n启动主应用：python run.py （{main_host}:{main_port}）")
@@ -97,7 +97,7 @@ def main():
     if not _port_open(main_host, main_port):
         print("\n主应用端口未能在 60 秒内就绪，请查看 run.py 控制台/终端输出定位启动错误。")
     else:
-        print("\n服务已就绪：访问 http://localhost:5000")
+        print(f"\n后端服务已就绪：http://localhost:{main_port}；前端请运行 npm run dev 后访问 http://localhost:3000")
 
     # 阻塞等待主进程退出
     proc.wait()

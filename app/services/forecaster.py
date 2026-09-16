@@ -57,8 +57,15 @@ def forecast_supply_demand(horizon=6) -> dict:
         import numpy as np
         s_series = supply_vals if len(supply_vals) >= 2 else supply_vals + [supply_vals[-1]]
         d_series = demand_vals if len(demand_vals) >= 2 else demand_vals + [demand_vals[-1]]
-        ses_s = SimpleExpSmoothing(s_series).fit()
-        ses_d = SimpleExpSmoothing(d_series).fit()
+        # statsmodels 0.15 moved ``initialization_method`` from ``fit`` to
+        # the model constructor. Passing it explicitly keeps this endpoint
+        # compatible with both the current and older supported releases.
+        ses_s = SimpleExpSmoothing(
+            s_series, initialization_method="estimated"
+        ).fit()
+        ses_d = SimpleExpSmoothing(
+            d_series, initialization_method="estimated"
+        ).fit()
         f_s = ses_s.forecast(horizon)
         f_d = ses_d.forecast(horizon)
         base = datetime.now()
@@ -71,7 +78,7 @@ def forecast_supply_demand(horizon=6) -> dict:
             "forecast_supply": [max(0, round(float(x), 1)) for x in f_s],
             "forecast_demand": [max(0, round(float(x), 1)) for x in f_d],
         }
-    except ImportError:
+    except (ImportError, TypeError, ValueError):
         # 无 statsmodels 时使用简单移动平均
         s_avg = sum(supply_vals) / len(supply_vals) if supply_vals else 0
         d_avg = sum(demand_vals) / len(demand_vals) if demand_vals else 0

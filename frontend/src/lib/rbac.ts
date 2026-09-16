@@ -1,8 +1,8 @@
 export type SessionRole = 'admin' | 'government' | 'enterprise';
 
-export const GUEST_HOME_PATH = '/enterprise-directory';
+export const GUEST_HOME_PATH = '/';
 
-export const PUBLIC_GUEST_ROUTES = ['/enterprise-directory', '/matching'] as const;
+export const PUBLIC_GUEST_ROUTES = ['/', '/search', '/aia', '/agent-market', '/factory', '/enterprise-directory', '/matching'] as const;
 
 export const ENTERPRISE_PRIVATE_ROUTES = [
   '/dashboard',
@@ -37,7 +37,9 @@ export function redirectPathForUnauthorizedRole(role: string | undefined | null)
 }
 
 export function isPublicGuestPath(path: string): boolean {
-  return PUBLIC_GUEST_ROUTES.some((route) => path === route || path.startsWith(`${route}/`));
+  return PUBLIC_GUEST_ROUTES.some((route) => route === '/'
+    ? path === '/'
+    : path === route || path.startsWith(`${route}/`));
 }
 
 export function canRoleAccessPath(role: string | undefined | null, path: string | undefined | null): boolean {
@@ -46,7 +48,7 @@ export function canRoleAccessPath(role: string | undefined | null, path: string 
   if (path.startsWith('/gov') || path.startsWith('/supervision')) {
     return role === 'admin' || role === 'government';
   }
-  if (isPublicGuestPath(path)) return role === 'enterprise';
+  if (isPublicGuestPath(path)) return true;
   if (ENTERPRISE_PRIVATE_ROUTES.some((route) => path === route || path.startsWith(`${route}/`))) {
     return role === 'enterprise';
   }

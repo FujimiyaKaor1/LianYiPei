@@ -8,6 +8,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { LoginModal } from './components/LoginModal';
 import { ScrollToTop } from './components/ScrollToTop';
 import { ToastProvider } from './components/ToastProvider';
+import { ChainXiaoYiPanel } from './components/ChainXiaoYiPanel';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -17,6 +18,7 @@ createRoot(document.getElementById('root')!).render(
           <AuthProvider>
             <ScrollToTop />
             <App />
+            <ChainXiaoYiPanel />
             <LoginModal />
           </AuthProvider>
         </ToastProvider>

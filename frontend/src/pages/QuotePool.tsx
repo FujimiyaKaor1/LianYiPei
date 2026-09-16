@@ -46,6 +46,7 @@ export default function QuotePool() {
 
   // 默认查看 "精密轴承" 价格指数（与设计文档一致）
   const [targetProduct, setTargetProduct] = useState('精密轴承');
+  const [selectedInquiryId, setSelectedInquiryId] = useState<number | null>(null);
   const productFilters = ['精密轴承', '驱动电机', '车规级传感器', '高频连接器'];
 
   const loadData = async () => {
@@ -58,6 +59,7 @@ export default function QuotePool() {
       ]);
       setQuotes(listRes.quotes || []);
       setTotalQuotes(listRes.total || 0);
+      setSelectedInquiryId(listRes.quotes?.[0]?.inquiry_id || null);
       setPriceIndex(indexRes);
     } catch (error) {
       setErrorText(error instanceof Error ? error.message : NETWORK_ERROR_MESSAGE);
@@ -75,7 +77,7 @@ export default function QuotePool() {
     setSubmitting(true);
     try {
       const payload: QuoteSubmitPayload = {
-        inquiry_id: 999,
+        inquiry_id: selectedInquiryId || 0,
         price: formData.price,
         product_name: targetProduct,
         quantity: formData.quantity,
@@ -84,6 +86,10 @@ export default function QuotePool() {
         remarks: formData.remarks || `意向报价 - ${targetProduct}`,
       };
 
+      if (!selectedInquiryId) {
+        showToast('当前没有可报价的真实询价单，请先从找厂或询价流程进入', 'warning');
+        return;
+      }
       const result = await api.submitQuote(payload);
       
       showToast(`报价提交成功！剩余今日报价次数：${result.remaining_quotes_today || '充足'}`, 'success');

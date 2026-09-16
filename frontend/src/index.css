@@ -19,6 +19,15 @@
   --color-brand-muted: #7EA6F8;
   --color-on-brand: #FFFFFF;
 
+  /* ── Public acquisition surface ─────────────────────── */
+  --color-public-bg: #F3F9FF;
+  --color-public-surface: #FFFFFF;
+  --color-public-brand: #246BDB;
+  --color-public-brand-soft: #E7F1FF;
+  --color-public-text: #14213D;
+  --color-public-muted: #6B7A90;
+  --color-public-border: #DBE9F7;
+
   /* ── Surfaces ─────────────────────────────────────────── */
   --color-canvas: #F2F7FF;
   --color-canvas-soft: #F6FAFF;
@@ -84,6 +93,7 @@
   --shadow-elevation-1: 0 1px 1px rgba(16, 24, 40, 0.02), 0 1px 2px rgba(16, 24, 40, 0.04);
   --shadow-elevation-2: 0 1px 1px rgba(16, 24, 40, 0.03), 0 8px 18px rgba(16, 24, 40, 0.06);
   --shadow-elevation-3: 0 1px 1px rgba(16, 24, 40, 0.03), 0 16px 36px -12px rgba(16, 24, 40, 0.18);
+  --shadow-public: 0 12px 30px -24px rgba(36, 107, 219, 0.34), 0 1px 2px rgba(20, 33, 61, 0.05);
 
   /* ── Border Radius ────────────────────────────────────── */
   --radius-xs: 4px;
@@ -253,6 +263,15 @@
 }
 
 @layer components {
+  .eyebrow {
+    color: var(--color-brand);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    line-height: 1.4;
+    text-transform: uppercase;
+  }
+
   /* ── Cards ────────────────────────────────────────────── */
   .card,
   .card-hover {
@@ -446,6 +465,37 @@
     font-variant-numeric: tabular-nums;
     letter-spacing: 0;
   }
+
+  /* Public pages share tokens with the workspace but keep a lighter hierarchy. */
+  .btn-public-primary,
+  .btn-public-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 8px;
+    min-height: 40px;
+    padding: 0 16px;
+    font-size: 0.875rem;
+    font-weight: 700;
+    line-height: 1.25rem;
+    transition: border-color 150ms, background-color 150ms, color 150ms, box-shadow 150ms, transform 150ms;
+  }
+  .btn-public-primary {
+    background: var(--color-public-brand);
+    color: #fff;
+    box-shadow: 0 5px 12px -8px rgba(36, 107, 219, 0.75);
+  }
+  .btn-public-primary:hover:not(:disabled) { background: #1C5CBD; transform: translateY(-1px); }
+  .btn-public-secondary {
+    border: 1px solid var(--color-public-border);
+    background: var(--color-public-surface);
+    color: var(--color-public-text);
+  }
+  .btn-public-secondary:hover:not(:disabled) { border-color: var(--color-public-brand); color: var(--color-public-brand); background: var(--color-public-brand-soft); }
+  .btn-public-primary:disabled,
+  .btn-public-secondary:disabled { cursor: not-allowed; opacity: 0.55; }
+  .public-site { color-scheme: light; --public-bg: #F3F9FF; --public-surface: #FFFFFF; --public-brand: #246BDB; --public-brand-soft: #E7F1FF; --public-text: #14213D; --public-muted: #6B7A90; --public-border: #DBE9F7; }
 }
 
 @layer utilities {
@@ -697,6 +747,34 @@
   .sidebar-user-copy {
     display: none;
   }
+}
+
+/*
+ * The public landing page is intentionally light, even when an authenticated
+ * workspace has selected the dark theme.  Keep the public surface independent
+ * from the workspace theme overrides above (notably .bg-white and .bg-slate-950).
+ */
+.public-home {
+  color-scheme: light;
+  color: #111827;
+}
+
+.public-home .bg-white,
+.public-home .bg-white\/50,
+.public-home .bg-white\/80 {
+  background-color: #ffffff !important;
+}
+
+.public-home .bg-slate-950 {
+  background-color: #020617 !important;
+}
+
+.public-home .text-white {
+  color: #ffffff !important;
+}
+
+.public-home .border-white\/10 {
+  border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 .gov-digital-screen {

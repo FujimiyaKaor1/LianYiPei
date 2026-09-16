@@ -60,7 +60,9 @@ def create_app(config_class=Config):
         @login_manager.request_loader
         def _dev_request_user(req):
             path = req.path or ""
-            if not _path_is_top_level_api(path):
+            # 会话探测必须反映真实 Cookie 状态，否则开发自动登录会让
+            # React 把未登录访客误判成管理员并重定向到后台。
+            if path == "/api/session" or not _path_is_top_level_api(path):
                 return None
             user = _dev_login_enterprise()
             if user is None:
@@ -72,7 +74,8 @@ def create_app(config_class=Config):
         @app.before_request
         def _dev_api_force_login_session():
             """与 request_loader 互补：保证本请求内 g._login_user 已就绪（不依赖 Cookie）。"""
-            if not _path_is_top_level_api(request.path):
+            # 保留业务 API 的本地免登录联调，但 /api/session 只能检查真实会话。
+            if request.path == "/api/session" or not _path_is_top_level_api(request.path):
                 return None
             from flask_login import current_user
 
@@ -158,6 +161,7 @@ def create_app(config_class=Config):
     from app.routes.intent_quote import intent_quote_bp
     from app.routes.hermes import bp as hermes_bp
     from app.routes.rag import rag_bp
+    from app.routes.chain_xiaoyi import chain_xiaoyi_bp
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(enterprise_bp, url_prefix='/enterprise')
@@ -187,6 +191,7 @@ def create_app(config_class=Config):
     app.register_blueprint(intent_quote_bp)
     app.register_blueprint(hermes_bp)
     app.register_blueprint(rag_bp)
+    app.register_blueprint(chain_xiaoyi_bp)
 
     from app.routes.react_admin_shell import bp as react_admin_shell_bp
 

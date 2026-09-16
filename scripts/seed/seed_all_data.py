@@ -140,7 +140,7 @@ def seed_mysql(app):
                 db.session.add(te)
                 db.session.commit()
                 print("  [MySQL] 已创建企业账号 test_ent / 123456")
-            # 政府端 SPA：须 role=government；与 scripts/seed_data.py 一致
+            # 政府端 SPA：须 role=government；与本脚本的固定账号保持一致
             if not Enterprise.query.filter_by(role='government').first():
                 gov = Enterprise(
                     name='政府产业监管局',

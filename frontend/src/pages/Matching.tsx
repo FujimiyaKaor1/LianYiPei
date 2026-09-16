@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search,
   ChevronRight,
@@ -150,13 +150,20 @@ function SkeletonCard() {
 export default function Matching() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { user, requestLogin } = useAuth();
   const demoTimersRef = useRef<{ t1?: ReturnType<typeof setTimeout>; t2?: ReturnType<typeof setTimeout> }>({});
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('query') || '');
   const [activeTag, setActiveTag] = useState('');
   const [sortBy, setSortBy] = useState<'score' | 'credit' | 'distance'>('score');
-  const [deliveryDays, setDeliveryDays] = useState(30);
+  const [deliveryDays, setDeliveryDays] = useState(() => {
+    const raw = searchParams.get('intent');
+    try {
+      const parsed = raw ? JSON.parse(raw) as Record<string, unknown> : null;
+      return typeof parsed?.delivery_days === 'number' ? parsed.delivery_days : 30;
+    } catch { return 30; }
+  });
   const [creditLevel, setCreditLevel] = useState<(typeof CREDIT_LEVELS)[number]>('AAA');
   const [suppliers, setSuppliers] = useState<SupplierSearchItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -214,7 +221,14 @@ export default function Matching() {
   };
 
   useEffect(() => {
-    void loadSuppliers();
+    const initialQuery = searchParams.get('query') || '';
+    const rawIntent = searchParams.get('intent');
+    let parsedIntent: Record<string, unknown> = {};
+    try { parsedIntent = rawIntent ? JSON.parse(rawIntent) as Record<string, unknown> : {}; } catch { parsedIntent = {}; }
+    void loadSuppliers({
+      query: initialQuery || String(parsedIntent.product || ''),
+      deliveryDays: typeof parsedIntent.delivery_days === 'number' ? parsedIntent.delivery_days : 30,
+    });
   }, []);
 
   useEffect(() => {

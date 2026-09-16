@@ -15,7 +15,7 @@ if not exist .env (
 )
 
 echo [1/3] 检查数据库...
-python scripts/create_db.py 2>nul
+python scripts\db\create_db.py 2>nul
 if errorlevel 1 (
     echo 数据库创建失败，请检查 MySQL 是否启动
     pause
@@ -24,12 +24,12 @@ if errorlevel 1 (
 
 echo.
 echo [2/3] 初始化数据（若已有数据会跳过）...
-python scripts/seed_all_data.py
+python scripts\seed\seed_all_data.py
 
 echo.
 echo [3/3] 启动应用...
 echo 访问: http://localhost:5000
-echo 管理员: admin / admin123
+echo 管理员: admin / admin
 echo ========================================
 python run.py
 

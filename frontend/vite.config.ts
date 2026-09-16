@@ -14,7 +14,7 @@ export default defineConfig(({mode}) => {
   const flaskProxyTarget =
     env.VITE_FLASK_PROXY_TARGET ||
     env.FLASK_PROXY_TARGET ||
-    'http://127.0.0.1:5000';
+    'http://127.0.0.1:5050';
 
   // 生产构建输出到 Flask static 目录（便于 Flask 直接服务）
   const isProd = mode === 'production';

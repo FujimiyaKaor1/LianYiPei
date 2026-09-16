@@ -13,11 +13,11 @@ _logger = logging.getLogger(__name__)
 
 from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
 from flask_login import current_user, login_required
-from sqlalchemy import and_, or_
+from sqlalchemy import String, and_, cast, func, or_
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.authz import role_required, user_effective_role, user_session_role
-from app.models import Enterprise
+from app.models import Enterprise, Inquiry, Product, Transaction
 from app.services import map_service
 from app.services import finance_service
 from app.services.fulfillment_dashboard import get_active_fulfillments, get_dashboard_payload
@@ -989,6 +989,730 @@ def api_enterprises_directory():
                 }
                 for ent in rows
             ],
+        }
+    )
+
+
+PUBLIC_SEARCH_TYPES = {"all", "enterprise", "product", "supply", "demand"}
+PUBLIC_INDUSTRY_LABELS = {
+    "machinery": "机械制造",
+    "electronics": "电子信息",
+    "automotive": "汽车零部件",
+    "electric": "新能源与电气",
+    "metal": "金属加工",
+    "chemical": "化工材料",
+    "medicine": "医药健康",
+    "logistics": "物流与供应链",
+}
+
+
+def _public_credit_level(score: float | None) -> str:
+    value = float(score or 0)
+    if value >= 90:
+        return "AAA"
+    if value >= 80:
+        return "AA"
+    if value >= 70:
+        return "A"
+    if value >= 60:
+        return "BBB"
+    return "待提升"
+
+
+def _public_mode() -> str:
+    return str(current_app.config.get("PUBLIC_DATA_MODE", "demo") or "demo").strip().lower()
+
+
+def _public_is_demo() -> bool:
+    return _public_mode() != "production"
+
+
+def _enterprise_public_qualifications(ent: Enterprise) -> list[dict]:
+    raw = ent.qualifications if isinstance(ent.qualifications, list) else []
+    return [row for row in raw if isinstance(row, dict)]
+
+
+def _enterprise_has_label(ent: Enterprise, *terms: str) -> bool:
+    haystack = " ".join(
+        str(value or "")
+        for row in _enterprise_public_qualifications(ent)
+        for value in (row.get("label_type"), row.get("label_name"), row.get("status"))
+    ).lower()
+    return any(term.lower() in haystack for term in terms)
+
+
+def _enterprise_is_export_capable(ent: Enterprise) -> bool:
+    extras = ent.extras if isinstance(ent.extras, dict) else {}
+    explicit = any(
+        bool(extras.get(key))
+        for key in ("is_export", "is_foreign_trade", "export_capable", "foreign_trade")
+    )
+    text = f"{ent.business_scope or ''} {ent.tech_keywords or ''}"
+    return explicit or any(term in text for term in ("出口", "外贸", "国际贸易", "跨境"))
+
+
+def _enterprise_has_decision_maker(ent: Enterprise) -> bool:
+    return bool((ent.contact or "").strip() or (ent.phone or "").strip())
+
+
+def _enterprise_is_little_giant(ent: Enterprise) -> bool:
+    extras = ent.extras if isinstance(ent.extras, dict) else {}
+    return bool(extras.get("is_little_giant")) or _enterprise_has_label(
+        ent, "little_giant", "专精特新", "小巨人"
+    )
+
+
+def _public_enterprise_signals(ent: Enterprise) -> dict:
+    return {
+        "credit_level": _public_credit_level(ent.credit_score),
+        "data_updated_at": _public_data_updated_at(ent),
+        "verification_status": ent.verification_status or ("approved" if ent.is_verified else "pending"),
+        "status": ent.business_status or "待核验",
+        "is_export": _enterprise_is_export_capable(ent),
+        "has_decision_maker": _enterprise_has_decision_maker(ent),
+        "is_little_giant": _enterprise_is_little_giant(ent),
+        "is_green_factory": bool(ent.is_green_factory),
+        "registered_capital": float(ent.registered_capital or 0),
+        "source": "企业档案",
+        "is_demo": _public_is_demo(),
+    }
+
+
+def _public_resource_fields(signals: dict) -> dict:
+    """Common anonymous resource metadata kept at the resource top level."""
+    return {
+        "verification_status": signals.get("verification_status"),
+        "source": signals.get("source"),
+        "updated_at": signals.get("data_updated_at") or signals.get("created_at"),
+        "is_demo": bool(signals.get("is_demo")),
+    }
+
+
+def _public_data_updated_at(entity) -> str | None:
+    value = getattr(entity, "last_data_update", None) or getattr(entity, "updated_at", None)
+    if value is None:
+        value = getattr(entity, "created_at", None)
+    return value.isoformat() if hasattr(value, "isoformat") else (str(value) if value else None)
+
+
+def _public_enterprise_item(ent: Enterprise) -> dict:
+    region = _enterprise_public_address(ent) or "区域待补充"
+    tags = []
+    if ent.is_verified or ent.verification_status == "approved":
+        tags.append("已审核")
+    if (ent.capacity or 0) > (ent.current_orders or 0):
+        tags.append("产能可用")
+    if ent.is_green_factory:
+        tags.append("绿色供应")
+    if _enterprise_is_export_capable(ent):
+        tags.append("支持出口")
+    if _enterprise_is_little_giant(ent):
+        tags.append("专精特新")
+    if _enterprise_has_decision_maker(ent):
+        tags.append("有决策人联系方式")
+    if not tags:
+        tags.append("平台企业")
+    signals = _public_enterprise_signals(ent)
+    return {
+        "kind": "enterprise",
+        "id": ent.id,
+        "title": ent.name,
+        "subtitle": f"{ent.business_scope or ent.industry_code or '产业配套企业'} · {region}",
+        "tags": tags,
+        "public_signals": signals,
+        **_public_resource_fields(signals),
+        "requires_login_for_action": True,
+    }
+
+
+def _public_product_item(product: Product) -> dict:
+    ent = product.enterprise
+    region = _enterprise_public_address(ent) if ent else "区域待补充"
+    supplier_name = ent.name if ent else "平台企业"
+    category = product.category or product.industry_code or "产业产品"
+    signals = {
+        "enterprise_id": ent.id if ent else None,
+        "data_updated_at": _public_data_updated_at(product),
+        "source": "企业产品档案",
+        "is_demo": _public_is_demo(),
+    }
+    return {
+        "kind": "product",
+        "id": product.id,
+        "title": product.name,
+        "subtitle": f"{supplier_name} · {category} · {region}",
+        "tags": [category],
+        "public_signals": signals,
+        **_public_resource_fields(signals),
+        "requires_login_for_action": True,
+    }
+
+
+def _public_inquiry_item(inquiry: Inquiry) -> dict:
+    ent = inquiry.poster
+    product_name = inquiry.product.name if inquiry.product else (inquiry.product_name or "未命名产品")
+    direction_label = "供应信息" if inquiry.direction == "supply" else "采购需求"
+    quantity = f"{inquiry.quantity}{inquiry.unit or ''}" if inquiry.quantity else "数量待确认"
+    region = _enterprise_public_address(ent) if ent else "区域待补充"
+    signals = {
+        "status": inquiry.status,
+        "created_at": inquiry.created_at.isoformat() if inquiry.created_at else None,
+        "source": "公开供需信息",
+        "is_demo": _public_is_demo(),
+    }
+    return {
+        "kind": inquiry.direction,
+        "id": inquiry.id,
+        "title": product_name,
+        "subtitle": f"{ent.name if ent else '平台企业'} · {quantity} · {region}",
+        "tags": [direction_label, "开放中"],
+        "public_signals": signals,
+        **_public_resource_fields(signals),
+        "requires_login_for_action": True,
+    }
+
+
+def _public_industry_filter(model, industry_key: str):
+    keywords = INDUSTRY_DIRECTORY_KEYWORDS.get(industry_key)
+    if not keywords:
+        return None
+    if model is Enterprise:
+        return or_(*[Enterprise.business_scope.contains(keyword) for keyword in keywords])
+    if model is Product:
+        return or_(*[
+            Product.category.contains(keyword)
+            | Product.description.contains(keyword)
+            | Enterprise.business_scope.contains(keyword)
+            for keyword in keywords
+        ])
+    return or_(*[
+        Inquiry.product_name.contains(keyword)
+        | Inquiry.description.contains(keyword)
+        | Inquiry.content.contains(keyword)
+        | Enterprise.business_scope.contains(keyword)
+        for keyword in keywords
+    ])
+
+
+def _public_region_filter(model, province: str):
+    if not province:
+        return None
+    return or_(
+        Enterprise.province == province,
+        and_(
+            or_(Enterprise.province.is_(None), Enterprise.province == ""),
+            Enterprise.address.contains(province),
+        ),
+    )
+
+
+def _public_enterprise_constraints(
+    query,
+    province: str,
+    city: str = "",
+    is_export: bool = False,
+    has_decision_maker: bool = False,
+    is_little_giant: bool = False,
+    is_green_factory: bool = False,
+    company_status: str = "",
+    min_registered_capital: float | None = None,
+):
+    region_filter = _public_region_filter(Enterprise, province)
+    if region_filter is not None:
+        query = query.filter(region_filter)
+    if city:
+        query = query.filter(
+            or_(Enterprise.city == city, Enterprise.city.contains(city), Enterprise.address.contains(city))
+        )
+    if is_green_factory:
+        query = query.filter(Enterprise.is_green_factory.is_(True))
+    if company_status:
+        query = query.filter(Enterprise.business_status == company_status)
+    if min_registered_capital is not None:
+        query = query.filter(Enterprise.registered_capital >= min_registered_capital)
+    if has_decision_maker:
+        query = query.filter(
+            or_(
+                and_(Enterprise.contact.isnot(None), Enterprise.contact != ""),
+                and_(Enterprise.phone.isnot(None), Enterprise.phone != ""),
+            )
+        )
+    # JSON 标签来自企业画像；CAST 保持 SQLite 测试库和 MySQL 生产库行为一致。
+    qualifications_text = cast(Enterprise.qualifications, String)
+    extras_text = cast(Enterprise.extras, String)
+    if is_little_giant:
+        query = query.filter(
+            or_(
+                qualifications_text.contains("little_giant"),
+                qualifications_text.contains("专精特新"),
+                qualifications_text.contains("小巨人"),
+                extras_text.contains("is_little_giant"),
+            )
+        )
+    if is_export:
+        query = query.filter(
+            or_(
+                Enterprise.business_scope.contains("出口"),
+                Enterprise.business_scope.contains("外贸"),
+                Enterprise.business_scope.contains("国际贸易"),
+                Enterprise.business_scope.contains("跨境"),
+                extras_text.contains("is_export"),
+                extras_text.contains("is_foreign_trade"),
+            )
+        )
+    return query
+
+
+def _public_enterprise_query(
+    q: str,
+    province: str,
+    industry_key: str,
+    **filters,
+):
+    query = Enterprise.query.filter(Enterprise.role == "enterprise")
+    if q:
+        # 平台搜索产品时同时返回其供应企业，避免结果只有产品而缺少可行动的主体。
+        query = query.outerjoin(Product, Product.enterprise_id == Enterprise.id).distinct()
+        query = query.filter(
+            or_(
+                Enterprise.name.contains(q),
+                Enterprise.business_scope.contains(q),
+                Enterprise.industry_code.contains(q),
+                Product.name.contains(q),
+                Product.description.contains(q),
+                Product.category.contains(q),
+            )
+        )
+    query = _public_enterprise_constraints(query, province, **filters)
+    industry_filter = _public_industry_filter(Enterprise, industry_key)
+    if industry_filter is not None:
+        query = query.filter(industry_filter)
+    return query
+
+
+def _public_product_query(q: str, province: str, industry_key: str, **filters):
+    query = Product.query.join(Enterprise, Product.enterprise_id == Enterprise.id).filter(
+        Enterprise.role == "enterprise"
+    )
+    if q:
+        query = query.filter(
+            or_(
+                Product.name.contains(q),
+                Product.description.contains(q),
+                Product.category.contains(q),
+                Enterprise.name.contains(q),
+                Enterprise.business_scope.contains(q),
+            )
+        )
+    query = _public_enterprise_constraints(query, province, **filters)
+    industry_filter = _public_industry_filter(Product, industry_key)
+    if industry_filter is not None:
+        query = query.filter(industry_filter)
+    return query
+
+
+def _public_inquiry_query(
+    q: str,
+    province: str,
+    industry_key: str,
+    direction: str | None = None,
+    **filters,
+):
+    query = Inquiry.query.join(Enterprise, Inquiry.poster_id == Enterprise.id).filter(
+        Enterprise.role == "enterprise",
+        Inquiry.status.in_(("open", "active")),
+    )
+    if direction:
+        query = query.filter(Inquiry.direction == direction)
+    if q:
+        query = query.filter(
+            or_(
+                Inquiry.product_name.contains(q),
+                Inquiry.description.contains(q),
+                Inquiry.content.contains(q),
+                Enterprise.name.contains(q),
+            )
+        )
+    query = _public_enterprise_constraints(query, province, **filters)
+    industry_filter = _public_industry_filter(Inquiry, industry_key)
+    if industry_filter is not None:
+        query = query.filter(industry_filter)
+    return query
+
+
+def _public_regions() -> list[dict]:
+    rows = (
+        Enterprise.query.with_entities(Enterprise.province, func.count(Enterprise.id))
+        .filter(Enterprise.role == "enterprise", Enterprise.province.isnot(None), Enterprise.province != "")
+        .group_by(Enterprise.province)
+        .order_by(func.count(Enterprise.id).desc())
+        .limit(8)
+        .all()
+    )
+    return [{"key": province, "label": province, "count": count} for province, count in rows]
+
+
+def _public_industrial_belts() -> list[dict]:
+    return [
+        {"key": row["key"], "label": f'{row["label"]}产业带', "count": row["count"]}
+        for row in _public_regions()
+    ]
+
+
+def _public_services() -> list[dict]:
+    return [
+        {"key": "onboarding", "title": "企业入驻", "summary": "完善企业、产品、产能和资质档案"},
+        {"key": "verification", "title": "工厂能力认证", "summary": "用可验证数据建立制造能力名片"},
+        {"key": "matching", "title": "AI 供需匹配", "summary": "从需求快速找到合适的供应商"},
+        {"key": "graph", "title": "产业链图谱", "summary": "查看上下游关系、产业缺口和风险"},
+        {"key": "open", "title": "开放 API / MCP", "summary": "将工厂数据接入业务系统和 Agent"},
+        {"key": "government", "title": "政府与园区方案", "summary": "支撑招商、补链和产业治理"},
+    ]
+
+
+@api_bp.route("/public/home", methods=["GET"])
+def api_public_home():
+    """公共平台首页聚合数据，只返回匿名可见的资源摘要。"""
+    enterprise_count = Enterprise.query.filter(Enterprise.role == "enterprise").count()
+    product_count = Product.query.join(Enterprise, Product.enterprise_id == Enterprise.id).filter(
+        Enterprise.role == "enterprise"
+    ).count()
+    active_supply_count = Inquiry.query.filter(
+        Inquiry.direction == "supply", Inquiry.status.in_(("open", "active"))
+    ).count()
+    active_demand_count = Inquiry.query.filter(
+        Inquiry.direction == "demand", Inquiry.status.in_(("open", "active"))
+    ).count()
+    completed_transaction_count = Transaction.query.filter(Transaction.status == "completed").count()
+    verified_count = Enterprise.query.filter(
+        Enterprise.role == "enterprise",
+        or_(Enterprise.is_verified.is_(True), Enterprise.verification_status == "approved"),
+    ).count()
+
+    featured_enterprises = (
+        Enterprise.query.filter(Enterprise.role == "enterprise")
+        .order_by(Enterprise.credit_score.desc(), Enterprise.id.desc())
+        .limit(6)
+        .all()
+    )
+    featured_products = (
+        Product.query.join(Enterprise, Product.enterprise_id == Enterprise.id)
+        .filter(Enterprise.role == "enterprise")
+        .order_by(Product.created_at.desc(), Product.id.desc())
+        .limit(8)
+        .all()
+    )
+    recent_inquiries = (
+        Inquiry.query.join(Enterprise, Inquiry.poster_id == Enterprise.id)
+        .filter(Enterprise.role == "enterprise", Inquiry.status.in_(("open", "active")))
+        .order_by(Inquiry.created_at.desc(), Inquiry.id.desc())
+        .limit(8)
+        .all()
+    )
+
+    return jsonify(
+        {
+            "stats": {
+                "enterprise_count": enterprise_count,
+                "product_count": product_count,
+                "active_supply_count": active_supply_count,
+                "active_demand_count": active_demand_count,
+                "completed_transaction_count": completed_transaction_count,
+                # MySQL 产品节点是 Neo4j 不可用时的稳定降级口径；首页不因图数据库暂时不可用而阻塞。
+                "graph_node_count": product_count,
+                "verified_count": verified_count,
+            },
+            "featured_enterprises": [_public_enterprise_item(ent) for ent in featured_enterprises],
+            "featured_products": [_public_product_item(product) for product in featured_products],
+            "latest_inquiries": [_public_inquiry_item(inquiry) for inquiry in recent_inquiries],
+            "industries": [
+                {"key": key, "label": label} for key, label in PUBLIC_INDUSTRY_LABELS.items()
+            ],
+            "regions": _public_regions(),
+            "industrial_belts": _public_industrial_belts(),
+            "public_services": _public_services(),
+            "data_freshness": {
+                "mode": _public_mode(),
+                "is_demo": _public_is_demo(),
+                "label": "演示数据" if _public_is_demo() else "生产数据",
+                "updated_at": datetime.utcnow().isoformat(),
+            },
+            "data_status": {
+                "mode": _public_mode(),
+                "message": "公开页面仅展示脱敏摘要；完整企业能力和联系方式需登录后查看。",
+            },
+        }
+    )
+
+
+@api_bp.route("/public/search", methods=["GET"])
+def api_public_search():
+    """公共统一资源搜索：企业、产品、供应信息和采购需求。"""
+    q = (request.args.get("q") or "").strip()[:120]
+    search_type = (request.args.get("type") or "all").strip().lower()
+    province = (request.args.get("province") or "").strip()[:30]
+    city = (request.args.get("city") or "").strip()[:50]
+    industry_key = (request.args.get("industry") or "").strip().lower()
+    sort = (request.args.get("sort") or "relevance").strip().lower()
+    is_export = request.args.get("is_export", "").lower() in {"1", "true", "yes"}
+    has_decision_maker = request.args.get("has_decision_maker", "").lower() in {"1", "true", "yes"}
+    is_little_giant = request.args.get("is_little_giant", "").lower() in {"1", "true", "yes"}
+    is_green_factory = request.args.get("is_green_factory", "").lower() in {"1", "true", "yes"}
+    company_status = (request.args.get("company_status") or "").strip()[:20]
+    min_registered_capital = request.args.get("min_registered_capital", type=float)
+    page = max(1, request.args.get("page", default=1, type=int) or 1)
+    per_page = max(1, min(50, request.args.get("per_page", default=20, type=int) or 20))
+
+    if search_type not in PUBLIC_SEARCH_TYPES:
+        return jsonify({"error": "type 必须是 all、enterprise、product、supply 或 demand"}), 400
+
+    filters = {
+        "city": city,
+        "is_export": is_export,
+        "has_decision_maker": has_decision_maker,
+        "is_little_giant": is_little_giant,
+        "is_green_factory": is_green_factory,
+        "company_status": company_status,
+        "min_registered_capital": min_registered_capital,
+    }
+    sources = []
+    if search_type in {"all", "enterprise"}:
+        query = _public_enterprise_query(q, province, industry_key, **filters)
+        total = query.count()
+        sources.append(("enterprise", total, query))
+    if search_type in {"all", "product"}:
+        query = _public_product_query(q, province, industry_key, **filters)
+        total = query.count()
+        sources.append(("product", total, query))
+    if search_type in {"all", "supply", "demand"}:
+        direction = None if search_type == "all" else search_type
+        query = _public_inquiry_query(q, province, industry_key, direction, **filters)
+        total = query.count()
+        sources.append(("inquiry", total, query))
+
+    total = sum(source_total for _, source_total, _ in sources)
+    start = (page - 1) * per_page
+    end = start + per_page
+    page_results = []
+    cursor = 0
+    for source_name, source_total, query in sources:
+        segment_start = max(0, start - cursor)
+        segment_end = min(source_total, end - cursor)
+        if segment_start < segment_end:
+            limit = segment_end - segment_start
+            if source_name == "enterprise":
+                rows = query.order_by(Enterprise.credit_score.desc(), Enterprise.id.desc()).offset(segment_start).limit(limit).all()
+                page_results.extend(_public_enterprise_item(row) for row in rows)
+            elif source_name == "product":
+                rows = query.order_by(Product.created_at.desc(), Product.id.desc()).offset(segment_start).limit(limit).all()
+                page_results.extend(_public_product_item(row) for row in rows)
+            else:
+                rows = query.order_by(Inquiry.created_at.desc(), Inquiry.id.desc()).offset(segment_start).limit(limit).all()
+                page_results.extend(_public_inquiry_item(row) for row in rows)
+        cursor += source_total
+        if cursor >= end:
+            break
+
+    if sort == "name":
+        page_results.sort(key=lambda item: item["title"])
+    return jsonify(
+        {
+            "query": q,
+            "type": search_type,
+            "province": province,
+            "city": city,
+            "industry": industry_key,
+            "sort": sort,
+            "filters": filters,
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "pages": (total + per_page - 1) // per_page if total else 0,
+            "has_more": start + per_page < total,
+            "results": page_results,
+        }
+    )
+
+
+@api_bp.route("/public/enterprises/<int:enterprise_id>", methods=["GET"])
+def api_public_enterprise_detail(enterprise_id: int):
+    """公开企业详情：只返回脱敏企业画像和公开产品，不返回联系方式。"""
+    ent = Enterprise.query.filter(
+        Enterprise.id == enterprise_id, Enterprise.role == "enterprise"
+    ).first()
+    if not ent:
+        return jsonify({"error": "企业不存在"}), 404
+
+    public_item = _public_enterprise_item(ent)
+    capacity = int(ent.capacity or 0)
+    current_orders = int(ent.current_orders or 0)
+    if capacity <= 0:
+        capacity_summary = "产能待补充"
+    elif capacity > current_orders:
+        capacity_summary = "当前有可用产能"
+    else:
+        capacity_summary = "当前产能较紧张"
+    products = Product.query.filter(Product.enterprise_id == ent.id).order_by(
+        Product.created_at.desc(), Product.id.desc()
+    ).limit(30).all()
+
+    return jsonify(
+        {
+            "enterprise": {
+                "id": ent.id,
+                "name": ent.name,
+                "region": _enterprise_public_address(ent) or "区域待补充",
+                "business_scope": ent.business_scope or "",
+                "industry_code": ent.industry_code or "",
+                "business_status": ent.business_status or "待核验",
+                "registered_capital": float(ent.registered_capital or 0),
+                "credit_level": _public_credit_level(ent.credit_score),
+                "capacity_summary": capacity_summary,
+                "tags": public_item["tags"],
+                "public_signals": public_item["public_signals"],
+                "data_updated_at": _public_data_updated_at(ent),
+            },
+            "products": [_public_product_item(product) for product in products],
+            "actions": {
+                "requires_login": True,
+                "available": ["contact", "inquiry", "favorite", "export"],
+            },
+        }
+    )
+
+
+@api_bp.route("/public/agent-market", methods=["GET"])
+def api_public_agent_market():
+    """公开 Agent 能力目录，能力数量按真实展示内容计算。"""
+    groups = [
+        {"title": "AI 销售员", "summary": "线索获取、客户跟进和报价成交", "demo": False, "agents": ["客户线索整理", "智能报价助手", "企微跟进助手"]},
+        {"title": "AI 采购员", "summary": "供应商寻源、比价决策和绩效风控", "demo": True, "agents": ["全国快速询价", "供应商筛选", "供应商风险检查"]},
+        {"title": "AI 计划员", "summary": "订单分解、生产计划和交期协调", "demo": False, "agents": ["订单计划助手", "产能排程建议", "交期风险提醒"]},
+        {"title": "AI 生产员", "summary": "车间执行、质量记录和异常闭环", "demo": False, "agents": ["生产执行助手", "质量异常归因", "工艺知识助手"]},
+        {"title": "AI 财法务", "summary": "合同审查、单据处理和资金风险", "demo": False, "agents": ["合同审查", "发票单据处理", "财务风险告警"]},
+        {"title": "AI 出海专员", "summary": "海外获客、合规检查和出口协同", "demo": False, "agents": ["海外客户开发", "出口资质检查", "跨境合规助手"]},
+        {"title": "AI 情报官", "summary": "产业监测、竞争分析和政策匹配", "demo": False, "agents": ["产业监测", "招商线索发现", "政策匹配助手"]},
+    ]
+    return jsonify(
+        {
+            "groups": groups,
+            "layers": [
+                {"key": "industry", "title": "产业数据底座", "description": "企业、产品、产能、信用和产业关系"},
+                {"key": "enterprise", "title": "企业业务数据", "description": "订单、库存、BOM、客户和报价"},
+                {"key": "agent", "title": "岗位型 AI Agent", "description": "输出名单、询价单、排产建议和风险告警"},
+            ],
+        }
+    )
+
+
+def _public_structured_intent(query: str, parsed: dict) -> dict:
+    """Normalize model output and add safe deterministic fields for the public flow.
+
+    The public page must remain useful when the local LLM is unavailable. These
+    fields are intentionally limited to procurement constraints and never
+    include contact or private enterprise data.
+    """
+    intent = dict(parsed) if isinstance(parsed, dict) else {}
+    region_terms = (
+        "华东", "华南", "华北", "华中", "西南", "西北", "东北",
+        "广东", "浙江", "江苏", "山东", "福建", "安徽", "湖北", "四川",
+    )
+    region = next((term for term in region_terms if term in query), None)
+    if region:
+        intent["region"] = region
+
+    quantity_match = re.search(
+        r"(\d+(?:\.\d+)?)\s*(万|千)?\s*(件|台|套|吨|公斤|个|pcs)",
+        query,
+        flags=re.IGNORECASE,
+    )
+    if quantity_match:
+        quantity = float(quantity_match.group(1))
+        multiplier = {"万": 10000, "千": 1000}.get(quantity_match.group(2) or "", 1)
+        intent["quantity"] = int(quantity * multiplier) if (quantity * multiplier).is_integer() else quantity * multiplier
+        intent["unit"] = quantity_match.group(3)
+
+    delivery_match = re.search(
+        r"(?:交期|交付|交货|周期)[^\d]{0,8}(\d+)\s*(?:天|日)?|"
+        r"(\d+)\s*(?:天|日)\s*(?:内|交付|交货|交期)?",
+        query,
+    )
+    if delivery_match:
+        intent["delivery_days"] = int(delivery_match.group(1) or delivery_match.group(2))
+
+    process_terms = ("注塑", "冲压", "铸造", "锻造", "CNC", "机加工", "表面处理", "焊接", "装配")
+    processes = [term for term in process_terms if term.lower() in query.lower()]
+    if processes:
+        intent["processes"] = processes
+
+    certification_terms = ("ISO 9001", "ISO9001", "IATF16949", "ISO", "3C", "CE", "FDA", "专精特新", "绿色工厂")
+    certifications = [term for term in certification_terms if term.lower() in query.lower()]
+    if certifications:
+        intent["certifications"] = certifications
+
+    if any(term in query for term in ("出口", "外贸", "跨境", "国际贸易")):
+        intent["is_export"] = True
+
+    return intent
+
+
+@api_bp.route("/public/ai-find", methods=["POST"])
+def api_public_ai_find():
+    """公开 AI 找厂：复用现有匹配引擎，但对匿名返回做脱敏。"""
+    data = request.get_json(silent=True) or {}
+    query = str(data.get("query") or data.get("message") or "").strip()[:500]
+    if not query:
+        return jsonify({"error": "请输入产品、工艺、地区或采购要求"}), 400
+
+    parsed = _public_structured_intent(query, extract_weights_from_nl(query) or {})
+    product = str(parsed.get("product") or query).strip()[:200]
+    try:
+        quantity = max(1, min(int(data.get("quantity", 100)), 1_000_000))
+    except (TypeError, ValueError):
+        quantity = 100
+
+    try:
+        matched = match_suppliers(
+            demand_product=product,
+            demand_quantity=quantity,
+            demand_ent_id=None,
+            demand_industry_code=data.get("industry_code"),
+            sort_by="score",
+            filters=None,
+        )
+    except Exception:
+        _logger.exception("public ai-find failed")
+        matched = []
+
+    candidates = []
+    for row in (matched or [])[:10]:
+        enterprise_id = int(row.get("enterprise_id") or row.get("id") or 0)
+        ent = Enterprise.query.filter(
+            Enterprise.id == enterprise_id, Enterprise.role == "enterprise"
+        ).first()
+        if not ent:
+            continue
+        item = _public_enterprise_item(ent)
+        candidates.append(
+            {
+                "id": ent.id,
+                "title": ent.name,
+                "subtitle": item["subtitle"],
+                "score": float(row.get("score") or row.get("confidence_index") or 0),
+                "reason": row.get("ai_match_reason") or row.get("match") or "符合产品和企业能力条件",
+                "tags": item["tags"],
+                "public_signals": item["public_signals"],
+                **_public_resource_fields(item["public_signals"]),
+                "requires_login_for_action": True,
+            }
+        )
+    return jsonify(
+        {
+            "query": query,
+            "parsed_intent": parsed,
+            "product": product,
+            "results": candidates,
+            "has_more": len(matched or []) > len(candidates),
         }
     )
 

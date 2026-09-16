@@ -1,0 +1,199 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1520" viewBox="0 0 2400 1520">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7fafc"/>
+      <stop offset="1" stop-color="#eef4f7"/>
+    </linearGradient>
+    <linearGradient id="navy" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#17324d"/>
+      <stop offset="1" stop-color="#28536c"/>
+    </linearGradient>
+    <linearGradient id="teal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d766e"/>
+      <stop offset="1" stop-color="#15958b"/>
+    </linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#b56c11"/>
+      <stop offset="1" stop-color="#d18a2c"/>
+    </linearGradient>
+    <linearGradient id="purple" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#60458a"/>
+      <stop offset="1" stop-color="#7d62a7"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="7" stdDeviation="10" flood-color="#163247" flood-opacity=".13"/>
+    </filter>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#163247" flood-opacity=".08"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#4d7183"/>
+    </marker>
+    <marker id="arrow-teal" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#0d766e"/>
+    </marker>
+    <style>
+      .font { font-family: "Heiti SC", "STHeiti", "Songti SC", "Arial Unicode MS", Arial, sans-serif; }
+      .title { font-size: 44px; font-weight: 700; fill: #17324d; letter-spacing: 1px; }
+      .subtitle { font-size: 21px; fill: #5d7583; }
+      .band-title { font-size: 20px; font-weight: 700; fill: #ffffff; }
+      .band-note { font-size: 16px; fill: #dce8ee; }
+      .box-title { font-size: 23px; font-weight: 700; fill: #17324d; }
+      .box-sub { font-size: 17px; fill: #557080; }
+      .item { font-size: 17px; fill: #274856; }
+      .small { font-size: 15px; fill: #607a87; }
+      .tiny { font-size: 14px; fill: #607a87; }
+      .strong { font-weight: 700; fill: #17324d; }
+      .white { fill: #ffffff; }
+      .line { stroke: #c6d7de; stroke-width: 2; }
+      .flow { stroke: #4d7183; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .flow-teal { stroke: #0d766e; stroke-width: 3.5; fill: none; marker-end: url(#arrow-teal); }
+      .dash { stroke-dasharray: 9 8; }
+    </style>
+  </defs>
+
+  <rect width="2400" height="1520" fill="url(#bg)"/>
+  <rect x="0" y="0" width="2400" height="120" fill="#ffffff" opacity=".88"/>
+  <text x="100" y="62" class="font title">链易配｜产业链供需智能匹配与风险监管平台</text>
+  <text x="100" y="96" class="font subtitle">架构性汇报图：从用户入口、业务域到智能引擎与数据底座的完整实现关系</text>
+  <rect x="1885" y="34" width="390" height="52" rx="26" fill="#e2f3ef" stroke="#b6ded7"/>
+  <circle cx="1920" cy="60" r="8" fill="#0d766e"/>
+  <text x="1942" y="67" class="font item" fill="#0d766e">当前演示：Flask + SQLite + 本地 Ollama</text>
+
+  <!-- Layer 1 -->
+  <rect x="70" y="145" width="2260" height="178" rx="16" fill="url(#navy)" filter="url(#shadow)"/>
+  <text x="105" y="186" class="font band-title">一、用户与产品入口层</text>
+  <text x="105" y="214" class="font band-note">三类角色共享同一套平台能力，通过角色权限进入不同工作台</text>
+  <rect x="110" y="236" width="620" height="65" rx="10" fill="#ffffff" opacity=".97"/>
+  <text x="140" y="263" class="font box-title">企业端｜经营协同工作台</text>
+  <text x="140" y="289" class="font box-sub">企业看板 · 企业名录 · 供需匹配 · 报价 · 订单 · 履约</text>
+  <rect x="765" y="236" width="620" height="65" rx="10" fill="#ffffff" opacity=".97"/>
+  <text x="795" y="263" class="font box-title">政府端｜产业监管驾驶舱</text>
+  <text x="795" y="289" class="font box-sub">数字大屏 · 预警中心 · 图谱 · 招商决策 · 质量标签</text>
+  <rect x="1420" y="236" width="865" height="65" rx="10" fill="#ffffff" opacity=".97"/>
+  <text x="1450" y="263" class="font box-title">平台管理端｜治理与运维控制台</text>
+  <text x="1450" y="289" class="font box-sub">入驻审核 · 规则配置 · 风控处置 · 外部 API 管理 · 审计日志</text>
+
+  <!-- arrows -->
+  <path d="M420 323 L420 363" class="flow"/>
+  <path d="M1075 323 L1075 363" class="flow"/>
+  <path d="M1850 323 L1850 363" class="flow"/>
+
+  <!-- Layer 2 -->
+  <rect x="70" y="365" width="2260" height="205" rx="16" fill="#ffffff" stroke="#c5d7de" stroke-width="2" filter="url(#soft)"/>
+  <rect x="70" y="365" width="2260" height="48" rx="16" fill="#e8f0f4"/>
+  <rect x="70" y="397" width="2260" height="16" fill="#e8f0f4"/>
+  <text x="105" y="397" class="font box-title">二、访问控制与 API 控制层｜Flask 应用核心</text>
+  <text x="1910" y="397" class="font small">app/__init__.py · app/routes/</text>
+  <rect x="110" y="438" width="480" height="102" rx="10" fill="#f6fafb" stroke="#d1e0e5"/>
+  <text x="135" y="468" class="font box-title">身份与权限</text>
+  <text x="135" y="496" class="font item">登录 / 注册 / 登出</text>
+  <text x="135" y="522" class="font item">Flask-Login · 角色权限：admin / government / enterprise</text>
+  <rect x="625" y="438" width="720" height="102" rx="10" fill="#f6fafb" stroke="#d1e0e5"/>
+  <text x="650" y="468" class="font box-title">业务 API 蓝图</text>
+  <text x="650" y="496" class="font item">企业 / 供需 / 匹配 / 报价 / 订单 / 履约 / 消息 / 收藏</text>
+  <text x="650" y="522" class="font item">信用 / 预警 / 招商 / 质量 / 合同 / 发票 / 数据授权 / 外部接口</text>
+  <rect x="1380" y="438" width="905" height="102" rx="10" fill="#f6fafb" stroke="#d1e0e5"/>
+  <text x="1405" y="468" class="font box-title">双前端运行模式</text>
+  <text x="1405" y="496" class="font item">React 19 + Vite + Tailwind：主工作台和现代化角色页面</text>
+  <text x="1405" y="522" class="font item">Jinja2 + Bootstrap + ECharts：兼容旧页面、报告和部分服务端页面</text>
+
+  <path d="M1200 570 L1200 608" class="flow-teal"/>
+
+  <!-- Layer 3 business domains -->
+  <rect x="70" y="610" width="2260" height="380" rx="16" fill="#ffffff" stroke="#c5d7de" stroke-width="2" filter="url(#soft)"/>
+  <text x="105" y="652" class="font box-title">三、业务能力层｜以四大高层业务域组织全部功能模块</text>
+  <text x="1828" y="652" class="font small">路由负责接入，services 负责业务编排</text>
+
+  <!-- business boxes -->
+  <rect x="110" y="685" width="520" height="250" rx="12" fill="#edf8f6" stroke="#a9d9d2" stroke-width="2"/>
+  <rect x="110" y="685" width="520" height="48" rx="12" fill="url(#teal)"/>
+  <text x="138" y="716" class="font band-title">A 供需协同与智能撮合</text>
+  <text x="138" y="760" class="font item">• 企业画像、企业名录与供需发布</text>
+  <text x="138" y="790" class="font item">• 9 维度供应商匹配与排序</text>
+  <text x="138" y="820" class="font item">• 意向报价、报价池、沟通会话</text>
+  <text x="138" y="850" class="font item">• 收藏客商、集采拼单、协作码</text>
+  <text x="138" y="888" class="font small">实现：matcher / recommender / intent_quote</text>
+  <text x="138" y="914" class="font small">inquiry_chat / quote_pool</text>
+
+  <rect x="660" y="685" width="520" height="250" rx="12" fill="#fff7e9" stroke="#efd29d" stroke-width="2"/>
+  <rect x="660" y="685" width="520" height="48" rx="12" fill="url(#amber)"/>
+  <text x="688" y="716" class="font band-title">B 交易履约与企业经营</text>
+  <text x="688" y="760" class="font item">• 报价转订单，合同 / 发票 / 对账</text>
+  <text x="688" y="790" class="font item">• 订单状态、履约进度与质量核验</text>
+  <text x="688" y="820" class="font item">• 产能日历、融资资格与资产管理</text>
+  <text x="688" y="850" class="font item">• 消息通知、案例沉淀与协作闭环</text>
+  <text x="688" y="894" class="font small">实现：orders / contract / invoice / fulfillment / capacity / finance</text>
+
+  <rect x="1210" y="685" width="520" height="250" rx="12" fill="#f4effa" stroke="#d5c5e8" stroke-width="2"/>
+  <rect x="1210" y="685" width="520" height="48" rx="12" fill="url(#purple)"/>
+  <text x="1238" y="716" class="font band-title">C 政府监管与产业决策</text>
+  <text x="1238" y="760" class="font item">• 产业链健康度、数字大屏和趋势</text>
+  <text x="1238" y="790" class="font item">• 进口依赖、跨省依赖、本地短缺预警</text>
+  <text x="1238" y="820" class="font item">• 质量标签、企业审核与风险工单</text>
+  <text x="1238" y="850" class="font item">• 产业缺口识别、招商建议与报告</text>
+  <text x="1238" y="894" class="font small">实现：dashboard / alerter / recruitment / quality_labels / admin_panel</text>
+
+  <rect x="1760" y="685" width="520" height="250" rx="12" fill="#eef3f8" stroke="#bfd0dd" stroke-width="2"/>
+  <rect x="1760" y="685" width="520" height="48" rx="12" fill="#4d7183"/>
+  <text x="1788" y="716" class="font band-title">D 平台治理与外部协作</text>
+  <text x="1788" y="760" class="font item">• 数据授权、工商 / 税务 / 电力接口</text>
+  <text x="1788" y="790" class="font item">• 企业微信 / 微信服务号推送</text>
+  <text x="1788" y="820" class="font item">• Hermes 本机告警与远程确认动作</text>
+  <text x="1788" y="850" class="font item">• 审计日志、定时任务、Schema 迁移</text>
+  <text x="1788" y="888" class="font small">实现：external_interfaces / wechat / hermes</text>
+  <text x="1788" y="914" class="font small">scheduler / operation_logger</text>
+
+  <!-- Cross domain arrows -->
+  <path d="M630 810 L660 810" class="flow-teal"/>
+  <path d="M1180 810 L1210 810" class="flow"/>
+  <path d="M1730 810 L1760 810" class="flow"/>
+
+  <path d="M920 990 L920 1027" class="flow"/>
+  <path d="M1480 990 L1480 1027" class="flow"/>
+
+  <!-- Layer 4 intelligence -->
+  <rect x="70" y="1030" width="2260" height="230" rx="16" fill="#17324d" filter="url(#shadow)"/>
+  <text x="105" y="1072" class="font band-title">四、智能分析与决策引擎层｜把数据转成“推荐、预警、预测、问答”</text>
+  <text x="1824" y="1072" class="font band-note">app/services/ · app/applications/ · scripts/</text>
+  <rect x="110" y="1096" width="500" height="128" rx="10" fill="#23455e" stroke="#4e7185"/>
+  <text x="136" y="1125" class="font band-title">匹配与信用引擎</text>
+  <text x="136" y="1152" class="font band-note">关键词 / 类别 / 距离 / 历史交易 / 产能 / 语义 / 信用 / 技术 / GNN</text>
+  <text x="136" y="1180" class="font band-note">Thompson Sampling 根据反馈自适应调整匹配权重</text>
+  <text x="136" y="1208" class="font small" fill="#b8d0db">matcher · ranking_model · credit_engine · bandit · gnn_model</text>
+  <rect x="635" y="1096" width="500" height="128" rx="10" fill="#23455e" stroke="#4e7185"/>
+  <text x="661" y="1125" class="font band-title">风险与趋势引擎</text>
+  <text x="661" y="1152" class="font band-note">多维风险扫描：进口依赖 / 跨省依赖 / 本地短缺 / 绿色风险</text>
+  <text x="661" y="1180" class="font band-note">按月聚合供需，Holt-Winters 指数平滑预测未来 6 个月</text>
+  <text x="661" y="1208" class="font small" fill="#b8d0db">alerter · alert_engine · forecaster · workflow_service</text>
+  <rect x="1160" y="1096" width="500" height="128" rx="10" fill="#23455e" stroke="#4e7185"/>
+  <text x="1186" y="1125" class="font band-title">图谱与知识引擎</text>
+  <text x="1186" y="1152" class="font band-note">Neo4j 保存产业链关系，NetworkX 执行 PageRank / 社区发现</text>
+  <text x="1186" y="1180" class="font band-note">RAG 读取知识文档，返回带上下文的业务问答</text>
+  <text x="1186" y="1208" class="font small" fill="#b8d0db">graph_manager · graph_algorithms · rag_service</text>
+  <rect x="1685" y="1096" width="595" height="128" rx="10" fill="#23455e" stroke="#4e7185"/>
+  <text x="1711" y="1125" class="font band-title">大模型与多模态扩展</text>
+  <text x="1711" y="1152" class="font band-note">Ollama + LangChain：Text-to-SQL / 流式问答；MiMo 为可选云端模型</text>
+  <text x="1711" y="1180" class="font band-note">CLIP 图文匹配、FedLab 联邦学习、离线 HAN-BPR GNN 训练</text>
+  <text x="1711" y="1208" class="font small" fill="#b8d0db">llm_service · llm_query · clip_matcher · fedlab_demo.py</text>
+
+  <path d="M1200 1260 L1200 1298" class="flow-teal"/>
+
+  <!-- Layer 5 data -->
+  <rect x="70" y="1300" width="2260" height="165" rx="16" fill="#ffffff" stroke="#c5d7de" stroke-width="2" filter="url(#soft)"/>
+  <text x="105" y="1342" class="font box-title">五、数据底座与外部依赖层</text>
+  <rect x="110" y="1365" width="610" height="72" rx="10" fill="#f6fafb" stroke="#d1e0e5"/>
+  <text x="135" y="1393" class="font box-title">关系数据：SQLAlchemy ORM</text>
+  <text x="135" y="1420" class="font item">企业 · 产品 · 供需 · 报价 · 交易 · 预警 · 消息 · 招商</text>
+  <rect x="755" y="1365" width="610" height="72" rx="10" fill="#f6fafb" stroke="#d1e0e5"/>
+  <text x="780" y="1393" class="font box-title">图谱与向量</text>
+  <text x="780" y="1420" class="font item">Neo4j 产业链关系 · embedding / FAISS（按需）· 文档知识库</text>
+  <rect x="1400" y="1365" width="880" height="72" rx="10" fill="#f6fafb" stroke="#d1e0e5"/>
+  <text x="1425" y="1393" class="font box-title">可选外部服务</text>
+  <text x="1425" y="1420" class="font item">MySQL · Ollama · Redis · 高德地图 · 微信 / 企业微信 · Hermes · 工商 / 税务 / 电力 API</text>
+
+  <!-- Footer implementation legend -->
+  <rect x="70" y="1482" width="2260" height="1" fill="#c6d7de"/>
+  <text x="100" y="1508" class="font small"><tspan class="strong">实现主线：</tspan>请求进入 React/Jinja → Flask 路由鉴权 → service 编排业务 → ORM/图谱读取与写入 → 智能引擎计算 → API 返回并更新工作台</text>
+  <text x="1850" y="1508" class="font tiny">当前本地：外部接口未配置时按代码内置兜底运行</text>
+</svg>

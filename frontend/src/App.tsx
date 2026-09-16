@@ -11,7 +11,7 @@ import { AdminLayout } from './components/AdminLayout';
 import { RequireAuth } from './components/RequireAuth';
 import { RequireRole } from './components/RequireRole';
 import { useAuth } from './context/AuthContext';
-import { GUEST_HOME_PATH, loginHomePathForRole } from './lib/rbac';
+import { loginHomePathForRole } from './lib/rbac';
 
 // Enterprise pages
 import Dashboard from './pages/Dashboard';
@@ -28,6 +28,11 @@ import FulfillmentDashboard from './pages/FulfillmentDashboard';
 import CapacityCalendar from './pages/CapacityCalendar';
 import EnterpriseDirectory from './pages/EnterpriseDirectory';
 import AlertWorkflow from './pages/AlertWorkflow';
+import PublicHome from './pages/PublicHome';
+import PublicSearch from './pages/PublicSearch';
+import PublicAia from './pages/PublicAia';
+import FactoryDetail from './pages/FactoryDetail';
+import AgentMarket from './pages/AgentMarket';
 
 // Government pages
 import GovDashboard from './pages/gov/GovDashboard';
@@ -78,29 +83,28 @@ function GovLayoutGuard() {
   return <GovLayout />;
 }
 
-function RoleBasedHomeOutlet() {
+function PublicOrRoleHome() {
   const { user, loading } = useAuth();
-  if (loading) return null;
-  if (!user) {
-    return <Navigate to={GUEST_HOME_PATH} replace />;
-  }
-  const path = loginHomePathForRole(user?.role);
-  if (path !== '/') {
-    return <Navigate to={path} replace />;
-  }
-  return <Dashboard />;
+  if (loading) return <AuthLoadingShell />;
+  if (!user) return <PublicHome />;
+  return <Navigate to={loginHomePathForRole(user.role)} replace />;
 }
 
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<PublicOrRoleHome />} />
       <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route path="/search" element={<PublicSearch />} />
+      <Route path="/aia" element={<PublicAia />} />
+      <Route path="/agent-market" element={<AgentMarket />} />
+      <Route path="/factory/:id" element={<FactoryDetail />} />
+      <Route path="/enterprise-directory" element={<PublicSearch />} />
 
       <Route path="/supervision" element={<Navigate to="/gov" replace />} />
 
-      <Route path="/" element={<EnterpriseLayoutGuard />}>
-        <Route index element={<RoleBasedHomeOutlet />} />
-        <Route path="enterprise-directory" element={<EnterpriseDirectory />} />
+      <Route element={<EnterpriseLayoutGuard />}>
+        <Route path="workspace/enterprise-directory" element={<EnterpriseDirectory />} />
         <Route path="matching" element={<Matching />} />
 
         <Route element={<RequireAuth />}>

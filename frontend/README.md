@@ -1,20 +1,29 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# React 前端
 
-# Run and deploy your AI Studio app
+`frontend/` 保存 React/Vite 前端的唯一源码。Flask 生产运行时使用构建输出目录 `app/static/frontend/`，不要直接修改其中的打包 JS/CSS。
 
-This contains everything you need to run your app locally.
+## 本地开发
 
-View your app in AI Studio: https://ai.studio/apps/a0d72959-cbf4-42d0-b67f-9fde89697975
+```bash
+npm install
+npm run dev
+```
 
-## Run Locally
+## 检查和构建
 
-**Prerequisites:**  Node.js
+```bash
+npm run lint   # TypeScript 类型检查
+npm run build  # 构建到 ../app/static/frontend
+```
 
+资源入口在 `src/main.tsx`，路由和页面在 `src/App.tsx`、`src/pages/`，通用组件在 `src/components/`，API 封装在 `src/services/`。
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 公共首页入口
+
+`src/pages/PublicHome.tsx` 是未登录用户的统一入口：提供关键词搜索与 AI 找工厂双模式、行业/地区/常用条件发现、Agent 能力矩阵，以及基于 `/api/public/home` 和 `/api/public/search` 的脱敏资源展示。首页只展示公开摘要，完整企业能力与协同动作仍通过登录后的工作台完成。
+
+```bash
+npm run verify:public-home
+```
+
+`public/` 中的资源会随构建复制到 Flask 静态目录；因此 `frontend/public/` 与 `app/static/frontend/` 出现相同资源是预期的，不是需要删除的临时副本。
