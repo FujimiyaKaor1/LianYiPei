@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
-import { api, type SupplierSearchItem } from '@/src/services/api';
+import { api, type QuoteListItem, type SupplierSearchItem } from '@/src/services/api';
 import { getStoredModelChoice, onModelChoiceChanged, type ModelChoice } from '@/src/lib/modelChoice';
 import { useAuth } from '@/src/context/AuthContext';
 
@@ -175,7 +175,21 @@ export default function Matching() {
   
   const [inquirySendingId, setInquirySendingId] = useState<number | null>(null);
   const [globalToast, setGlobalToast] = useState<string | null>(null);
-  const [activeEnterpriseId, setActiveEnterpriseId] = useState<number | null>(null);
+  const [activeEnterpriseId, setActiveEnterpriseId] = useState<number | null>(() => {
+    const raw = searchParams.get('supplier_id');
+    return raw && /^\d+$/.test(raw) ? Number(raw) : null;
+  });
+  const [inquiryId, setInquiryId] = useState<number | null>(() => {
+    const raw = searchParams.get('inquiry_id');
+    return raw && /^\d+$/.test(raw) ? Number(raw) : null;
+  });
+  const [favoriteIds, setFavoriteIds] = useState<Set<number>>(new Set());
+  const [quotes, setQuotes] = useState<QuoteListItem[]>([]);
+  const [quotesLoading, setQuotesLoading] = useState(false);
+  const [selectedQuoteId, setSelectedQuoteId] = useState<number | null>(null);
+  const [compareIds, setCompareIds] = useState<number[]>([]);
+  const activePanel = searchParams.get('panel');
+  const [quoteSort, setQuoteSort] = useState<'price' | 'delivery' | 'credit'>('price');
 
   const minCreditParam = useMemo(() => {
     if (creditLevel === '不限') return '';
@@ -236,6 +250,21 @@ export default function Matching() {
   }, []);
 
   useEffect(() => {
+    if (!user) { setFavoriteIds(new Set()); return; }
+    void api.getFavorites({ limit: 500 }).then(response => setFavoriteIds(new Set((response.favorites || []).map(item => Number(item.supplier_id))))).catch(() => undefined);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!inquiryId) { setQuotes([]); return; }
+    setQuotesLoading(true);
+    void api.getQuotesForInquiry(inquiryId).then(response => {
+      const list = response.quotes || [];
+      setQuotes(list);
+      setSelectedQuoteId(list.find(item => item.selected)?.id || null);
+    }).catch(() => setQuotes([])).finally(() => setQuotesLoading(false));
+  }, [inquiryId]);
+
+  useEffect(() => {
     return () => {
       const { t1, t2 } = demoTimersRef.current;
       if (t1) clearTimeout(t1);
@@ -270,6 +299,7 @@ export default function Matching() {
         setGlobalToast('询盘发送失败，请重试');
         return;
       }
+      setInquiryId(inquiryResp.inquiry_id);
 
       // Step 2：自动创建 InquiryChat 会话（匿名询价闭环）
       let createdChatId: number | null = null;
@@ -314,6 +344,41 @@ export default function Matching() {
     }
   };
 
+  const toggleFavorite = async (item: SupplierSearchItem) => {
+    if (!user) { requestLogin(`${location.pathname}${location.search}`); return; }
+    const supplierId = Number(item.id);
+    try {
+      if (favoriteIds.has(supplierId)) {
+        await api.removeFavoriteById(supplierId);
+        setFavoriteIds(previous => { const next = new Set(previous); next.delete(supplierId); return next; });
+        setGlobalToast('已取消收藏');
+      } else {
+        await api.addFavorite({ supplier_id: supplierId, product_name: searchQuery, match_score: Number(item.score || 0) });
+        setFavoriteIds(previous => new Set(previous).add(supplierId));
+        setGlobalToast('已收藏该客商');
+      }
+    } catch (error) { setGlobalToast(error instanceof Error ? error.message : '收藏操作失败'); }
+  };
+
+  const selectQuote = async (quote: QuoteListItem) => {
+    if (!inquiryId) return;
+    try {
+      await api.selectQuote(quote.id);
+      setSelectedQuoteId(quote.id);
+      setGlobalToast('已标记心仪报价，供应商将收到通知');
+    } catch (error) { setGlobalToast(error instanceof Error ? error.message : '标记报价失败'); }
+  };
+
+  const toggleCompare = (quoteId: number) => {
+    setCompareIds(previous => previous.includes(quoteId) ? previous.filter(id => id !== quoteId) : previous.length < 4 ? [...previous, quoteId] : previous);
+  };
+
+  const sortedQuotes = [...quotes].sort((left, right) => {
+    if (quoteSort === 'delivery') return (left.delivery_days ?? Number.MAX_SAFE_INTEGER) - (right.delivery_days ?? Number.MAX_SAFE_INTEGER);
+    if (quoteSort === 'credit') return (right.credit_score ?? 0) - (left.credit_score ?? 0);
+    return (left.price ?? Number.MAX_SAFE_INTEGER) - (right.price ?? Number.MAX_SAFE_INTEGER);
+  });
+
   // ── 点击「智能匹配」按钮：强制 deep_learning 模式 ──────────────────────
 
   const handleSearch = () => {
@@ -335,26 +400,14 @@ export default function Matching() {
   // ── 指标分析（基于真实数据动态生成） ────────────────────────────────────
 
   const getMetrics = (item: SupplierSearchItem) => {
-    const seed = (Number(item.id) * 137) % 100;
     const creditScore = Number(item.credit_score) || 70;
     return [
-      { label: '价格竞争力 (同级对比)', value: Math.min(99, 80 + (seed % 18)), icon: TrendingUp },
-      { label: '历史交期达成率', value: Math.min(99, 88 + (Number(item.id) % 11)), icon: Clock },
-      { label: '质量控制水平 (良品率)', value: Math.min(99, 92 + ((seed + 3) % 7)), icon: CheckCircle },
-      { label: '产线数字化覆盖率', value: Math.min(99, 70 + ((seed * 2) % 28)), icon: Zap },
+      { label: '价格竞争力 (同级对比)', value: null, icon: TrendingUp },
+      { label: '历史交期达成率', value: null, icon: Clock },
+      { label: '质量控制水平 (良品率)', value: null, icon: CheckCircle },
+      { label: '产线数字化覆盖率', value: null, icon: Zap },
       { label: '信用综合评定', value: Math.round(creditScore), icon: ShieldCheck },
     ];
-  };
-
-  const getCapacityHeatmap = (id: number) => {
-    const seed = id * 53;
-    return Array.from({ length: 30 }).map((_, i) => {
-      const val = (seed + i * 17) % 100;
-      if (val < 15) return 0;
-      if (val < 50) return 1;
-      if (val < 85) return 2;
-      return 3;
-    });
   };
 
   const activeSupplier = suppliers.find(s => Number(s.id) === activeEnterpriseId) || suppliers[0];
@@ -445,6 +498,17 @@ export default function Matching() {
         </div>
       )}
 
+      {(activePanel === 'favorites' || activePanel === 'quotes' || inquiryId) && (
+        <section className="panel shrink-0 overflow-hidden">
+          <div className="panel-header flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+            <div><h3 className="text-sm font-bold text-ink">{activePanel === 'favorites' ? '收藏客商' : '报价比较'}</h3><p className="mt-1 text-[11px] text-ink-muted">{inquiryId ? `当前询价单 #${inquiryId} 的真实业务数据` : '请先从匹配结果发起真实询价'}</p></div>
+            {inquiryId && <div className="flex items-center gap-1"><span className="mr-1 text-[10px] text-ink-muted">排序</span>{[['price', '价格'], ['delivery', '交期'], ['credit', '信用']].map(([key, label]) => <button key={key} type="button" onClick={() => setQuoteSort(key as typeof quoteSort)} className={cn('rounded px-2 py-1 text-[10px] font-bold', quoteSort === key ? 'bg-brand-soft text-brand' : 'text-ink-muted hover:bg-surface-subtle')}>{label}</button>)}</div>}
+          </div>
+          {activePanel === 'favorites' ? <div className="p-4 text-xs text-ink-muted">收藏已前移至左侧匹配结果卡片，可直接收藏或取消收藏供应商。</div> : !inquiryId ? <div className="p-4 text-xs text-ink-muted">请先发起询价，供应商报价后将在这里集中展示。</div> : quotesLoading ? <div className="p-4 text-xs text-ink-muted">正在加载报价…</div> : sortedQuotes.length === 0 ? <div className="p-4 text-xs text-ink-muted">当前询价暂未收到报价。</div> : <div className="grid gap-2 p-4 md:grid-cols-2">{sortedQuotes.map(quote => <div key={quote.id} className={cn('rounded-md border p-3', selectedQuoteId === quote.id ? 'border-brand bg-brand-soft/30' : 'border-border bg-white')}><div className="flex items-start justify-between gap-3"><div><p className="text-xs font-bold text-ink">{quote.supplier_name}</p><p className="mt-1 text-[11px] text-ink-muted">¥ {quote.price?.toLocaleString()} · {quote.quantity || '—'} {quote.unit || ''} · {quote.delivery_days ?? '—'} 天</p></div><span className="text-[10px] font-bold text-ink-muted">信用 {quote.credit_score ?? '—'}</span></div><div className="mt-3 flex items-center justify-between"><span className="text-[10px] text-ink-faint">{quote.created_at?.slice(0, 10) || '时间待补充'}</span><div className="flex gap-2"><button type="button" onClick={() => toggleCompare(quote.id)} className="text-[10px] font-bold text-brand">{compareIds.includes(quote.id) ? '取消比较' : '加入比较'}</button><button type="button" onClick={() => void selectQuote(quote)} className="rounded bg-brand px-2 py-1 text-[10px] font-bold text-white">{selectedQuoteId === quote.id ? '已标记' : '标记心仪'}</button></div></div></div>)}</div>}
+          {compareIds.length > 0 && <div className="border-t border-border bg-surface-subtle px-4 py-2 text-[11px] text-ink-muted">已选择 {compareIds.length} 条报价进行比较（最多 4 条）</div>}
+        </section>
+      )}
+
       {/* Bottom Grid Layout */}
       <section className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4">
         
@@ -525,6 +589,7 @@ export default function Matching() {
                         <div className={cn("mt-1 origin-right scale-90 text-[9px] font-semibold", isActive ? "text-white/60" : "text-ink-muted")}>匹配分</div>
                       </div>
                     </div>
+                    <button type="button" onClick={(event) => { event.stopPropagation(); void toggleFavorite(item); }} className={cn('self-start rounded px-2 py-1 text-[10px] font-bold', favoriteIds.has(Number(item.id)) ? (isActive ? 'bg-white/15 text-white' : 'bg-amber-50 text-amber-700') : (isActive ? 'bg-white/10 text-white/80' : 'bg-surface-subtle text-ink-muted'))}>{favoriteIds.has(Number(item.id)) ? '★ 已收藏' : '☆ 收藏客商'}</button>
                     
                     <div className={cn("h-px w-full", isActive ? "bg-white/10" : "bg-neutral-100")}></div>
                     
@@ -635,12 +700,12 @@ export default function Matching() {
                              <metric.icon className="h-3 w-3 text-ink-muted transition-colors group-hover:text-brand" />
                              {metric.label}
                            </div>
-                           <span className="font-bold text-ink">{metric.value}%</span>
+                           <span className="font-bold text-ink">{metric.value == null ? '暂无数据' : `${metric.value}%`}</span>
                          </div>
                          <div className="h-1 w-full overflow-hidden rounded-full bg-surface-container">
                            <motion.div 
                              initial={{ width: 0 }}
-                             animate={{ width: `${metric.value}%` }}
+                             animate={{ width: `${metric.value ?? 0}%` }}
                              transition={{ duration: 0.8, delay: 0.05 * idx, ease: "easeOut" }}
                              className="h-full rounded-full bg-brand"
                            />
@@ -658,35 +723,8 @@ export default function Matching() {
                       未来30天产能日历
                     </h3>
                   </div>
-                  <div className="rounded-md border border-border bg-surface-subtle p-5">
-                    <div className="grid grid-cols-6 gap-2">
-                      {getCapacityHeatmap(Number(activeSupplier.id)).map((status, idx) => (
-                        <motion.div 
-                          key={`cap-day-${idx}`}
-                          initial={{ opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ delay: idx * 0.01 }}
-                          className={cn(
-                            "aspect-square cursor-crosshair rounded-[4px] border transition-all hover:scale-105",
-                            status === 0 ? "border-brand-solid bg-brand-solid" :
-                            status === 1 ? "border-risk bg-risk" :
-                            status === 2 ? "border-trust/30 bg-trust-soft" :
-                            "border-border bg-white"
-                          )}
-                          title={`Day ${idx + 1}`}
-                        />
-                      ))}
-                    </div>
-                    <div className="flex items-center justify-end gap-1.5 mt-3 text-[9px] font-medium text-neutral-400">
-                      <span>排满</span>
-                      <div className="flex gap-0.5">
-                        <div className="w-2.5 h-2.5 rounded-[2px] bg-brand-solid"></div>
-                        <div className="w-2.5 h-2.5 rounded-[2px] bg-risk"></div>
-                        <div className="w-2.5 h-2.5 rounded-[2px] bg-trust-soft"></div>
-                        <div className="w-2.5 h-2.5 rounded-[2px] border border-border bg-white"></div>
-                      </div>
-                      <span>空闲</span>
-                    </div>
+                  <div className="rounded-md border border-dashed border-border bg-surface-subtle p-5 text-center text-xs text-ink-muted">
+                    当前匹配接口未提供该企业的真实日历数据，产能状态请以供应商确认结果为准。
                   </div>
                 </div>
 

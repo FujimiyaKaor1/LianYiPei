@@ -39,6 +39,7 @@ import {
   type ChatMessageData,
   type BusinessInsightsData,
   type EnterpriseProfile,
+  type EnterpriseSalesSummary,
 } from '@/src/services/api';
 import { useAuth } from '@/src/context/AuthContext';
 import { useToast } from '@/src/components/ToastProvider';
@@ -46,35 +47,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { BusinessCardModal, type BusinessCardData } from '@/src/components/BusinessCardModal';
 import { IntentQuoteModal } from '@/src/components/IntentQuoteModal';
 import { AnalysisReportModal } from '@/src/components/AnalysisReportModal';
-
-/** 演示数据常量 */
-const DEMO_INQUIRY_ID = 1;
-const DEMO_BUYER_ENTERPRISE_ID = 2;
-
-const LS_INBOX_KEY = 'lyp_sales_inbox_fallback_v1';
-
-function readLsInbox(): SalesMessageItem[] {
-  try {
-    const raw = localStorage.getItem(LS_INBOX_KEY);
-    if (!raw) return [];
-    const j = JSON.parse(raw) as { messages?: SalesMessageItem[] };
-    return Array.isArray(j?.messages) ? j.messages : [];
-  } catch {
-    return [];
-  }
-}
-
-function appendLsInbox(msg: SalesMessageItem) {
-  try {
-    const prev = readLsInbox();
-    localStorage.setItem(
-      LS_INBOX_KEY,
-      JSON.stringify({ messages: [msg, ...prev].slice(0, 40), updatedAt: new Date().toISOString() }),
-    );
-  } catch {
-    /* ignore quota */
-  }
-}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 工具函数
@@ -443,6 +415,9 @@ export default function SalesConsole() {
 
   // ── 采购/销售模式切换 ─────────────────────────────────────────────────────
   const [mode, setMode] = useState<'procurement' | 'sales'>('sales');
+  const [salesSummary, setSalesSummary] = useState<EnterpriseSalesSummary | null>(null);
+  const [salesSummaryLoading, setSalesSummaryLoading] = useState(false);
+  const [salesSummaryError, setSalesSummaryError] = useState('');
 
   // ── 旧版消息列表 ─────────────────────────────────────────────────────────
   const [chatList, setChatList] = useState<ChatThreadItem[]>([]);
@@ -469,7 +444,7 @@ export default function SalesConsole() {
   const [insightError, setInsightError] = useState('');
   const [matchScore, setMatchScore] = useState<number>(0);
   const [risk, setRisk] = useState<CreditRiskResult | null>(null);
-  const [profitRate, setProfitRate] = useState<number>(10);
+  const [profitRate, setProfitRate] = useState<number | null>(null);
   const [businessInsights, setBusinessInsights] = useState<BusinessInsightsData | null>(null);
 
   // ── 报价 Modal ────────────────────────────────────────────────────────────
@@ -477,7 +452,6 @@ export default function SalesConsole() {
   const [quoteError, setQuoteError] = useState('');
   const [myCreditScore, setMyCreditScore] = useState<number | null>(null);
   const [myCreditLoading, setMyCreditLoading] = useState(false);
-  const [quotesTodayCount, setQuotesTodayCount] = useState(5);
   const [quoteSuccessToast, setQuoteSuccessToast] = useState(false);
   const [fallbackBuyerId] = useState<number | null>(null);
 
@@ -560,15 +534,7 @@ export default function SalesConsole() {
       const data = await api.fetchSalesMessages({ page: 1, per_page: 20, mode });
       const list = data.messages || [];
       const mapped = mapSalesToThreads(list, 'api');
-      const lsRaw = readLsInbox();
-      const lsThreads = mapSalesToThreads(lsRaw, 'ls').filter((t) => {
-        const url = t.link_url || '';
-        if (url.includes('seller_quote=1')) return true;
-        const iid = extractInquiryId(chatItemToSalesMessageLike(t));
-        if (!iid) return true;
-        return !mapped.some((m) => extractInquiryId(chatItemToSalesMessageLike(m)) === iid);
-      });
-      const next = [...mapped, ...lsThreads];
+      const next = mapped;
       setChatList(() => {
         setActiveChatId((aid) => {
           if (activeInquiryIdFromState) {
@@ -584,19 +550,10 @@ export default function SalesConsole() {
       });
       setUnreadCount(data.unread_count || 0);
     } catch (error) {
-      const lsRaw = readLsInbox();
-      const fallback = mapSalesToThreads(lsRaw, 'ls');
-      if (fallback.length > 0) {
-        setChatList(fallback);
-        setActiveChatId((aid) => {
-          if (aid && fallback.some((c) => c.id === aid)) return aid;
-          return fallback[0]?.id ?? null;
-        });
-        setUnreadCount(0);
-        setMessageError('');
-      } else {
-        setMessageError(error instanceof Error ? error.message : '消息加载失败');
-      }
+      setChatList([]);
+      setActiveChatId(null);
+      setUnreadCount(0);
+      setMessageError(error instanceof Error ? error.message : '消息加载失败');
     } finally {
       setLoadingMessages(false);
     }
@@ -616,6 +573,29 @@ export default function SalesConsole() {
   useEffect(() => {
     void loadMessages();
   }, [loadMessages]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setSalesSummary(null);
+      return;
+    }
+    let cancelled = false;
+    setSalesSummaryLoading(true);
+    setSalesSummaryError('');
+    api.getEnterpriseSalesSummary(mode)
+      .then((data) => {
+        if (!cancelled) setSalesSummary(data);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setSalesSummary(null);
+        setSalesSummaryError(error instanceof Error ? error.message : '销售指标加载失败');
+      })
+      .finally(() => {
+        if (!cancelled) setSalesSummaryLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [mode, user?.id]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 加载 InquiryChat 会话列表（新）
@@ -692,11 +672,9 @@ export default function SalesConsole() {
     } catch (err) {
       setInsightError(err instanceof Error ? err.message : '商机评估加载失败');
       setBusinessInsights(null);
-      // 降级为本地算分
-      const baseMatch = 65 + (Math.abs(chatId * 17) % 34);
-      const baseProfit = 8 + (Math.abs(chatId * 3) % 15);
-      setMatchScore(baseMatch);
-      setProfitRate(baseProfit);
+      // 接口失败时明确显示无数据，不用本地数字冒充商机评估。
+      setMatchScore(0);
+      setProfitRate(null);
       setRisk(null);
     } finally {
       setInsightLoading(false);
@@ -709,22 +687,18 @@ export default function SalesConsole() {
     setInsightError('');
     const sm = chatItemToSalesMessageLike(thread);
     const buyerEnt = extractBuyerId(sm) ?? extractEnterpriseId(sm);
-    const seed = (thread.apiMessageId ?? 0) * 17 + (buyerEnt ?? 0);
-    const baseMatch = 65 + (Math.abs(seed) % 34);
-    const baseProfit = 8 + (Math.abs(seed * 3) % 15);
     try {
       const query = deriveDemand(sm).slice(0, 80);
       const [scoreResult, riskResult] = await Promise.all([
         api.fetchOpportunityScore({ query }),
         api.fetchCreditRisk(buyerEnt ?? user?.id ?? 0),
       ]);
-      const blended = Math.round((baseMatch + (scoreResult.score || 0)) / 2);
-      setMatchScore(Math.max(55, Math.min(99, blended)));
+      setMatchScore(Number(scoreResult.score || 0));
       setRisk(riskResult);
-      setProfitRate(Math.max(6, Math.min(22, Math.round(baseProfit + (scoreResult.score || 0) * 0.04))));
+      setProfitRate(null);
     } catch {
-      setMatchScore(baseMatch);
-      setProfitRate(baseProfit);
+      setMatchScore(0);
+      setProfitRate(null);
       setRisk(null);
     } finally {
       setInsightLoading(false);
@@ -927,7 +901,6 @@ export default function SalesConsole() {
       void loadInsights(activeInquiryChatId);
       void loadInquiryChats();
     }
-    setQuotesTodayCount((c) => c + 1);
   };
 
   // ── 名片交换 ──────────────────────────────────────────────────────────────
@@ -1019,7 +992,6 @@ export default function SalesConsole() {
   const riskStyleLocal = getRiskStyle(risk);
   const buyerName = selectedMessage ? deriveBuyerName(selectedMessage) : '采购商';
   const demandText = selectedMessage ? deriveDemand(selectedMessage) : '请选择左侧消息查看详情';
-  const displayCreditScore = myCreditScore != null ? Math.round(myCreditScore) : 93;
 
   /** 当前会话可收藏的对方企业 ID（销售→买方，采购→卖方；匿名会话不展示） */
   const counterpartyEnterpriseId = useMemo(() => {
@@ -1068,6 +1040,67 @@ export default function SalesConsole() {
           </button>
         </div>
       ) : null}
+
+      <section className="col-span-12 space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="eyebrow text-brand">{mode === 'sales' ? 'Sales desk' : 'Procurement desk'}</p>
+            <h1 className="mt-1 text-2xl font-black tracking-tight text-ink">销售控制台</h1>
+            <p className="mt-1 text-sm text-ink-muted">{mode === 'sales' ? '查看收到的询盘、报价和履约进度' : '查看发起的需求、供应商报价和采购进度'}</p>
+          </div>
+          <div className="text-right text-xs text-ink-muted">
+            <p>{salesSummary?.is_demo ? '演示数据' : '真实业务数据'}</p>
+            <p className="mt-1">更新时间：{salesSummary?.updated_at ? new Date(salesSummary.updated_at).toLocaleString('zh-CN') : '暂无数据'}</p>
+          </div>
+        </div>
+
+        {salesSummaryError ? (
+          <div className="panel border-critical/20 bg-critical-soft px-4 py-3 text-sm text-critical">
+            销售指标暂时无法获取：{salesSummaryError}。当前不展示本地或固定业务数字。
+          </div>
+        ) : null}
+
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          {[
+            ['新增询盘', salesSummary?.metrics.new_inquiries, '近 30 天'],
+            ['已报价', salesSummary?.metrics.quoted, '关联真实报价'],
+            ['意向转化率', salesSummary ? `${salesSummary.metrics.intent_conversion_rate}%` : undefined, '询盘到报价'],
+            ['待履约订单', salesSummary?.metrics.pending_fulfillment_orders, '当前待处理'],
+          ].map(([label, value, hint]) => (
+            <div key={String(label)} className="card-hover p-4">
+              <div className="text-xs font-semibold text-ink-muted">{label}</div>
+              <div className="mt-2 text-2xl font-black text-ink">
+                {salesSummaryLoading ? '—' : value ?? '暂无数据'}
+              </div>
+              <div className="mt-1 text-[11px] text-ink-faint">{hint}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="panel p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-ink">销售漏斗</h2>
+              <p className="mt-1 text-xs text-ink-muted">只统计当前企业参与的真实业务记录。</p>
+            </div>
+            <span className="badge-neutral">{salesSummary?.source === 'business_records' ? '业务数据' : '暂无来源'}</span>
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+            {[
+              ['询盘', salesSummary?.funnel.inquiries],
+              ['报价', salesSummary?.funnel.quotes],
+              ['签约/订单', salesSummary?.funnel.contracts],
+              ['履约中', salesSummary?.funnel.fulfillment],
+            ].map(([label, value], index) => (
+              <div key={String(label)} className="relative rounded-md border border-border bg-surface-subtle p-3">
+                <div className="text-xs font-semibold text-ink-muted">{label}</div>
+                <div className="mt-2 text-xl font-black text-ink">{salesSummaryLoading ? '—' : value ?? '暂无数据'}</div>
+                {index < 3 ? <ArrowRight className="absolute right-2 top-1/2 hidden h-4 w-4 translate-x-full -translate-y-1/2 text-ink-faint md:block" /> : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* Success Toast */}
       <AnimatePresence>
@@ -1682,9 +1715,9 @@ export default function SalesConsole() {
                 },
                 {
                   label: '预计利润率',
-                  value: `${profitRate}%`,
-                  sub: profitRate >= 12 ? '+2.1%' : '+0.8%',
-                  subText: '基于当前需求估算',
+                  value: profitRate == null ? '暂无数据' : `${profitRate}%`,
+                  sub: profitRate == null ? undefined : '来自业务接口',
+                  subText: profitRate == null ? '当前没有可核验的利润率数据' : '基于当前需求估算',
                   loading: insightLoading,
                 },
                 {
@@ -1748,109 +1781,9 @@ export default function SalesConsole() {
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════════════════
-          模块 B：意向合作漏斗（保留原有模块）
-      ═══════════════════════════════════════════════════════════════════ */}
-      <section className="col-span-8 bg-white rounded-[24px] border border-neutral-100 shadow-[0_4px_40px_rgba(0,0,0,0.03)] p-8">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h2 className="font-bold text-lg">意向合作漏斗</h2>
-            <p className="text-xs text-neutral-400 mt-1">当前进行中的 48 个合作项目</p>
-          </div>
-          <button
-            onClick={() => navigate('/orders')}
-            className="text-xs font-bold text-neutral-400 hover:text-primary transition-colors flex items-center gap-1"
-          >
-            全部动态 <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="space-y-4">
-          {[
-            { name: '某大型通讯企业', project: '5G 基站精密连接器采购', status: '意向报价中', amount: '¥ 458,000.00', date: '截止日期：明天', icon: Factory, color: 'text-blue-500', bg: 'bg-blue-50' },
-            { name: '东莞泰科电子', project: '高频线束定制打样', status: '线下打样中', amount: '待定', date: '进度：样品已寄出', icon: Cpu, color: 'text-orange-500', bg: 'bg-orange-50' },
-            { name: '华南仪器厂', project: '年度传感模块框架协议', status: '待确认订单', amount: '¥ 2,240,000.00', date: '生效期：2024Q3', icon: FileText, color: 'text-blue-500', bg: 'bg-blue-50' },
-          ].map((item, i) => (
-            <div key={i} className="group flex items-center justify-between gap-3 p-4 hover:bg-surface-container-low rounded-2xl transition-all border border-transparent hover:border-neutral-100">
-              <div className="flex items-center gap-4 min-w-0 flex-1 cursor-pointer">
-                <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center shrink-0', item.bg, item.color)}>
-                  <item.icon className="w-6 h-6" />
-                </div>
-                <div className="min-w-0">
-                  <h4 className="text-sm font-bold truncate">{item.name}</h4>
-                  <p className="text-xs text-neutral-400 truncate">项目：{item.project}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 sm:gap-6 shrink-0">
-                <span className={cn('px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap', item.bg, item.color)}>{item.status}</span>
-                <div className="text-right hidden sm:block">
-                  <div className="text-xs font-bold">{item.amount}</div>
-                  <div className="text-[10px] text-neutral-400">{item.date}</div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-neutral-300 group-hover:text-primary hidden sm:block" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════════════════════
-          模块 C：企业资产画像 + 快速特权（保留原有模块）
-      ═══════════════════════════════════════════════════════════════════ */}
-      <section className="col-span-4 flex flex-col gap-6">
-        <div className="bg-gradient-to-br from-brand-solid via-brand-solid-hover to-brand-deep rounded-[24px] p-8 text-white relative overflow-hidden shadow-xl">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 blur-3xl rounded-full"></div>
-          <div className="relative z-10">
-            <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-4">企业资产画像</h3>
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <div className="text-4xl font-black">92</div>
-                <div className="text-xs text-neutral-400 mt-1">履约信用分</div>
-              </div>
-              <div className="bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md">
-                <div className="text-[10px] text-neutral-300">行业排名</div>
-                <div className="text-sm font-bold">超越 88% 同行</div>
-              </div>
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-neutral-400">信用额度：</span>
-                <span className="font-bold">¥ 5,000,000.00</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-neutral-400">本月回款：</span>
-                <span className="font-bold text-blue-400">¥ 842,500.00</span>
-              </div>
-            </div>
-            <button
-              onClick={() => navigate('/orders')}
-              className="mt-8 w-full py-4 bg-white text-primary rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-neutral-100 transition-colors"
-            >
-              <RefreshCw className="w-4 h-4" />
-              一键同步 SaaS 订单系统
-            </button>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-[24px] border border-neutral-100 shadow-[0_4px_40px_rgba(0,0,0,0.03)] p-6">
-          <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-4">快速特权</h4>
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { icon: TrendingUp, label: '优先抢单', path: '/matching' },
-              { icon: Wallet, label: '账期保理', path: '/assets' },
-              { icon: Award, label: '优质商机', path: '/workspace/enterprise-directory' },
-              { icon: Zap, label: 'AI 营销', path: '/sales-console' },
-            ].map((item, i) => (
-              <button
-                key={i}
-                onClick={() => navigate(item.path)}
-                className="p-4 bg-surface-container-low rounded-2xl flex flex-col gap-2 items-center text-center hover:bg-neutral-100 transition-colors group"
-              >
-                <item.icon className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
-                <span className="text-[10px] font-bold">{item.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+      <section className="col-span-12 panel flex items-center justify-between gap-4 p-5">
+        <div><h2 className="text-sm font-bold text-ink">意向合作漏斗</h2><p className="mt-1 text-xs text-ink-muted">选择左侧真实会话后查看报价、名片和下一步动作。</p></div>
+        <button type="button" onClick={() => navigate('/orders')} className="btn-secondary btn-sm gap-1.5">查看订单 <ArrowRight className="h-3.5 w-3.5" /></button>
       </section>
     </div>
   );

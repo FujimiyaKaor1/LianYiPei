@@ -699,6 +699,7 @@ def api_inquiry_send():
         feedback.updated_at = datetime.utcnow()
 
     inquiry = Inquiry(
+        poster_id=buyer_id,
         buyer_id=buyer_id,
         seller_id=supplier_id,
         product_name=product_name or None,

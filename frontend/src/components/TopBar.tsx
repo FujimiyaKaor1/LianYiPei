@@ -5,6 +5,7 @@ import { useAuth } from '@/src/context/AuthContext';
 import { useTheme } from '@/src/context/ThemeContext';
 import { useToast } from '@/src/components/ToastProvider';
 import { api } from '@/src/services/api';
+import { EnterpriseNavMenu } from './EnterpriseNavMenu';
 
 interface TopBarProps {
   title: string;
@@ -37,6 +38,7 @@ export function TopBar({ title, showSearch = true }: TopBarProps) {
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <h2 className="truncate text-[20px] font-bold text-ink">{title}</h2>
+          <EnterpriseNavMenu compact />
           <span className="rounded-md border border-trust/20 bg-trust-soft px-2 py-0.5 text-[10px] font-bold text-trust">
             Live
           </span>

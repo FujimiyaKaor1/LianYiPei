@@ -3,6 +3,7 @@
 """
 import logging
 from typing import Optional, Tuple
+from datetime import datetime
 
 from flask import Blueprint, jsonify, request, render_template
 from flask_login import current_user, login_required
@@ -468,8 +469,15 @@ def fulfillment_dashboard():
 def list_quotes():
     """获取最近报价列表 (支持前端 QuotePool 页面)。"""
     page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 20, type=int)
-    q = Quote.query.filter_by(status='active').order_by(Quote.created_at.desc())
+    per_page = max(1, min(request.args.get('per_page', 20, type=int), 100))
+    # 报价池只展示当前企业参与的询价，避免跨企业泄露价格与合作关系。
+    q = Quote.query.join(Inquiry, Quote.inquiry_id == Inquiry.id).filter(
+        Quote.status == 'active',
+        (Quote.supplier_id == current_user.id) |
+        (Inquiry.buyer_id == current_user.id) |
+        (Inquiry.poster_id == current_user.id) |
+        (Inquiry.seller_id == current_user.id),
+    ).order_by(Quote.created_at.desc(), Quote.id.desc())
     total = q.count()
     quotes = q.offset((page - 1) * per_page).limit(per_page).all()
     result = []
@@ -511,8 +519,13 @@ def submit_quote():
     if price <= 0:
         raise APIError.bad_request('报价金额必须大于0', ERR_QUOTE_PRICE_INVALID)
 
-    if not Inquiry.query.get(int(inquiry_id)):
+    inquiry = Inquiry.query.get(int(inquiry_id))
+    if not inquiry:
         raise APIError.not_found('询价单不存在', ERR_INQUIRY_NOT_FOUND)
+    if inquiry.seller_id and inquiry.seller_id != current_user.id:
+        raise APIError.forbidden('只有该询价单的供应方可以提交报价', ERR_FORBIDDEN)
+    if inquiry.buyer_id == current_user.id or inquiry.poster_id == current_user.id:
+        raise APIError.forbidden('采购方不能以供应方身份提交报价', ERR_FORBIDDEN)
 
     quote, error = add_quote(
         inquiry_id=int(inquiry_id),
@@ -551,8 +564,45 @@ def get_price_index_api(product_name: str):
 @role_required('enterprise')
 def get_inquiry_quotes(inquiry_id: int):
     """获取询价单的所有报价。"""
+    inquiry = Inquiry.query.get_or_404(inquiry_id)
+    allowed = {inquiry.poster_id, inquiry.buyer_id, inquiry.seller_id}
+    allowed.discard(None)
+    if current_user.id not in allowed:
+        return jsonify({'error': '无权查看该询价单报价'}), 403
     quotes = get_quotes_for_inquiry(inquiry_id)
     return jsonify({'quotes': quotes})
+
+
+@collab_bp.route('/api/quotes/<int:quote_id>/select', methods=['POST'])
+@role_required('enterprise')
+def select_quote(quote_id: int):
+    """买方标记意向报价；幂等写入 Inquiry.match_context。"""
+    quote = Quote.query.get_or_404(quote_id)
+    inquiry = Inquiry.query.get_or_404(quote.inquiry_id)
+    # 只有询价发布方/采购方可以表达意向，供应商不能替采购方选择自己的报价。
+    allowed = {inquiry.poster_id, inquiry.buyer_id}
+    allowed.discard(None)
+    if current_user.id not in allowed:
+        return jsonify({'error': '无权操作该报价'}), 403
+    context = dict(inquiry.match_context) if isinstance(inquiry.match_context, dict) else {}
+    old_id = context.get('selected_quote_id')
+    if old_id != quote.id:
+        context['selected_quote_id'] = quote.id
+        context['selected_quote_by'] = current_user.id
+        context['selected_quote_at'] = datetime.utcnow().isoformat()
+        inquiry.match_context = context
+        db.session.add(Message(
+            sender_id=current_user.id,
+            recipient_id=quote.supplier_id,
+            message_type='quote_selected',
+            title='报价被标记为心仪报价',
+            content=f'询价单 #{inquiry.id} 的报价已被采购方标记，请进入销售控制台继续沟通。',
+            link_url=f'/sales-console?inquiry_id={inquiry.id}',
+            mode='sales',
+        ))
+        logger.info('quote selected quote_id=%s inquiry_id=%s by enterprise_id=%s', quote.id, inquiry.id, current_user.id)
+        db.session.commit()
+    return jsonify({'success': True, 'selected_quote_id': quote.id, 'inquiry_id': inquiry.id, 'idempotent': old_id == quote.id})
 
 
 @collab_bp.route('/inquiry/<int:inquiry_id>', methods=['GET'])

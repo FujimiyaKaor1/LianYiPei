@@ -7,17 +7,17 @@ import json
 import logging
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 _logger = logging.getLogger(__name__)
 
 from flask import Blueprint, Response, current_app, jsonify, request, stream_with_context
 from flask_login import current_user, login_required
-from sqlalchemy import String, and_, cast, func, or_
+from sqlalchemy import String, and_, cast, false, func, or_
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.authz import role_required, user_effective_role, user_session_role
-from app.models import Enterprise, Inquiry, Product, Transaction
+from app.models import Enterprise, Inquiry, Product, Quote, Transaction
 from app.services import map_service
 from app.services import finance_service
 from app.services.fulfillment_dashboard import get_active_fulfillments, get_dashboard_payload
@@ -143,6 +143,181 @@ def api_orders_list():
 def api_orders_statistics():
     stats = OrderService.get_order_statistics(current_user.id)
     return jsonify({"success": True, "statistics": stats})
+
+
+def _enterprise_inquiry_scope(enterprise_id: int):
+    return Inquiry.query.filter(or_(
+        Inquiry.poster_id == enterprise_id,
+        Inquiry.buyer_id == enterprise_id,
+        Inquiry.seller_id == enterprise_id,
+    ))
+
+
+def _json_orders_for_enterprise(enterprise_id: int) -> list[dict]:
+    ent = Enterprise.query.get(enterprise_id)
+    extras = ent.extras if ent and isinstance(ent.extras, dict) else {}
+    rows = extras.get("saas_orders") if isinstance(extras.get("saas_orders"), list) else []
+    return [row for row in rows if isinstance(row, dict)]
+
+
+@api_bp.route("/enterprise/dashboard/summary", methods=["GET"])
+@role_required("enterprise")
+def api_enterprise_dashboard_summary():
+    """企业经营摘要；所有查询均以当前登录企业为边界，不返回演示数字。"""
+    enterprise_id = int(current_user.id)
+    since = datetime.utcnow() - timedelta(days=30)
+    inquiries = _enterprise_inquiry_scope(enterprise_id).filter(Inquiry.created_at >= since)
+    inquiry_ids = [row.id for row in inquiries.with_entities(Inquiry.id).all()]
+    quote_query = Quote.query.filter(Quote.created_at >= since)
+    if inquiry_ids:
+        quote_query = quote_query.filter(or_(Quote.supplier_id == enterprise_id, Quote.inquiry_id.in_(inquiry_ids)))
+    else:
+        quote_query = quote_query.filter(Quote.supplier_id == enterprise_id)
+    orders = _json_orders_for_enterprise(enterprise_id)
+    recent_orders = []
+    for row in orders:
+        raw = str(row.get("created_at") or row.get("order_date") or "")
+        try:
+            if datetime.fromisoformat(raw.replace("Z", "+00:00")).replace(tzinfo=None) >= since:
+                recent_orders.append(row)
+        except ValueError:
+            continue
+    completed = sum(1 for row in recent_orders if row.get("status") == "completed")
+    finished_or_cancelled = sum(1 for row in recent_orders if row.get("status") in {"completed", "cancelled"})
+    fulfillment_rate = round(completed / finished_or_cancelled * 100, 1) if finished_or_cancelled else 0
+    open_inquiries = _enterprise_inquiry_scope(enterprise_id).filter(Inquiry.status.in_(["open", "active"])).count()
+    pending_quotes = quote_query.filter(Quote.status == "active").count()
+    todos = []
+    if open_inquiries:
+        todos.append({"key": "inquiries", "label": "待处理询盘", "count": open_inquiries, "path": "/sales-console"})
+    if pending_quotes:
+        todos.append({"key": "quotes", "label": "待查看报价", "count": pending_quotes, "path": "/matching?panel=quotes"})
+    pending_shipments = sum(1 for row in orders if row.get("status") in {"pending", "in_progress"})
+    if pending_shipments:
+        todos.append({"key": "shipments", "label": "待发货 / 履约", "count": pending_shipments, "path": "/orders"})
+    return jsonify({
+        "success": True,
+        "metrics": {
+            "inquiries": inquiries.count(),
+            "quotes": quote_query.count(),
+            "orders": len(recent_orders),
+            "fulfillment_rate": fulfillment_rate,
+        },
+        "todos": todos,
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+        "source": "business_records",
+        "is_demo": False,
+    })
+
+
+@api_bp.route("/enterprise/dashboard/trends", methods=["GET"])
+@role_required("enterprise")
+def api_enterprise_dashboard_trends():
+    """近六个月趋势。没有业务记录的月份返回 0，而不是前端填充伪造数据。"""
+    enterprise_id = int(current_user.id)
+    now = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    months = []
+    for index in range(5, -1, -1):
+        month = now.month - index
+        year = now.year
+        while month <= 0:
+            month += 12
+            year -= 1
+        start = now.replace(year=year, month=month)
+        next_month = start.replace(year=year + 1, month=1) if month == 12 else start.replace(month=month + 1)
+        months.append((start, next_month))
+    inquiries = _enterprise_inquiry_scope(enterprise_id).all()
+    quotes = Quote.query.filter(or_(Quote.supplier_id == enterprise_id, Quote.inquiry.has(or_(Inquiry.buyer_id == enterprise_id, Inquiry.poster_id == enterprise_id)))).all()
+    orders = _json_orders_for_enterprise(enterprise_id)
+    labels, inquiry_values, quote_values, order_values, fulfillment_values = [], [], [], [], []
+    for start, end in months:
+        labels.append(start.strftime("%Y-%m"))
+        inquiry_values.append(sum(1 for row in inquiries if row.created_at and start <= row.created_at < end))
+        quote_values.append(sum(1 for row in quotes if row.created_at and start <= row.created_at < end))
+        month_orders = []
+        for row in orders:
+            raw = str(row.get("created_at") or row.get("order_date") or "")
+            try:
+                created = datetime.fromisoformat(raw.replace("Z", "+00:00")).replace(tzinfo=None)
+                if start <= created < end:
+                    month_orders.append(row)
+            except ValueError:
+                continue
+        order_values.append(len(month_orders))
+        done = sum(1 for row in month_orders if row.get("status") == "completed")
+        closed = sum(1 for row in month_orders if row.get("status") in {"completed", "cancelled"})
+        fulfillment_values.append(round(done / closed * 100, 1) if closed else 0)
+    return jsonify({"success": True, "labels": labels, "inquiries": inquiry_values, "quotes": quote_values, "orders": order_values, "fulfillment": fulfillment_values, "updated_at": datetime.utcnow().isoformat() + "Z", "source": "business_records", "is_demo": False})
+
+
+@api_bp.route("/enterprise/sales-summary", methods=["GET"])
+@role_required("enterprise")
+def api_enterprise_sales_summary():
+    """销售/采购控制台的真实指标，按当前企业和视角隔离。"""
+    enterprise_id = int(current_user.id)
+    mode = request.args.get("mode", "sales")
+    if mode not in {"sales", "procurement"}:
+        return jsonify({"error": "mode 必须是 sales 或 procurement"}), 400
+
+    days = request.args.get("range", "30d")
+    try:
+        window_days = max(1, min(int(days.rstrip("d")), 365)) if days.endswith("d") else 30
+    except (AttributeError, ValueError):
+        window_days = 30
+    since = datetime.utcnow() - timedelta(days=window_days)
+
+    if mode == "sales":
+        role_filter = or_(
+            Inquiry.seller_id == enterprise_id,
+            and_(Inquiry.poster_id == enterprise_id, Inquiry.direction == "supply"),
+        )
+    else:
+        role_filter = or_(
+            Inquiry.buyer_id == enterprise_id,
+            and_(Inquiry.poster_id == enterprise_id, Inquiry.direction == "demand"),
+        )
+
+    inquiries = Inquiry.query.filter(role_filter, Inquiry.created_at >= since).all()
+    inquiry_ids = {row.id for row in inquiries}
+    if mode == "sales":
+        quote_query = Quote.query.filter(Quote.supplier_id == enterprise_id, Quote.created_at >= since)
+    elif inquiry_ids:
+        quote_query = Quote.query.filter(Quote.inquiry_id.in_(inquiry_ids), Quote.created_at >= since)
+    else:
+        quote_query = Quote.query.filter(false())
+    quotes = quote_query.all()
+    quoted_inquiry_ids = {row.inquiry_id for row in quotes}
+
+    transactions = Transaction.query.filter(
+        or_(Transaction.buyer_id == enterprise_id, Transaction.seller_id == enterprise_id),
+        Transaction.created_at >= since,
+    ).all()
+    orders = _json_orders_for_enterprise(enterprise_id)
+    pending_orders = sum(1 for row in orders if row.get("status") in {"pending", "in_progress"})
+    pending_orders += sum(1 for row in transactions if row.status in {"pending", "in_progress"})
+    contracted_count = sum(1 for row in transactions if row.status not in {"cancelled", "rejected"})
+    conversion_rate = round(len(quoted_inquiry_ids) / len(inquiries) * 100, 1) if inquiries else 0
+
+    return jsonify({
+        "success": True,
+        "mode": mode,
+        "range": f"{window_days}d",
+        "metrics": {
+            "new_inquiries": len(inquiries),
+            "quoted": len(quotes),
+            "intent_conversion_rate": conversion_rate,
+            "pending_fulfillment_orders": pending_orders,
+        },
+        "funnel": {
+            "inquiries": len(inquiries),
+            "quotes": len(quotes),
+            "contracts": contracted_count,
+            "fulfillment": pending_orders,
+        },
+        "updated_at": datetime.utcnow().isoformat() + "Z",
+        "source": "business_records",
+        "is_demo": False,
+    })
 
 
 @api_bp.route("/orders", methods=["POST"])
@@ -901,14 +1076,25 @@ def api_enterprises_directory():
     """
     GET /api/enterprises/directory
     企业端名录多维筛选（参考产业目录类 B2B 检索）。
-    参数：province（省/直辖市/自治区名）、industry（预置行业 key）、q（关键词）、
-    min_credit、page、per_page；limit 作为旧参数兼容 per_page；
+    参数：province、city、industry、tech_keyword、q、min_credit、min_capacity、
+    max_capacity、capacity_status、is_export、is_little_giant、is_green_factory、
+    business_status、sort、page、per_page；limit 作为旧参数兼容 per_page；
     include_self=1 可用于政府大屏等全量监管视图。
     """
     province = (request.args.get("province") or "").strip()
+    city = (request.args.get("city") or "").strip()
     industry_key = (request.args.get("industry") or "").strip()
     q = (request.args.get("q") or "").strip()
+    tech_keyword = (request.args.get("tech_keyword") or "").strip()
     min_credit = request.args.get("min_credit", type=float)
+    min_capacity = request.args.get("min_capacity", type=float)
+    max_capacity = request.args.get("max_capacity", type=float)
+    capacity_status = (request.args.get("capacity_status") or "").strip()
+    business_status = (request.args.get("business_status") or "").strip()
+    sort = (request.args.get("sort") or "credit").strip()
+    is_export = request.args.get("is_export") in {"1", "true", "yes"}
+    is_little_giant = request.args.get("is_little_giant") in {"1", "true", "yes"}
+    is_green_factory = request.args.get("is_green_factory") in {"1", "true", "yes"}
     page = request.args.get("page", default=1, type=int) or 1
     per_page = request.args.get("per_page", type=int)
     legacy_limit = request.args.get("limit", type=int)
@@ -941,6 +1127,8 @@ def api_enterprises_directory():
                 ),
             )
         )
+    if city:
+        query = query.filter(or_(Enterprise.city == city, Enterprise.address.contains(city)))
 
     keywords = INDUSTRY_DIRECTORY_KEYWORDS.get(industry_key)
     if keywords:
@@ -956,13 +1144,45 @@ def api_enterprises_directory():
             )
         )
 
+    if tech_keyword:
+        query = query.filter(
+            or_(Enterprise.tech_keywords.contains(tech_keyword), Enterprise.business_scope.contains(tech_keyword))
+        )
+
+    if min_capacity is not None:
+        query = query.filter(func.coalesce(Enterprise.max_capacity, Enterprise.capacity) >= min_capacity)
+    if max_capacity is not None:
+        query = query.filter(func.coalesce(Enterprise.max_capacity, Enterprise.capacity) <= max_capacity)
+    if capacity_status:
+        if capacity_status == "ample":
+            query = query.filter(func.coalesce(Enterprise.capacity, 0) > func.coalesce(Enterprise.current_orders, 0))
+        elif capacity_status == "tight":
+            query = query.filter(func.coalesce(Enterprise.capacity, 0) <= func.coalesce(Enterprise.current_orders, 0))
+    if business_status:
+        query = query.filter(Enterprise.business_status == business_status)
+    if is_green_factory:
+        query = query.filter(Enterprise.is_green_factory.is_(True))
+    # 当前数据模型使用 is_lead_enterprise 表示重点/专精特新企业标记。
+    if is_little_giant:
+        query = query.filter(Enterprise.is_lead_enterprise.is_(True))
+    if is_export:
+        query = query.filter(Enterprise.extras.isnot(None)).filter(
+            cast(Enterprise.extras, String).ilike('%"is_export": true%')
+        )
+
     if min_credit is not None and min_credit > 0:
         query = query.filter(Enterprise.credit_score >= min_credit)
 
     total = query.count()
     pages = (total + per_page - 1) // per_page if total else 0
+    order_by = {
+        "name": (Enterprise.name.asc(), Enterprise.id.asc()),
+        "updated": (Enterprise.last_data_update.desc(), Enterprise.id.desc()),
+        "capacity": (func.coalesce(Enterprise.capacity, 0).desc(), Enterprise.id.desc()),
+        "credit": (Enterprise.credit_score.desc(), Enterprise.id.desc()),
+    }.get(sort, (Enterprise.credit_score.desc(), Enterprise.id.desc()))
     rows = (
-        query.order_by(Enterprise.credit_score.desc(), Enterprise.id.desc())
+        query.order_by(*order_by)
         .offset((page - 1) * per_page)
         .limit(per_page)
         .all()
@@ -986,6 +1206,20 @@ def api_enterprises_directory():
                     "credit_score": float(ent.credit_score or 0.0),
                     "business_scope": (ent.business_scope or "")[:280],
                     "industry_code": ent.industry_code or "",
+                    "tech_keywords": ent.tech_keywords or "",
+                    "capacity": float(ent.capacity or 0),
+                    "max_capacity": float(ent.max_capacity or ent.capacity or 0),
+                    "current_orders": int(ent.current_orders or 0),
+                    "capacity_status": "ample" if (ent.capacity or 0) > (ent.current_orders or 0) else "tight",
+                    "is_export": bool(isinstance(ent.extras, dict) and ent.extras.get("is_export") is True),
+                    "is_little_giant": bool(ent.is_lead_enterprise),
+                    "is_green_factory": bool(ent.is_green_factory),
+                    "business_status": ent.business_status or "待核验",
+                    "updated_at": (ent.last_data_update or ent.biz_data_updated_at or ent.created_at).isoformat() if (ent.last_data_update or ent.biz_data_updated_at or ent.created_at) else None,
+                    "source": "企业档案",
+                    "is_demo": False,
+                    "latitude": ent.latitude,
+                    "longitude": ent.longitude,
                 }
                 for ent in rows
             ],

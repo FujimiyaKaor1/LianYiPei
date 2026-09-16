@@ -1,19 +1,14 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
-  LayoutDashboard, 
   Network, 
-  BarChart3, 
-  ShieldAlert, 
   Settings, 
   Wallet, 
   Users,
   Package,
-  Receipt,
   Activity,
   CalendarDays,
   SlidersHorizontal,
-  Star,
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '@/src/context/AuthContext';
@@ -22,21 +17,16 @@ import { BrandLogo } from './BrandLogo';
 
 const navGroups = [
   {
-    label: '经营驾驶舱',
+    label: '供需协同',
     items: [
-      { icon: LayoutDashboard, label: '企业看板', path: '/dashboard' },
-      { icon: BarChart3, label: '销售控制台', path: '/sales-console' },
-      { icon: ShieldAlert, label: '风险监测', path: '/risk' },
+      { icon: Network, label: '供需匹配', path: '/matching' },
     ],
   },
   {
-    label: '供需协同',
+    label: '资源协同',
     items: [
-      { icon: SlidersHorizontal, label: '企业名录筛选', path: '/workspace/enterprise-directory' },
-      { icon: Network, label: '供需匹配', path: '/matching' },
-      { icon: Star, label: '收藏客商', path: '/favorites' },
+      { icon: SlidersHorizontal, label: '名录筛选', path: '/workspace/enterprise-directory' },
       { icon: Users, label: '集采拼单', path: '/group-purchase' },
-      { icon: Receipt, label: '报价池', path: '/quote-pool' },
     ],
   },
   {

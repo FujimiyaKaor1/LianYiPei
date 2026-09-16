@@ -119,6 +119,71 @@ def assign_alert(alert_id: int):
     })
 
 
+def _append_alert_action(alert: Alert, action: str, *, reason: str = '') -> dict:
+    """把预警处置动作写入告警自身的审计历史，并同步标准操作日志。"""
+    history = list(alert.workflow_history) if isinstance(alert.workflow_history, list) else []
+    already_done = any(
+        isinstance(item, dict)
+        and item.get('action') == action
+        and item.get('actor_id') == current_user.id
+        for item in history
+    )
+    if already_done:
+        return history[-1] if history else {}
+
+    entry = {
+        'action': action,
+        'actor_id': current_user.id,
+        'actor_role': getattr(current_user, 'role', None),
+        'reason': reason,
+        'created_at': datetime.utcnow().isoformat() + 'Z',
+    }
+    history.append(entry)
+    # JSON 列需要重新赋值，确保 SQLAlchemy 检测到变更。
+    alert.workflow_history = history
+    from app.services.operation_logger import log_operation
+    log_operation(
+        current_user.id,
+        f'alert_{action}',
+        'alert',
+        alert.id,
+        operation_detail=reason,
+    )
+    return entry
+
+
+@alerts_bp.route('/api/alerts/<int:alert_id>/acknowledge', methods=['POST'])
+@role_required('admin')
+def acknowledge_alert(alert_id: int):
+    """政府/管理员确认已知晓；不改变政府端告警的 active 状态。"""
+    alert = Alert.query.get_or_404(alert_id)
+    history = alert.workflow_history if isinstance(alert.workflow_history, list) else []
+    idempotent = any(
+        isinstance(item, dict)
+        and item.get('action') == 'acknowledge'
+        and item.get('actor_id') == current_user.id
+        for item in history
+    )
+    _append_alert_action(alert, 'acknowledge')
+    db.session.commit()
+    return jsonify({'success': True, 'idempotent': idempotent, 'is_active': alert.is_active})
+
+
+@alerts_bp.route('/api/alerts/<int:alert_id>/close', methods=['POST'])
+@role_required('admin')
+def close_alert(alert_id: int):
+    """只有政府/管理员角色可以关闭政府风险预警。"""
+    alert = Alert.query.get_or_404(alert_id)
+    data = request.get_json(silent=True) or {}
+    reason = str(data.get('reason') or '').strip()[:500]
+    idempotent = not bool(alert.is_active)
+    if alert.is_active:
+        alert.is_active = False
+        _append_alert_action(alert, 'close', reason=reason)
+        db.session.commit()
+    return jsonify({'success': True, 'idempotent': idempotent, 'is_active': alert.is_active})
+
+
 # ── 预警规则配置页面 ──────────────────────────────────────────────────────
 
 @alerts_bp.route('/dashboard/alert-rules')

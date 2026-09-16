@@ -50,6 +50,7 @@ export interface AlertData {
     last_sync?: string;
   };
   historical_trend?: number[];
+  is_active?: boolean;
 }
 
 export interface AlertsPayload {
@@ -135,6 +136,20 @@ export interface EnterpriseDirectoryItem {
   credit_score: number;
   business_scope: string;
   industry_code: string;
+  tech_keywords?: string;
+  capacity?: number;
+  max_capacity?: number;
+  current_orders?: number;
+  capacity_status?: 'ample' | 'tight' | string;
+  is_export?: boolean;
+  is_little_giant?: boolean;
+  is_green_factory?: boolean;
+  business_status?: string;
+  updated_at?: string | null;
+  source?: string;
+  is_demo?: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface EnterpriseDirectoryResponse {
@@ -432,6 +447,9 @@ export interface QuoteListItem {
   delivery_days: number | null;
   status: string;
   created_at: string | null;
+  supplier_id?: number;
+  credit_score?: number | null;
+  selected?: boolean;
 }
 
 export interface QuoteListResponse {
@@ -439,6 +457,48 @@ export interface QuoteListResponse {
   quotes: QuoteListItem[];
   total: number;
   page: number;
+}
+
+export interface EnterpriseDashboardSummary {
+  success: boolean;
+  metrics: { inquiries: number; quotes: number; orders: number; fulfillment_rate: number };
+  todos: { key: string; label: string; count: number; path: string }[];
+  updated_at: string;
+  source: string;
+  is_demo: boolean;
+}
+
+export interface EnterpriseDashboardTrends {
+  success: boolean;
+  labels: string[];
+  inquiries: number[];
+  quotes: number[];
+  orders: number[];
+  fulfillment: number[];
+  updated_at: string;
+  source: string;
+  is_demo: boolean;
+}
+
+export interface EnterpriseSalesSummary {
+  success: boolean;
+  mode: 'sales' | 'procurement';
+  range: string;
+  metrics: {
+    new_inquiries: number;
+    quoted: number;
+    intent_conversion_rate: number;
+    pending_fulfillment_orders: number;
+  };
+  funnel: {
+    inquiries: number;
+    quotes: number;
+    contracts: number;
+    fulfillment: number;
+  };
+  updated_at: string;
+  source: string;
+  is_demo: boolean;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
@@ -900,6 +960,20 @@ export const api = {
     return request<AlertsPayload>(url, undefined, options);
   },
 
+  acknowledgeAlert(alertId: number) {
+    return request<{ success: boolean; idempotent: boolean; is_active: boolean }>(
+      `/api/alerts/${alertId}/acknowledge`,
+      { method: 'POST', body: JSON.stringify({}) },
+    );
+  },
+
+  closeAlert(alertId: number, reason?: string) {
+    return request<{ success: boolean; idempotent: boolean; is_active: boolean }>(
+      `/api/alerts/${alertId}/close`,
+      { method: 'POST', body: JSON.stringify({ reason: reason || '' }) },
+    );
+  },
+
   fetchSuppliers(params?: SupplierSearchParams) {
     const query = new URLSearchParams();
     if (params?.query) query.set('query', params.query);
@@ -934,11 +1008,23 @@ export const api = {
     per_page?: number;
     limit?: number;
     include_self?: boolean;
+    city?: string;
+    tech_keyword?: string;
+    min_capacity?: number;
+    max_capacity?: number;
+    capacity_status?: string;
+    is_export?: boolean;
+    is_little_giant?: boolean;
+    is_green_factory?: boolean;
+    business_status?: string;
+    sort?: string;
   }) {
     const query = new URLSearchParams();
     if (params?.province) query.set('province', params.province);
+    if (params?.city) query.set('city', params.city);
     if (params?.industry) query.set('industry', params.industry);
     if (params?.q) query.set('q', params.q);
+    if (params?.tech_keyword) query.set('tech_keyword', params.tech_keyword);
     if (params?.min_credit !== undefined && params.min_credit !== null) {
       query.set('min_credit', String(params.min_credit));
     }
@@ -946,6 +1032,14 @@ export const api = {
     if (params?.per_page !== undefined) query.set('per_page', String(params.per_page));
     if (params?.limit !== undefined) query.set('limit', String(params.limit));
     if (params?.include_self !== undefined) query.set('include_self', params.include_self ? '1' : '0');
+    if (params?.min_capacity !== undefined) query.set('min_capacity', String(params.min_capacity));
+    if (params?.max_capacity !== undefined) query.set('max_capacity', String(params.max_capacity));
+    if (params?.capacity_status) query.set('capacity_status', params.capacity_status);
+    if (params?.is_export) query.set('is_export', '1');
+    if (params?.is_little_giant) query.set('is_little_giant', '1');
+    if (params?.is_green_factory) query.set('is_green_factory', '1');
+    if (params?.business_status) query.set('business_status', params.business_status);
+    if (params?.sort) query.set('sort', params.sort);
     const suffix = query.toString();
     const url = suffix ? `/api/enterprises/directory?${suffix}` : '/api/enterprises/directory';
     return request<EnterpriseDirectoryResponse>(url);
@@ -1242,6 +1336,31 @@ export const api = {
     const suffix = query.toString();
     const url = suffix ? `/api/quotes?${suffix}` : '/api/quotes';
     return request<QuoteListResponse>(url);
+  },
+
+  getEnterpriseDashboardSummary(range = '30d') {
+    return request<EnterpriseDashboardSummary>(`/api/enterprise/dashboard/summary?range=${encodeURIComponent(range)}`);
+  },
+
+  getEnterpriseDashboardTrends(range = '6m') {
+    return request<EnterpriseDashboardTrends>(`/api/enterprise/dashboard/trends?range=${encodeURIComponent(range)}`);
+  },
+
+  getEnterpriseSalesSummary(mode: 'sales' | 'procurement' = 'sales', range = '30d') {
+    return request<EnterpriseSalesSummary>(
+      `/api/enterprise/sales-summary?mode=${encodeURIComponent(mode)}&range=${encodeURIComponent(range)}`,
+    );
+  },
+
+  getQuotesForInquiry(inquiryId: number) {
+    return request<{ quotes: (QuoteListItem & { remarks?: string | null })[] }>(`/api/quotes/inquiry/${inquiryId}`);
+  },
+
+  selectQuote(quoteId: number) {
+    return request<{ success: boolean; selected_quote_id: number; inquiry_id: number; idempotent: boolean }>(`/api/quotes/${quoteId}/select`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
   },
 
   // ═══════════════════════════════════════════════════════════════════════

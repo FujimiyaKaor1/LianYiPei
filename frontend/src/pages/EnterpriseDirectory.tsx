@@ -1,316 +1,45 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Building2, ChevronDown, ChevronUp, Inbox, MapPin, Search } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { BadgeCheck, Building2, ChevronLeft, ChevronRight, Globe2, Inbox, Leaf, List, Map, MapPin, RefreshCw, Search, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '@/src/lib/utils';
 import { DIRECTORY_INDUSTRIES, DIRECTORY_PROVINCES } from '@/src/lib/enterpriseDirectoryFilters';
 import { api, type EnterpriseDirectoryItem } from '@/src/services/api';
+import { useAuth } from '@/src/context/AuthContext';
 
-const DIRECTORY_PAGE_SIZE = 120;
-
-function useDebounced<T>(value: T, ms: number): T {
-  const [d, setD] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setD(value), ms);
-    return () => clearTimeout(t);
-  }, [value, ms]);
-  return d;
-}
-
-function FilterTagRow({
-  title,
-  value,
-  options,
-  onChange,
-  dense,
-}: {
-  title: string;
-  value: string;
-  options: { key: string; label: string }[];
-  onChange: (key: string) => void;
-  dense?: boolean;
-}) {
-  return (
-    <div className="space-y-2">
-      <p className="text-[11px] font-bold text-neutral-400 tracking-wide">{title}</p>
-      <div className={cn('flex flex-wrap gap-2.5', dense && 'max-h-48 overflow-y-auto pr-1 scrollbar-hide')}>
-        {options.map((o) => {
-          const selected = value === o.key;
-          return (
-            <button
-              key={o.key || '__all__'}
-              type="button"
-              onClick={() => onChange(o.key)}
-              className={cn(
-                'px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-200 border',
-                selected
-                  ? 'bg-brand-solid text-white border-brand-solid shadow-sm'
-                  : 'bg-white text-neutral-600 border-neutral-100 hover:bg-neutral-50 hover:border-neutral-200',
-              )}
-            >
-              {o.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+const PAGE_SIZE = 24;
+const initialFilters = { province: '', city: '', industry: '', q: '', tech_keyword: '', min_credit: '', min_capacity: '', max_capacity: '', capacity_status: '', business_status: '', is_export: false, is_little_giant: false, is_green_factory: false };
 
 export default function EnterpriseDirectory() {
-  const [province, setProvince] = useState('');
-  const [industry, setIndustry] = useState('');
-  const [keyword, setKeyword] = useState('');
-  const debouncedQ = useDebounced(keyword, 320);
-  const [minCredit, setMinCredit] = useState<number | ''>('');
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-
+  const navigate = useNavigate();
+  const { requestLogin } = useAuth();
+  const [filters, setFilters] = useState(initialFilters);
   const [rows, setRows] = useState<EnterpriseDirectoryItem[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
+  const [pages, setPages] = useState(0);
+  const [view, setView] = useState<'list' | 'map'>('list');
+  const [advanced, setAdvanced] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
-  const load = useCallback(async (nextPage = 1, append = false) => {
-    if (append) {
-      setLoadingMore(true);
-    } else {
-      setLoading(true);
-    }
-    setError(null);
+  const setFilter = <K extends keyof typeof initialFilters>(key: K, value: typeof initialFilters[K]) => setFilters(previous => ({ ...previous, [key]: value }));
+  const load = useCallback(async (nextPage = 1) => {
+    setLoading(true); setError('');
     try {
-      const res = await api.fetchEnterpriseDirectory({
-        province: province || undefined,
-        industry: industry || undefined,
-        q: debouncedQ.trim() || undefined,
-        min_credit: minCredit === '' ? undefined : minCredit,
-        page: nextPage,
-        per_page: DIRECTORY_PAGE_SIZE,
-      });
-      setRows((prev) => (append ? [...prev, ...(res.enterprises || [])] : (res.enterprises || [])));
-      setTotal(res.total ?? res.count ?? 0);
-      setPage(res.page ?? nextPage);
-      setHasMore(Boolean(res.has_more));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败');
-      if (!append) {
-        setRows([]);
-        setTotal(0);
-        setPage(1);
-        setHasMore(false);
-      }
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [province, industry, debouncedQ, minCredit]);
+      const response = await api.fetchEnterpriseDirectory({ ...filters, min_credit: filters.min_credit ? Number(filters.min_credit) : undefined, min_capacity: filters.min_capacity ? Number(filters.min_capacity) : undefined, max_capacity: filters.max_capacity ? Number(filters.max_capacity) : undefined, q: filters.q || undefined, page: nextPage, per_page: PAGE_SIZE });
+      setRows(response.enterprises || []); setTotal(response.total || 0); setPage(response.page || nextPage); setPages(response.pages || 0);
+    } catch (err) { setRows([]); setTotal(0); setPages(0); setError(err instanceof Error ? err.message : '名录加载失败，请稍后重试'); }
+    finally { setLoading(false); }
+  }, [filters]);
+  useEffect(() => { void load(1); }, [load]);
+  const clear = () => setFilters(initialFilters);
+  const hasFilters = Object.values(filters).some(value => Boolean(value));
 
-  useEffect(() => {
-    void load(1, false);
-  }, [load]);
-
-  const clearAll = () => {
-    setProvince('');
-    setIndustry('');
-    setKeyword('');
-    setMinCredit('');
-  };
-
-  const hasFilters = Boolean(province || industry || keyword.trim() || minCredit !== '');
-
-  return (
-    <div className="flex flex-col lg:flex-row gap-8 items-start max-w-[1400px] mx-auto px-2 h-[calc(100vh-140px)] overflow-hidden">
-      {/* 左侧筛选（参考产业目录类站点，改为纵向侧栏） */}
-      <aside className="w-full lg:w-72 h-full shrink-0 flex flex-col rounded-2xl border border-neutral-200 bg-white shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b border-neutral-100 bg-neutral-50/80">
-          <h2 className="text-sm font-bold text-neutral-800">筛选条件</h2>
-          <p className="text-[11px] text-neutral-500 mt-0.5">按地区与行业缩小合作企业范围</p>
-        </div>
-        <div className="flex-1 min-h-0 p-5 space-y-6 overflow-y-auto scrollbar-hide">
-          <FilterTagRow title="省份地区" value={province} options={DIRECTORY_PROVINCES} onChange={setProvince} />
-          <FilterTagRow
-            title="服务行业"
-            value={industry}
-            options={DIRECTORY_INDUSTRIES}
-            onChange={setIndustry}
-            dense
-          />
-
-          <div>
-            <p className="text-[11px] font-bold text-neutral-400 mb-1.5">关键词</p>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-              <input
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                placeholder="企业名称 / 经营范围"
-                className="w-full pl-9 pr-3 py-2.5 text-xs rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-neutral-900/5 focus:border-neutral-400 transition-all"
-              />
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setAdvancedOpen((v) => !v)}
-            className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-neutral-600 hover:bg-neutral-50 rounded-xl transition-colors border border-dashed border-neutral-300"
-          >
-            {advancedOpen ? (
-              <>
-                收起高级筛选
-                <ChevronUp className="w-4 h-4" />
-              </>
-            ) : (
-              <>
-                展开高级筛选
-                <ChevronDown className="w-4 h-4" />
-              </>
-            )}
-          </button>
-
-          {advancedOpen && (
-            <div className="space-y-3 pt-1 border-t border-neutral-100">
-              <div>
-                <p className="text-[11px] font-bold text-neutral-400 mb-1.5">最低信用分</p>
-                <select
-                  value={minCredit === '' ? '' : String(minCredit)}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setMinCredit(v === '' ? '' : Number(v));
-                  }}
-                  className="w-full py-2.5 px-3 text-xs rounded-xl border border-neutral-200 bg-white focus:outline-none focus:ring-2 focus:ring-neutral-900/5"
-                >
-                  <option value="">不限</option>
-                  <option value="60">≥ 60</option>
-                  <option value="70">≥ 70</option>
-                  <option value="80">≥ 80</option>
-                  <option value="90">≥ 90</option>
-                </select>
-              </div>
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={clearAll}
-            disabled={!hasFilters}
-            className={cn(
-              'w-full py-2.5 rounded-xl text-sm font-bold transition-colors',
-              hasFilters
-                ? 'bg-brand-solid text-white hover:bg-brand-solid-hover shadow-sm active:scale-[0.98]'
-                : 'bg-neutral-100 text-neutral-400 cursor-not-allowed',
-            )}
-          >
-            清空筛选条件
-          </button>
-        </div>
-      </aside>
-
-      {/* 右侧结果 */}
-      <section className="flex-1 min-w-0 h-full flex flex-col space-y-4">
-        <div className="shrink-0 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-medium text-neutral-500">
-            {loading ? '加载中…' : (
-              <>
-                发现 <span className="text-neutral-900 font-bold">{total}</span> 家合作企业
-                {total > rows.length ? (
-                  <span className="ml-2 text-xs text-neutral-400">
-                    已加载 {rows.length} 家
-                  </span>
-                ) : null}
-              </>
-            )}
-          </p>
-        </div>
-
-        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide pr-1">
-          {error && (
-            <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 text-sm px-4 py-3 mb-4">{error}</div>
-          )}
-
-          {!loading && !error && rows.length === 0 && (
-            <div className="rounded-3xl border border-neutral-200 bg-white py-20 px-6 text-center shadow-sm">
-              <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-neutral-50 text-neutral-400 mb-6">
-                <Inbox className="w-10 h-10" />
-              </div>
-              <h3 className="text-lg font-bold text-neutral-800 mb-2">未找到符合条件的企业</h3>
-              <p className="text-sm text-neutral-500 max-w-md mx-auto mb-8">
-                建议尝试放宽地区或行业条件，或检查搜索关键词。
-              </p>
-              <button
-                type="button"
-                onClick={clearAll}
-                className="inline-flex items-center justify-center px-10 py-3.5 rounded-2xl bg-brand-solid text-white text-sm font-bold hover:bg-brand-solid-hover transition-all active:scale-[0.98]"
-              >
-                重置所有筛选
-              </button>
-            </div>
-          )}
-
-          {rows.length > 0 && (
-            <>
-              <ul className="grid gap-6 sm:grid-cols-1 xl:grid-cols-2 pb-8 px-1">
-              {rows.map((ent) => (
-                <li
-                  key={ent.id}
-                  className="group relative rounded-3xl border border-transparent bg-white p-6 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] hover:-translate-y-1 transition-all duration-300"
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-neutral-50 text-neutral-400 group-hover:bg-brand-solid group-hover:text-white flex items-center justify-center shrink-0 transition-colors duration-300">
-                      <Building2 className="w-6 h-6" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="text-lg font-semibold text-neutral-800 truncate group-hover:text-neutral-900 transition-colors" title={ent.name}>
-                          {ent.name}
-                        </h3>
-                        <div className="shrink-0 bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full font-bold text-[10px] tracking-tight uppercase">
-                          信用 {Math.round(ent.credit_score)}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-neutral-400">
-                        <span className="inline-flex items-center gap-1.5">
-                          <MapPin className="w-3.5 h-3.5" />
-                          <span>
-                            {[ent.province, ent.city].filter(Boolean).join(' ') || ent.address || '地区未填'}
-                          </span>
-                        </span>
-                        {ent.industry_code ? (
-                          <div className="flex items-center gap-1.5">
-                            <div className="w-1 h-1 rounded-full bg-neutral-200" />
-                            <span className="font-medium">{ent.industry_code}</span>
-                          </div>
-                        ) : null}
-                      </div>
-
-                      {ent.business_scope ? (
-                        <p className="text-sm text-neutral-500 mt-4 line-clamp-2 leading-relaxed group-hover:text-neutral-600 transition-colors">
-                          {ent.business_scope}
-                        </p>
-                      ) : (
-                        <p className="text-sm text-neutral-300 mt-4 italic">暂无经营范围描述</p>
-                      )}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            {hasMore && (
-              <div className="pb-8 flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => void load(page + 1, true)}
-                  disabled={loadingMore}
-                  className="px-8 py-3 rounded-xl bg-brand-solid text-white text-sm font-bold hover:bg-brand-solid-hover transition-all disabled:opacity-50"
-                >
-                  {loadingMore ? '加载中…' : `继续加载（${rows.length} / ${total}）`}
-                </button>
-              </div>
-            )}
-          </>
-        )}
-        </div>
-      </section>
+  return <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-5">
+    <section className="panel flex flex-wrap items-start justify-between gap-4 p-6"><div><p className="eyebrow text-brand">Enterprise directory</p><h1 className="mt-1 text-2xl font-black text-ink">名录筛选</h1><p className="mt-2 text-xs text-ink-muted">按地域、行业、技术与产能查找可核验合作企业</p></div><div className="flex items-center gap-2"><button type="button" onClick={() => setView('list')} className={cn('btn-secondary btn-sm gap-1.5', view === 'list' && 'border-brand bg-brand-soft text-brand')}><List className="h-3.5 w-3.5" />列表</button><button type="button" onClick={() => setView('map')} className={cn('btn-secondary btn-sm gap-1.5', view === 'map' && 'border-brand bg-brand-soft text-brand')}><Map className="h-3.5 w-3.5" />地图</button><button type="button" onClick={() => void load(page)} className="btn-secondary btn-sm" title="刷新"><RefreshCw className="h-3.5 w-3.5" /></button></div></section>
+    <div className="grid gap-5 lg:grid-cols-[260px_1fr]">
+      <aside className="panel h-fit p-4"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-brand" /><h2 className="text-sm font-bold text-ink">筛选条件</h2></div><button type="button" onClick={clear} disabled={!hasFilters} className="text-[11px] font-bold text-brand disabled:text-ink-faint">清空</button></div><div className="mt-4 space-y-4"><label className="block"><span className="field-label">关键词</span><div className="relative"><Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-faint" /><input value={filters.q} onChange={event => setFilter('q', event.target.value)} placeholder="企业名 / 经营范围" className="input w-full pl-9 text-xs" /></div></label><label className="block"><span className="field-label">省份</span><select value={filters.province} onChange={event => setFilter('province', event.target.value)} className="input w-full text-xs"><option value="">全部省份</option>{DIRECTORY_PROVINCES.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label><label className="block"><span className="field-label">城市</span><input value={filters.city} onChange={event => setFilter('city', event.target.value)} placeholder="如：佛山市" className="input w-full text-xs" /></label><label className="block"><span className="field-label">行业</span><select value={filters.industry} onChange={event => setFilter('industry', event.target.value)} className="input w-full text-xs"><option value="">全部行业</option>{DIRECTORY_INDUSTRIES.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label><button type="button" onClick={() => setAdvanced(value => !value)} className="w-full rounded-md border border-dashed border-border py-2 text-xs font-bold text-ink-muted hover:bg-surface-subtle">{advanced ? '收起高级筛选' : '展开高级筛选'}</button>{advanced && <div className="space-y-4 border-t border-border pt-4"><label className="block"><span className="field-label">技术关键词</span><input value={filters.tech_keyword} onChange={event => setFilter('tech_keyword', event.target.value)} placeholder="如：精密注塑" className="input w-full text-xs" /></label><label className="block"><span className="field-label">最低信用分</span><select value={filters.min_credit} onChange={event => setFilter('min_credit', event.target.value)} className="input w-full text-xs"><option value="">不限</option><option value="60">≥ 60</option><option value="70">≥ 70</option><option value="80">≥ 80</option><option value="90">≥ 90</option></select></label><div className="grid grid-cols-2 gap-2"><input type="number" min="0" value={filters.min_capacity} onChange={event => setFilter('min_capacity', event.target.value)} placeholder="最低产能" className="input text-xs" /><input type="number" min="0" value={filters.max_capacity} onChange={event => setFilter('max_capacity', event.target.value)} placeholder="最高产能" className="input text-xs" /></div><select value={filters.capacity_status} onChange={event => setFilter('capacity_status', event.target.value)} className="input w-full text-xs"><option value="">产能状态不限</option><option value="ample">当前有余量</option><option value="tight">排期较紧</option></select><select value={filters.business_status} onChange={event => setFilter('business_status', event.target.value)} className="input w-full text-xs"><option value="">经营状态不限</option><option value="存续">存续</option><option value="在业">在业</option><option value="注销">注销</option></select>{[['is_export', '可出口'], ['is_little_giant', '专精特新'], ['is_green_factory', '绿色工厂']].map(([key, label]) => <label key={key} className="flex items-center gap-2 text-xs font-semibold text-ink-soft"><input type="checkbox" checked={Boolean(filters[key as keyof typeof filters])} onChange={event => setFilter(key as keyof typeof initialFilters, event.target.checked as never)} />{label}</label>)}</div>}</div></aside>
+      <section className="min-w-0"><div className="mb-3 flex items-center justify-between"><p className="text-sm text-ink-muted">找到 <strong className="text-ink">{total}</strong> 家企业 · 第 {pages ? page : 0} / {pages} 页</p>{error && <span className="text-xs font-semibold text-critical">{error}</span>}</div>{view === 'map' ? <div className="panel min-h-[520px] bg-surface-subtle p-5"><div className="grid gap-3 md:grid-cols-2">{rows.filter(row => row.latitude != null && row.longitude != null).map(row => <button key={row.id} type="button" onClick={() => navigate(`/factory/${row.id}`)} className="flex items-start gap-3 rounded-md border border-border bg-white p-3 text-left hover:border-brand/40"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-brand" /><span><strong className="block text-xs text-ink">{row.name}</strong><span className="mt-1 block text-[11px] text-ink-muted">{row.province} {row.city} · {row.latitude?.toFixed(4)}, {row.longitude?.toFixed(4)}</span></span></button>)}</div>{!rows.some(row => row.latitude != null && row.longitude != null) && <div className="flex min-h-[420px] items-center justify-center text-center text-xs text-ink-muted">当前结果没有可用经纬度，无法绘制地图；企业仍可在列表模式查看。</div>}</div> : loading ? <div className="panel flex min-h-[420px] items-center justify-center gap-2 text-sm text-ink-muted"><RefreshCw className="h-4 w-4 animate-spin" />正在加载企业名录…</div> : rows.length ? <div className="grid gap-3 md:grid-cols-2">{rows.map(row => <article key={row.id} className="card-hover p-5"><div className="flex items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-brand-soft text-brand"><Building2 className="h-5 w-5" /></span><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><h3 className="truncate text-sm font-bold text-ink" title={row.name}>{row.name}</h3><span className="shrink-0 rounded bg-brand-soft px-1.5 py-1 text-[10px] font-bold text-brand">信用 {Math.round(row.credit_score)}</span></div><p className="mt-1 flex items-center gap-1 text-[11px] text-ink-muted"><MapPin className="h-3 w-3" />{[row.province, row.city].filter(Boolean).join(' ') || '位置待补充'} · {row.industry_code || '行业待补充'}</p><p className="mt-3 line-clamp-2 text-xs leading-5 text-ink-muted">{row.business_scope || '暂无经营范围描述'}</p><div className="mt-3 flex flex-wrap gap-1.5">{row.is_export && <span className="badge badge-success"><Globe2 className="mr-1 inline h-3 w-3" />可出口</span>}{row.is_little_giant && <span className="badge badge-default"><BadgeCheck className="mr-1 inline h-3 w-3" />专精特新</span>}{row.is_green_factory && <span className="badge badge-success"><Leaf className="mr-1 inline h-3 w-3" />绿色工厂</span>}{row.capacity_status && <span className="badge badge-default">{row.capacity_status === 'ample' ? '产能有余量' : '排期较紧'}</span>}</div><p className="mt-3 text-[10px] text-ink-faint">来源：{row.source || '企业档案'} · 更新于 {row.updated_at?.slice(0, 10) || '待更新'}{row.is_demo ? ' · 演示数据' : ''}</p></div></div><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={() => navigate(`/factory/${row.id}`)} className="btn-secondary btn-sm">查看详情</button><button type="button" onClick={() => requestLogin(`/matching?query=${encodeURIComponent(row.name)}&supplier_id=${row.id}`)} className="btn-primary btn-sm">发起询价</button></div></article>)}</div> : <div className="panel flex min-h-[420px] flex-col items-center justify-center text-center"><Inbox className="h-8 w-8 text-ink-faint" /><p className="mt-3 text-sm font-bold text-ink">未找到符合条件的企业</p><p className="mt-1 text-xs text-ink-muted">尝试减少筛选条件或更换关键词。</p></div>}{!loading && pages > 1 && <div className="mt-5 flex items-center justify-center gap-3"><button type="button" disabled={page <= 1} onClick={() => void load(page - 1)} className="btn-secondary btn-sm"><ChevronLeft className="h-3.5 w-3.5" />上一页</button><span className="text-xs text-ink-muted">{page} / {pages}</span><button type="button" disabled={page >= pages} onClick={() => void load(page + 1)} className="btn-secondary btn-sm">下一页<ChevronRight className="h-3.5 w-3.5" /></button></div>}</section>
     </div>
-  );
+  </div>;
 }

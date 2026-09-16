@@ -461,6 +461,14 @@
     background: linear-gradient(180deg, var(--color-surface-raised), color-mix(in srgb, var(--color-surface-subtle) 88%, var(--color-brand-soft)));
   }
 
+  .field-label {
+    display: block;
+    margin-bottom: 0.45rem;
+    color: var(--color-ink-muted);
+    font-size: 0.6875rem;
+    font-weight: 700;
+  }
+
   .metric-number {
     font-variant-numeric: tabular-nums;
     letter-spacing: 0;

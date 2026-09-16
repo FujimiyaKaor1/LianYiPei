@@ -20,7 +20,7 @@ export function Layout() {
       case '/assets': return '资产管理';
       case '/settings': return '系统设置';
       case '/group-purchase': return '集采拼单大厅';
-      case '/quote-pool': return '报价池';
+      case '/quote-pool': return '智能供需匹配';
       case '/fulfillment': return '履约看板';
       case '/capacity-calendar': return '产能日历';
       default: return '链易配';

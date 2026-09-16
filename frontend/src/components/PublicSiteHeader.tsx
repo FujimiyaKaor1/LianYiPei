@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Search, Sparkles } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
+import { EnterpriseNavMenu } from './EnterpriseNavMenu';
 
 export function PublicSiteHeader({ onLogin }: { onLogin?: () => void }) {
   return (
@@ -19,11 +20,13 @@ export function PublicSiteHeader({ onLogin }: { onLogin?: () => void }) {
           <Link className="transition hover:text-public-brand" to="/search">搜索工厂</Link>
           <Link className="flex items-center gap-1 transition hover:text-public-brand" to="/aia"><Sparkles className="h-3.5 w-3.5" /> AI 找工厂</Link>
           <Link className="transition hover:text-public-brand" to="/agent-market">AI 智能体</Link>
+          <EnterpriseNavMenu />
           <a className="transition hover:text-public-brand" href="/#discover">产业带</a>
           <a className="transition hover:text-public-brand" href="/#services">开放平台</a>
           <a className="transition hover:text-public-brand" href="/#services">服务</a>
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <div className="lg:hidden"><EnterpriseNavMenu /></div>
           <Link className="hidden items-center gap-1.5 rounded-full border border-public-border px-3 py-2 text-xs font-bold text-public-muted transition hover:border-public-brand hover:text-public-brand md:flex" to="/search">
             <Search className="h-3.5 w-3.5" /> 搜索工厂
           </Link>

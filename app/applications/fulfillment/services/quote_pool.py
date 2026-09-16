@@ -383,6 +383,8 @@ def get_price_index(product_name: str) -> dict:
 
 def get_quotes_for_inquiry(inquiry_id: int) -> list[dict]:
     """获取询价单的所有有效报价。"""
+    inquiry = Inquiry.query.get(inquiry_id)
+    selected_id = (inquiry.match_context or {}).get('selected_quote_id') if inquiry and isinstance(inquiry.match_context, dict) else None
     quotes = Quote.query.filter_by(inquiry_id=inquiry_id, status='active').all()
     result = []
     for q in quotes:
@@ -391,11 +393,14 @@ def get_quotes_for_inquiry(inquiry_id: int) -> list[dict]:
             'id': q.id,
             'supplier_id': q.supplier_id,
             'supplier_name': supplier.name if supplier else '未知',
+            'supplier_id': q.supplier_id,
+            'credit_score': supplier.credit_score if supplier else None,
             'price': q.price,
             'quantity': q.quantity,
             'unit': q.unit,
             'delivery_days': q.delivery_days,
             'remarks': q.remarks,
             'created_at': q.created_at.isoformat() if q.created_at else None,
+            'selected': q.id == selected_id,
         })
     return result
