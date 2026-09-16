@@ -52,24 +52,26 @@ export function EnterpriseNavMenu({ compact = false }: { compact?: boolean }) {
         企业看板 <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div role="menu" className={compact ? 'absolute right-0 top-full z-50 mt-2 w-44 rounded-md border border-border bg-surface p-1.5 shadow-elevation-3' : 'absolute left-0 top-full z-50 mt-2 w-48 rounded-lg border border-public-border bg-white p-1.5 shadow-public'}>
-          {ITEMS.map(({ label, path, icon: Icon }) => {
-            const active = location.pathname === path;
-            return (
-              <Link
-                key={path}
-                to={user ? path : '#'}
-                role="menuitem"
-                onClick={event => {
-                  if (!user && !loading) { event.preventDefault(); go(path); }
-                  else setOpen(false);
-                }}
-                className={compact ? `flex items-center gap-2 rounded px-2.5 py-2 text-xs font-semibold ${active ? 'bg-brand-soft text-brand' : 'text-ink-soft hover:bg-surface-subtle hover:text-ink'}` : `flex items-center gap-2 rounded-md px-3 py-2.5 text-xs font-semibold ${active ? 'bg-public-brand-soft text-public-brand' : 'text-public-muted hover:bg-public-bg hover:text-public-brand'}`}
-              >
-                <Icon className="h-3.5 w-3.5" />{label}
-              </Link>
-            );
-          })}
+        <div className={compact ? 'absolute right-0 top-full z-50 w-44 pt-2' : 'absolute left-0 top-full z-50 w-48 pt-2'}>
+          <div role="menu" className={compact ? 'w-44 rounded-md border border-border bg-surface p-1.5 shadow-elevation-3' : 'rounded-lg border border-public-border bg-white p-1.5 shadow-public'}>
+            {ITEMS.map(({ label, path, icon: Icon }) => {
+              const active = location.pathname === path;
+              return (
+                <Link
+                  key={path}
+                  to={user ? path : '#'}
+                  role="menuitem"
+                  onClick={event => {
+                    if (!user && !loading) { event.preventDefault(); go(path); }
+                    else setOpen(false);
+                  }}
+                  className={compact ? `flex items-center gap-2 rounded px-2.5 py-2 text-xs font-semibold ${active ? 'bg-brand-soft text-brand' : 'text-ink-soft hover:bg-surface-subtle hover:text-ink'}` : `flex items-center gap-2 rounded-md px-3 py-2.5 text-xs font-semibold ${active ? 'bg-public-brand-soft text-public-brand' : 'text-public-muted hover:bg-public-bg hover:text-public-brand'}`}
+                >
+                  <Icon className="h-3.5 w-3.5" />{label}
+                </Link>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
