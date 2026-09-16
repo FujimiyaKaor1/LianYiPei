@@ -266,6 +266,14 @@ export interface PublicAiFindResponse {
   has_more: boolean;
 }
 
+export interface IndustryNewsItem {
+  id: number; slug: string; title: string; summary: string; category: string;
+  source_name: string; source_url: string; published_at?: string | null; fetched_at?: string | null;
+  cover_image?: string | null; tags: string[]; is_external: boolean; is_demo: boolean;
+  content_excerpt?: string;
+}
+export interface IndustryNewsListResponse { items: IndustryNewsItem[]; total: number; page: number; per_page: number; pages: number; has_more: boolean; updated_at?: string | null; source: string; sync_status: string; }
+
 export interface ChainXiaoYiModelStatus {
   local_enabled: boolean;
   cloud_enabled: boolean;
@@ -1090,6 +1098,16 @@ export const api = {
 
   fetchPublicAgentMarket() {
     return request<PublicAgentMarketResponse>('/api/public/agent-market');
+  },
+
+  fetchIndustryNews(params?: { category?: string; q?: string; source?: string; page?: number; per_page?: number }) {
+    const query = new URLSearchParams();
+    Object.entries(params || {}).forEach(([key, value]) => { if (value) query.set(key, String(value)); });
+    const suffix = query.toString();
+    return request<IndustryNewsListResponse>(`/api/public/industry-news${suffix ? `?${suffix}` : ''}`);
+  },
+  fetchIndustryNewsDetail(slug: string) {
+    return request<{ article: IndustryNewsItem; related: IndustryNewsItem[] }>(`/api/public/industry-news/${encodeURIComponent(slug)}`);
   },
 
   publicAiFind(query: string, payload?: { quantity?: number; industry_code?: string }) {

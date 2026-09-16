@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
+  LayoutDashboard,
   Network, 
   Settings, 
   Wallet, 
@@ -15,7 +16,13 @@ import { useAuth } from '@/src/context/AuthContext';
 import { isPublicGuestPath } from '@/src/lib/rbac';
 import { BrandLogo } from './BrandLogo';
 
-const navGroups = [
+export const navGroups = [
+  {
+    label: '首页',
+    items: [
+      { icon: LayoutDashboard, label: '企业看板', path: '/dashboard' },
+    ],
+  },
   {
     label: '供需协同',
     items: [
@@ -45,6 +52,40 @@ const navGroups = [
     ],
   },
 ];
+
+export function EnterpriseTopNav() {
+  const { user, loading, requestLogin } = useAuth();
+  const navItems = navGroups.flatMap((group) => group.items);
+
+  return (
+    <nav
+      className="flex min-h-[56px] flex-shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-surface/92 px-4 shadow-[0_1px_0_rgba(15,23,42,0.04)] backdrop-blur-xl md:px-6"
+      aria-label="企业工作台导航"
+    >
+      {navItems.map((item) => (
+        <NavLink
+          key={item.path}
+          to={item.path}
+          onClick={(event) => {
+            if (!user && !loading && !isPublicGuestPath(item.path)) {
+              event.preventDefault();
+              requestLogin(item.path);
+            }
+          }}
+          className={({ isActive }) => cn(
+            'inline-flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-semibold transition-colors',
+            isActive
+              ? 'bg-brand-solid text-white shadow-elevation-1'
+              : 'text-ink-muted hover:bg-surface-subtle hover:text-brand',
+          )}
+        >
+          <item.icon className="h-4 w-4" />
+          <span>{item.label}</span>
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
 
 export function Sidebar() {
   const { user, loading, requestLogin } = useAuth();

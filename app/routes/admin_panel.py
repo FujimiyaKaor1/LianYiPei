@@ -22,11 +22,87 @@ from config import (
     _collab_api_keys_list,
 )
 from app.authz import role_required
-from app.models import Enterprise
+from app.models import Enterprise, IndustryNewsArticle, IndustryNewsSource, IndustryNewsSyncRun
+from app.services.industry_news_service import ALLOWED_CATEGORIES, validate_feed_url, sync_source
 from app import db
 
 admin_panel_bp = Blueprint('admin_panel', __name__)
 logger = logging.getLogger('app.ops')
+
+
+@admin_panel_bp.route('/api/news/sources', methods=['GET'])
+@role_required('admin')
+def news_sources():
+    rows = IndustryNewsSource.query.order_by(IndustryNewsSource.id.desc()).all()
+    return jsonify({'sources': [{'id': row.id, 'name': row.name, 'feed_url': row.feed_url, 'website_url': row.website_url,
+        'allowed_categories': row.allowed_categories or [], 'enabled': row.enabled, 'auto_publish': row.auto_publish,
+        'last_synced_at': row.last_synced_at.isoformat() if row.last_synced_at else None, 'last_sync_status': row.last_sync_status,
+        'last_error': row.last_error} for row in rows], 'categories': list(ALLOWED_CATEGORIES)})
+
+
+@admin_panel_bp.route('/api/news/sources', methods=['POST'])
+@role_required('admin')
+def create_news_source():
+    data = request.get_json(silent=True) or {}
+    name = str(data.get('name') or '').strip()[:120]
+    try: feed_url = validate_feed_url(data.get('feed_url'))
+    except ValueError as exc: return jsonify({'error': str(exc)}), 400
+    if not name: return jsonify({'error': '来源名称不能为空'}), 400
+    categories = [x for x in (data.get('allowed_categories') or []) if x in ALLOWED_CATEGORIES]
+    row = IndustryNewsSource(name=name, feed_url=feed_url, website_url=str(data.get('website_url') or '')[:500], allowed_categories=categories or ['产业趋势'], auto_publish=bool(data.get('auto_publish', True)))
+    db.session.add(row); db.session.commit()
+    return jsonify({'success': True, 'id': row.id}), 201
+
+
+@admin_panel_bp.route('/api/news/sources/<int:source_id>', methods=['PATCH'])
+@role_required('admin')
+def update_news_source(source_id):
+    row = IndustryNewsSource.query.get_or_404(source_id); data = request.get_json(silent=True) or {}
+    if 'feed_url' in data:
+        try: row.feed_url = validate_feed_url(data['feed_url'])
+        except ValueError as exc: return jsonify({'error': str(exc)}), 400
+    for field in ('name', 'website_url', 'last_error'):
+        if field in data: setattr(row, field, str(data[field])[:500])
+    for field in ('enabled', 'auto_publish'):
+        if field in data: setattr(row, field, bool(data[field]))
+    if 'allowed_categories' in data: row.allowed_categories = [x for x in data['allowed_categories'] if x in ALLOWED_CATEGORIES]
+    db.session.commit(); return jsonify({'success': True})
+
+
+@admin_panel_bp.route('/api/news/sources/<int:source_id>/sync', methods=['POST'])
+@role_required('admin')
+def sync_news_source(source_id):
+    row = IndustryNewsSource.query.get_or_404(source_id)
+    if not row.enabled: return jsonify({'error': '来源已停用'}), 400
+    run = sync_source(row)
+    return jsonify({'success': run.status == 'success', 'status': run.status, 'created_count': run.created_count, 'duplicate_count': run.duplicate_count, 'error': run.error_message})
+
+
+@admin_panel_bp.route('/api/news/articles', methods=['GET'])
+@role_required('admin')
+def admin_news_articles():
+    page = max(request.args.get('page', 1, type=int), 1); per_page = min(max(request.args.get('per_page', 20, type=int), 1), 100)
+    query = IndustryNewsArticle.query.order_by(IndustryNewsArticle.created_at.desc(), IndustryNewsArticle.id.desc())
+    total = query.count(); rows = query.offset((page - 1) * per_page).limit(per_page).all()
+    return jsonify({'items': [{'id': row.id, 'slug': row.slug, 'title': row.title, 'category': row.category, 'source_name': row.source_name, 'source_url': row.source_url, 'is_published': row.is_published, 'is_featured': row.is_featured, 'fetched_at': row.fetched_at.isoformat() if row.fetched_at else None} for row in rows], 'total': total, 'page': page, 'per_page': per_page})
+
+
+@admin_panel_bp.route('/api/news/articles/<int:article_id>', methods=['PATCH'])
+@role_required('admin')
+def update_news_article(article_id):
+    row = IndustryNewsArticle.query.get_or_404(article_id); data = request.get_json(silent=True) or {}
+    if 'category' in data and data['category'] in ALLOWED_CATEGORIES: row.category = data['category']
+    if 'tags' in data and isinstance(data['tags'], list): row.tags = [str(x)[:40] for x in data['tags'][:20]]
+    for field in ('is_published', 'is_featured'):
+        if field in data: setattr(row, field, bool(data[field]))
+    db.session.commit(); return jsonify({'success': True})
+
+
+@admin_panel_bp.route('/api/news/sync-runs', methods=['GET'])
+@role_required('admin')
+def news_sync_runs():
+    rows = IndustryNewsSyncRun.query.order_by(IndustryNewsSyncRun.started_at.desc(), IndustryNewsSyncRun.id.desc()).limit(100).all()
+    return jsonify({'items': [{'id': row.id, 'source_id': row.source_id, 'status': row.status, 'fetched_count': row.fetched_count, 'created_count': row.created_count, 'duplicate_count': row.duplicate_count, 'error_message': row.error_message, 'started_at': row.started_at.isoformat() if row.started_at else None} for row in rows]})
 
 
 # ══════════════════════════════════════════════════════════════════════════

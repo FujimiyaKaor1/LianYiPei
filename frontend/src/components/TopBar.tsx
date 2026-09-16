@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
-import { Bell, LogOut, Moon, Search, Sun, User } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Bell, Home, LogOut, Moon, Search, Sun, User } from 'lucide-react';
 import { useAuth } from '@/src/context/AuthContext';
 import { useTheme } from '@/src/context/ThemeContext';
 import { useToast } from '@/src/components/ToastProvider';
 import { api } from '@/src/services/api';
-import { EnterpriseNavMenu } from './EnterpriseNavMenu';
+import { BrandLogo } from './BrandLogo';
 
 interface TopBarProps {
   title: string;
@@ -35,18 +35,24 @@ export function TopBar({ title, showSearch = true }: TopBarProps) {
 
   return (
     <header className="sticky top-0 z-30 flex h-[72px] flex-shrink-0 items-center justify-between border-b border-border bg-surface/86 px-6 backdrop-blur-xl">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <h2 className="truncate text-[20px] font-bold text-ink">{title}</h2>
-          <EnterpriseNavMenu compact />
-          <span className="rounded-md border border-trust/20 bg-trust-soft px-2 py-0.5 text-[10px] font-bold text-trust">
-            Live
-          </span>
-        </div>
-        <div className="mt-1 flex items-center gap-2 text-[11px] font-medium text-ink-muted">
-          <span>运营日历 {dateLabel}</span>
-          <span className="h-1 w-1 rounded-full bg-ink-faint" />
-          <span>数据同步中枢</span>
+      <div className="flex min-w-0 items-center gap-4">
+        <BrandLogo
+          subtitle="供应链经营工作台"
+          titleClassName="text-ink"
+          subtitleClassName="text-ink-muted"
+        />
+        <div className="min-w-0 border-l border-border pl-4">
+          <div className="flex items-center gap-2">
+            <h2 className="truncate text-[20px] font-bold text-ink">{title}</h2>
+            <span className="rounded-md border border-trust/20 bg-trust-soft px-2 py-0.5 text-[10px] font-bold text-trust">
+              Live
+            </span>
+          </div>
+          <div className="mt-1 flex items-center gap-2 text-[11px] font-medium text-ink-muted">
+            <span>运营日历 {dateLabel}</span>
+            <span className="h-1 w-1 rounded-full bg-ink-faint" />
+            <span>数据同步中枢</span>
+          </div>
         </div>
       </div>
 
@@ -63,6 +69,15 @@ export function TopBar({ title, showSearch = true }: TopBarProps) {
         )}
 
         <div className="flex items-center gap-2">
+          <Link
+            to="/"
+            className="btn-secondary btn-sm hidden gap-1.5 sm:inline-flex"
+            aria-label="回到首页"
+          >
+            <Home className="h-3.5 w-3.5" />
+            回到首页
+          </Link>
+
           {loading ? (
             <span className="text-xs text-ink-muted px-2">…</span>
           ) : user ? (

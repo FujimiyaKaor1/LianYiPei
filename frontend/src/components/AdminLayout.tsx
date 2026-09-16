@@ -8,6 +8,7 @@ import {
   KeyRound,
   ScrollText,
   Monitor,
+  Newspaper,
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '@/src/context/AuthContext';
@@ -22,6 +23,7 @@ const adminNavItems = [
   { icon: ShieldAlert, label: '风控中心', path: '/admin/dashboard/risk' },
   { icon: KeyRound, label: 'API管理', path: '/admin/dashboard/api-management' },
   { icon: ScrollText, label: '审计日志', path: '/admin/dashboard/audit' },
+  { icon: Newspaper, label: '行业资讯', path: '/admin/dashboard/news' },
 ];
 
 export function AdminLayout() {
@@ -40,6 +42,7 @@ export function AdminLayout() {
     if (path.includes('/risk')) return '风控中心';
     if (path.includes('/api-management')) return 'API管理';
     if (path.includes('/audit')) return '审计日志';
+    if (path.includes('/news')) return '行业资讯';
     return '管理后台';
   };
 

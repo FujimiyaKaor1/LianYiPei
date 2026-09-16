@@ -23,9 +23,9 @@
             --radius-sm: 12px;
             --radius-lg: 20px;
             --transition: 0.2s ease;
-            --sidebar-width: 260px;
             --ai-panel-width: 320px;
             --header-height: 60px;
+            --top-nav-height: 56px;
         }
 
         * {
@@ -176,8 +176,29 @@
         .header-right {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 12px;
             padding-right: 16px;
+        }
+
+        .home-btn {
+            height: 40px;
+            padding: 0 14px;
+            border-radius: var(--radius-sm);
+            background: var(--primary-light);
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: var(--transition);
+        }
+
+        .home-btn:hover {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(42, 109, 255, 0.22);
         }
 
         .user-avatar {
@@ -236,38 +257,40 @@
         /* ===== 主内容区域 ===== */
         .main-wrapper {
             display: flex;
-            margin-top: var(--header-height);
-            min-height: calc(100vh - var(--header-height));
+            margin-top: calc(var(--header-height) + var(--top-nav-height));
+            min-height: calc(100vh - var(--header-height) - var(--top-nav-height));
         }
 
-        /* ===== 左侧菜单栏 ===== */
-        .sidebar {
-            width: var(--sidebar-width);
+        /* ===== 顶部横向导航 ===== */
+        .top-nav {
+            height: var(--top-nav-height);
             background: var(--card);
-            border-right: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
             position: fixed;
             top: var(--header-height);
             left: 0;
-            bottom: 0;
+            right: 0;
             display: flex;
-            flex-direction: column;
-            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 0 24px;
+            z-index: 900;
         }
 
         .nav-menu {
-            flex: 1;
-            padding: 24px 16px;
             display: flex;
-            flex-direction: column;
-            gap: 8px;
+            align-items: center;
+            gap: 10px;
+            width: min(100%, 1120px);
         }
 
         .nav-item {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 16px 24px;
-            border-radius: var(--radius);
+            gap: 8px;
+            min-height: 38px;
+            padding: 0 16px;
+            border-radius: var(--radius-sm);
             text-decoration: none;
             color: var(--text);
             font-size: 15px;
@@ -283,7 +306,8 @@
         }
 
         .nav-item:hover {
-            background: #F0F2F5;
+            background: var(--primary-light);
+            color: var(--primary);
         }
 
         .nav-item.active {
@@ -296,16 +320,13 @@
             color: white;
         }
 
-        .sidebar-footer {
-            padding: 16px;
-            border-top: 1px solid var(--border);
-        }
-
         .quick-entry {
+            margin-left: auto;
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 14px 20px;
+            gap: 8px;
+            min-height: 38px;
+            padding: 0 14px;
             background: #F0F2F5;
             border-radius: var(--radius-sm);
             text-decoration: none;
@@ -323,13 +344,12 @@
 
         .quick-entry i {
             color: var(--primary);
-            font-size: 18px;
+            font-size: 15px;
         }
 
         /* ===== 中间主内容区 ===== */
         .main-content {
             flex: 1;
-            margin-left: var(--sidebar-width);
             margin-right: var(--ai-panel-width);
             padding: 24px;
             min-width: 0;
@@ -475,7 +495,7 @@
             background: var(--card);
             border-left: 1px solid var(--border);
             position: fixed;
-            top: var(--header-height);
+            top: calc(var(--header-height) + var(--top-nav-height));
             right: 0;
             bottom: 0;
             display: flex;
@@ -705,7 +725,7 @@
         <!-- 顶部导航栏 -->
         <header class="header">
             <div class="header-left">
-                <a href="#" class="logo">
+                <a href="{{ url_for('main.index') }}" class="logo" aria-label="返回链易配首页">
                     <div class="logo-icon">
                         <i class="fas fa-link"></i>
                     </div>
@@ -725,6 +745,10 @@
             </div>
 
             <div class="header-right">
+                <a href="{{ url_for('main.index') }}" class="home-btn">
+                    <i class="fas fa-house"></i>
+                    <span>回到首页</span>
+                </a>
                 <button class="settings-btn" title="设置">
                     <i class="fas fa-cog"></i>
                 </button>
@@ -734,41 +758,38 @@
             </div>
         </header>
 
+        <!-- 顶部横向导航 -->
+        <div class="top-nav">
+            <nav class="nav-menu" aria-label="工作台导航">
+                <a href="#" class="nav-item active" data-page="home">
+                    <i class="fas fa-home"></i>
+                    <span>首页</span>
+                </a>
+                <a href="#" class="nav-item" data-page="match">
+                    <i class="fas fa-handshake"></i>
+                    <span>企业匹配</span>
+                </a>
+                <a href="#" class="nav-item" data-page="smart">
+                    <i class="fas fa-magic"></i>
+                    <span>智能匹配</span>
+                </a>
+                <a href="#" class="nav-item" data-page="graph">
+                    <i class="fas fa-project-diagram"></i>
+                    <span>供应链图谱</span>
+                </a>
+                <a href="#" class="nav-item" data-page="ai">
+                    <i class="fas fa-robot"></i>
+                    <span>AI对话助手</span>
+                </a>
+                <a href="#" class="quick-entry">
+                    <i class="fas fa-sitemap"></i>
+                    <span>12条产业链图谱</span>
+                </a>
+            </nav>
+        </div>
+
         <!-- 主内容区域 -->
         <div class="main-wrapper">
-            <!-- 左侧菜单栏 -->
-            <aside class="sidebar">
-                <nav class="nav-menu">
-                    <a href="#" class="nav-item active" data-page="home">
-                        <i class="fas fa-home"></i>
-                        <span>首页</span>
-                    </a>
-                    <a href="#" class="nav-item" data-page="match">
-                        <i class="fas fa-handshake"></i>
-                        <span>企业匹配</span>
-                    </a>
-                    <a href="#" class="nav-item" data-page="smart">
-                        <i class="fas fa-magic"></i>
-                        <span>智能匹配</span>
-                    </a>
-                    <a href="#" class="nav-item" data-page="graph">
-                        <i class="fas fa-project-diagram"></i>
-                        <span>供应链图谱</span>
-                    </a>
-                    <a href="#" class="nav-item" data-page="ai">
-                        <i class="fas fa-robot"></i>
-                        <span>AI对话助手</span>
-                    </a>
-                </nav>
-
-                <div class="sidebar-footer">
-                    <a href="#" class="quick-entry">
-                        <i class="fas fa-sitemap"></i>
-                        <span>12条产业链图谱</span>
-                    </a>
-                </div>
-            </aside>
-
             <!-- 中间主内容区 -->
             <main class="main-content">
                 <!-- 指标卡片区域 -->

@@ -17,7 +17,8 @@ from sqlalchemy import String, and_, cast, false, func, or_
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.authz import role_required, user_effective_role, user_session_role
-from app.models import Enterprise, Inquiry, Product, Quote, Transaction
+from app.models import Enterprise, Inquiry, Product, Quote, Transaction, IndustryNewsArticle, IndustryNewsSource
+from app.services.industry_news_service import ALLOWED_CATEGORIES
 from app.services import map_service
 from app.services import finance_service
 from app.services.fulfillment_dashboard import get_active_fulfillments, get_dashboard_payload
@@ -36,6 +37,57 @@ api_bp.add_url_rule("/match/ai", endpoint="match_ai", view_func=ai_match_view, m
 # 匹配闭环：询盘、签约（实现见 match 蓝图内视图）
 api_bp.add_url_rule("/inquiry/send", endpoint="inquiry_send", view_func=api_inquiry_send, methods=["POST"])
 api_bp.add_url_rule("/inquiry/sign", endpoint="inquiry_sign", view_func=api_inquiry_sign, methods=["POST"])
+
+
+def _news_item(article):
+    return {
+        "id": article.id, "slug": article.slug, "title": article.title,
+        "summary": article.summary or "", "category": article.category,
+        "source_name": article.source_name, "source_url": article.source_url,
+        "published_at": article.published_at.isoformat() if article.published_at else None,
+        "fetched_at": article.fetched_at.isoformat() if article.fetched_at else None,
+        "cover_image": article.cover_image_url, "tags": article.tags or [],
+        "is_external": True, "is_demo": bool(article.is_demo),
+    }
+
+
+@api_bp.route("/public/industry-news", methods=["GET"])
+def api_public_industry_news():
+    page = max(request.args.get("page", 1, type=int), 1)
+    per_page = min(max(request.args.get("per_page", 12, type=int), 1), 50)
+    query = IndustryNewsArticle.query.filter(IndustryNewsArticle.is_published.is_(True))
+    category = (request.args.get("category") or "").strip()
+    keyword = (request.args.get("q") or "").strip()[:100]
+    source = (request.args.get("source") or "").strip()[:120]
+    if category and category in ALLOWED_CATEGORIES: query = query.filter(IndustryNewsArticle.category == category)
+    if source: query = query.filter(IndustryNewsArticle.source_name == source)
+    if keyword: query = query.filter(or_(IndustryNewsArticle.title.contains(keyword), IndustryNewsArticle.summary.contains(keyword)))
+    total = query.count()
+    items = query.order_by(IndustryNewsArticle.published_at.desc(), IndustryNewsArticle.id.desc()).offset((page - 1) * per_page).limit(per_page).all()
+    latest = IndustryNewsArticle.query.filter(IndustryNewsArticle.is_published.is_(True)).order_by(IndustryNewsArticle.fetched_at.desc()).first()
+    return jsonify({"items": [_news_item(item) for item in items], "total": total, "page": page, "per_page": per_page,
+                    "pages": (total + per_page - 1) // per_page if total else 0, "has_more": page * per_page < total,
+                    "updated_at": latest.fetched_at.isoformat() if latest and latest.fetched_at else None,
+                    "source": "rss_allowlist", "sync_status": "idle"})
+
+
+@api_bp.route("/public/industry-news/<string:slug>", methods=["GET"])
+def api_public_industry_news_detail(slug):
+    article = IndustryNewsArticle.query.filter_by(slug=slug, is_published=True).first()
+    if not article: return jsonify({"error": "资讯不存在"}), 404
+    related = IndustryNewsArticle.query.filter(IndustryNewsArticle.is_published.is_(True), IndustryNewsArticle.id != article.id, IndustryNewsArticle.category == article.category).order_by(IndustryNewsArticle.published_at.desc(), IndustryNewsArticle.id.desc()).limit(4).all()
+    return jsonify({"article": _news_item(article) | {"content_excerpt": article.content_excerpt or ""}, "related": [_news_item(item) for item in related]})
+
+
+@api_bp.route("/public/industry-news/categories", methods=["GET"])
+def api_public_industry_news_categories():
+    return jsonify({"categories": [{"key": category, "label": category, "count": IndustryNewsArticle.query.filter_by(category=category, is_published=True).count()} for category in ALLOWED_CATEGORIES]})
+
+
+@api_bp.route("/public/industry-news/sources", methods=["GET"])
+def api_public_industry_news_sources():
+    rows = IndustryNewsSource.query.filter_by(enabled=True).all()
+    return jsonify({"sources": [{"name": row.name, "last_synced_at": row.last_synced_at.isoformat() if row.last_synced_at else None, "status": row.last_sync_status or "idle"} for row in rows]})
 
 
 def _order_date_to_str(value):

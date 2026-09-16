@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import { Sidebar } from './Sidebar';
+import { EnterpriseTopNav } from './Sidebar';
 import { TopBar } from './TopBar';
 
 export function Layout() {
@@ -28,10 +28,10 @@ export function Layout() {
   };
 
   return (
-    <div className="app-shell flex min-h-screen w-full">
-      <Sidebar />
+    <div className="app-shell min-h-screen w-full">
       <main className="flex h-screen min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <TopBar title={getTitle(location.pathname)} />
+        <EnterpriseTopNav />
         <div data-scroll-root className="min-h-0 w-full flex-1 overflow-auto p-4 pb-12 md:p-6">
           <Outlet />
         </div>

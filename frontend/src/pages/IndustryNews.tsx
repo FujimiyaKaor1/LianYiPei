@@ -1,22 +1,30 @@
-import { ArrowLeft, Newspaper } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Search, ExternalLink, Clock3, Newspaper, RefreshCw } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { PublicSiteHeader } from '@/src/components/PublicSiteHeader';
+import { api, type IndustryNewsItem } from '@/src/services/api';
 
-/** 行业资讯占位页，后续承接产业和制造业资讯内容。 */
+const categories = ['全部', '政策法规', '产业趋势', '供应链', '技术创新', '企业动态', '出海与贸易'];
+const dateText = (value?: string | null) => value ? new Date(value).toLocaleDateString('zh-CN') : '时间待同步';
+
 export default function IndustryNews() {
-  const navigate = useNavigate();
-  return (
-    <div className="public-site min-h-screen bg-public-bg text-public-text">
-      <PublicSiteHeader />
-      <main className="mx-auto max-w-[1120px] px-4 py-16 md:px-8">
-        <section className="rounded-xl border border-public-border bg-public-surface p-8 shadow-public md:p-12">
-          <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-public-brand-soft text-public-brand"><Newspaper className="h-5 w-5" /></span>
-          <p className="eyebrow mt-6 text-public-brand">Industry news</p>
-          <h1 className="mt-3 text-3xl font-black tracking-tight md:text-5xl">行业资讯</h1>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-public-muted">行业资讯栏目正在建设中，后续将提供制造业政策、产业趋势、供应链动态和企业实践内容。</p>
-          <button type="button" onClick={() => navigate('/')} className="btn-public-secondary mt-8"><ArrowLeft className="h-4 w-4" />返回首页</button>
-        </section>
-      </main>
-    </div>
-  );
+  const [params, setParams] = useSearchParams(); const [items, setItems] = useState<IndustryNewsItem[]>([]);
+  const [total, setTotal] = useState(0); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
+  const category = params.get('category') || ''; const q = params.get('q') || ''; const page = Number(params.get('page') || 1);
+  const load = () => { setLoading(true); setError(''); void api.fetchIndustryNews({ category, q, page, per_page: 12 }).then((data) => { setItems(data.items); setTotal(data.total); }).catch((err) => setError(err instanceof Error ? err.message : '资讯暂时无法加载')).finally(() => setLoading(false)); };
+  useEffect(load, [category, q, page]);
+  const featured = items.filter((item) => item.is_featured).slice(0, 3);
+  const setFilter = (key: string, value: string) => { const next = new URLSearchParams(params); value ? next.set(key, value) : next.delete(key); next.delete('page'); setParams(next); };
+  return <div className="public-site min-h-screen bg-public-bg text-public-text"><PublicSiteHeader />
+    <main className="mx-auto max-w-[1240px] px-4 py-8 md:px-8 md:py-12">
+      <section className="rounded-xl border border-public-border bg-white p-6 md:p-8"><div className="flex flex-wrap items-end justify-between gap-5"><div><p className="eyebrow text-public-brand">MANUFACTURING INSIGHTS</p><h1 className="mt-2 text-3xl font-black">行业资讯</h1><p className="mt-2 text-sm text-public-muted">关注制造业政策、产业趋势与供应链动态</p></div><div className="text-right text-xs text-public-muted">内容来自白名单 RSS<br />更新时间以实际同步为准</div></div>
+        <form className="mt-6 flex gap-2" onSubmit={(event) => { event.preventDefault(); setFilter('q', (event.currentTarget.elements.namedItem('q') as HTMLInputElement).value); }}><div className="relative flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-public-muted" /><input name="q" defaultValue={q} placeholder="搜索政策、技术、供应链关键词" className="w-full rounded-lg border border-public-border bg-public-bg py-2.5 pl-9 pr-3 text-sm outline-none focus:border-public-brand" /></div><button className="btn-public-primary" type="submit">搜索</button></form>
+        <div className="mt-5 flex gap-2 overflow-x-auto pb-1">{categories.map((item) => <button key={item} type="button" onClick={() => setFilter('category', item === '全部' ? '' : item)} className={`whitespace-nowrap rounded-lg border px-3 py-2 text-xs font-bold ${((item === '全部' && !category) || item === category) ? 'border-public-brand bg-public-brand text-white' : 'border-public-border text-public-muted hover:border-public-brand hover:text-public-brand'}`}>{item}</button>)}</div>
+      </section>
+      {featured.length > 0 && <section className="mt-6"><div className="mb-3 flex items-center gap-2"><Newspaper className="h-4 w-4 text-public-brand" /><h2 className="font-black">推荐专题</h2></div><div className="grid gap-4 md:grid-cols-3">{featured.map((item) => <NewsCard key={item.id} item={item} featured />)}</div></section>}
+      <div className="mt-7 grid gap-6 lg:grid-cols-[1fr_280px]"><section><div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-black">最新资讯 <span className="ml-2 text-xs font-medium text-public-muted">共 {total} 篇</span></h2><button type="button" onClick={load} className="inline-flex items-center gap-1 text-xs font-bold text-public-muted hover:text-public-brand"><RefreshCw className="h-3.5 w-3.5" />刷新</button></div>{loading ? <State text="正在加载资讯…" /> : error ? <State text={error} action="重试" onClick={load} /> : items.length === 0 ? <State text={q || category ? '没有符合条件的资讯' : 'RSS 尚未同步，暂无文章'} /> : <div className="space-y-3">{items.map((item) => <NewsCard key={item.id} item={item} />)}</div>}{total > 12 && <div className="mt-5 flex justify-center gap-3 text-xs"><button disabled={page <= 1} onClick={() => setFilter('page', String(page - 1))} className="btn-public-secondary disabled:opacity-40">上一页</button><span className="py-2 text-public-muted">第 {page} 页</span><button disabled={page * 12 >= total} onClick={() => setFilter('page', String(page + 1))} className="btn-public-secondary disabled:opacity-40">下一页</button></div>}</section>
+        <aside className="space-y-4"><div className="rounded-xl border border-public-border bg-white p-5"><h3 className="font-black">链小易快捷提问</h3><p className="mt-2 text-xs leading-6 text-public-muted">总结政策、分析影响，或根据资讯找相关工厂。</p><Link to="/aia?query=请帮我分析最新制造业资讯并找相关工厂" className="mt-3 inline-flex text-xs font-bold text-public-brand">去问链小易 →</Link></div><div className="rounded-xl border border-public-border bg-white p-5"><h3 className="font-black">找工厂</h3><p className="mt-2 text-xs leading-6 text-public-muted">从公开企业能力中筛选可核验的制造资源。</p><Link to="/search" className="mt-3 inline-flex text-xs font-bold text-public-brand">搜索工厂 →</Link></div></aside></div>
+    </main></div>;
 }
+function NewsCard({ item, featured = false }: { item: IndustryNewsItem; featured?: boolean; key?: string | number }) { return <article className={`rounded-xl border border-public-border bg-white p-5 transition hover:border-public-brand/50 hover:shadow-public ${featured ? 'min-h-[170px]' : ''}`}><div className="flex items-center gap-2 text-[11px] text-public-muted"><span className="rounded bg-public-brand-soft px-2 py-1 font-bold text-public-brand">{item.category}</span><span>{item.source_name}</span><span>·</span><span>{dateText(item.published_at)}</span></div><Link to={`/industry-news/${item.slug}`} className="mt-3 block text-base font-black leading-7 hover:text-public-brand">{item.title}</Link><p className="mt-2 line-clamp-2 text-sm leading-6 text-public-muted">{item.summary || '暂无摘要，查看原文了解详情。'}</p><div className="mt-3 flex items-center justify-between text-[11px] text-public-muted"><span className="inline-flex items-center gap-1"><Clock3 className="h-3 w-3" />外部来源 · 抓取 {dateText(item.fetched_at)}</span><a href={item.source_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-public-brand" onClick={(e) => e.stopPropagation()}>原文 <ExternalLink className="h-3 w-3" /></a></div></article>; }
+function State({ text, action, onClick }: { text: string; action?: string; onClick?: () => void }) { return <div className="rounded-xl border border-dashed border-public-border bg-white px-6 py-16 text-center text-sm text-public-muted">{text}{action && <button type="button" onClick={onClick} className="ml-3 font-bold text-public-brand">{action}</button>}</div>; }

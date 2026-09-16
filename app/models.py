@@ -892,3 +892,63 @@ class BusinessCard(db.Model):
 
     def __repr__(self):
         return f"<BusinessCard {self.initiator_id} -> {self.recipient_id}>"
+
+
+# =============================================================================
+# 17. Industry news (RSS allow-list content)
+# =============================================================================
+class IndustryNewsSource(db.Model):
+    __tablename__ = "industry_news_sources"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(120), nullable=False)
+    feed_url = db.Column(db.String(500), nullable=False, unique=True)
+    website_url = db.Column(db.String(500))
+    allowed_categories = db.Column(db.JSON, default=list)
+    enabled = db.Column(db.Boolean, default=True, nullable=False)
+    auto_publish = db.Column(db.Boolean, default=True, nullable=False)
+    last_synced_at = db.Column(db.DateTime)
+    last_sync_status = db.Column(db.String(20), default="idle")
+    last_error = db.Column(db.String(500))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class IndustryNewsArticle(db.Model):
+    __tablename__ = "industry_news_articles"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    slug = db.Column(db.String(220), nullable=False, unique=True)
+    title = db.Column(db.String(500), nullable=False)
+    summary = db.Column(db.Text, default="")
+    content_excerpt = db.Column(db.Text, default="")
+    category = db.Column(db.String(40), default="产业趋势")
+    tags = db.Column(db.JSON, default=list)
+    source_name = db.Column(db.String(120), nullable=False)
+    source_url = db.Column(db.String(1000), nullable=False)
+    canonical_url = db.Column(db.String(1000), nullable=False, unique=True)
+    published_at = db.Column(db.DateTime)
+    fetched_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    cover_image_url = db.Column(db.String(1000))
+    content_hash = db.Column(db.String(64), nullable=False, unique=True)
+    is_featured = db.Column(db.Boolean, default=False, nullable=False)
+    is_published = db.Column(db.Boolean, default=False, nullable=False)
+    is_demo = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class IndustryNewsSyncRun(db.Model):
+    __tablename__ = "industry_news_sync_runs"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    source_id = db.Column(db.Integer, db.ForeignKey("industry_news_sources.id", ondelete="CASCADE"), nullable=False)
+    started_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    finished_at = db.Column(db.DateTime)
+    status = db.Column(db.String(20), nullable=False, default="running")
+    fetched_count = db.Column(db.Integer, default=0)
+    created_count = db.Column(db.Integer, default=0)
+    updated_count = db.Column(db.Integer, default=0)
+    duplicate_count = db.Column(db.Integer, default=0)
+    error_message = db.Column(db.String(500))
+    source = db.relationship("IndustryNewsSource", backref=db.backref("sync_runs", lazy="dynamic"))

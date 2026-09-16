@@ -33,6 +33,8 @@ import PublicSearch from './pages/PublicSearch';
 import PublicAia from './pages/PublicAia';
 import FactoryDetail from './pages/FactoryDetail';
 import AgentMarket from './pages/AgentMarket';
+import IndustryNewsDetail from './pages/IndustryNewsDetail';
+import NewsManagementPage from './pages/admin/NewsManagementPage';
 
 // Government pages
 import GovDashboard from './pages/gov/GovDashboard';
@@ -97,6 +99,7 @@ export default function App() {
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="/search" element={<PublicSearch />} />
       <Route path="/aia" element={<PublicHome />} />
+      <Route path="/industry-news/:slug" element={<IndustryNewsDetail />} />
       <Route path="/industry-news" element={<IndustryNews />} />
       <Route path="/agent-market" element={<AgentMarket />} />
       <Route path="/factory/:id" element={<FactoryDetail />} />
@@ -162,6 +165,7 @@ export default function App() {
           <Route path="risk" element={<RiskCenterPage />} />
           <Route path="api-management" element={<APIGatewayPage />} />
           <Route path="audit" element={<AuditLogPage />} />
+          <Route path="news" element={<NewsManagementPage />} />
         </Route>
       </Route>
 
