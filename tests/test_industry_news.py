@@ -75,6 +75,18 @@ def test_irrelevant_news_is_not_publishable(_db):
     assert record["is_published"] is False
 
 
+def test_policy_category_relevance_is_publishable_when_policy_terms_match(_db):
+    record = build_news_record({
+        "title": "工信部发布制造业设备更新政策",
+        "description": "政策支持工业设备和产线升级。",
+        "url": "https://example.com/news/policy-score",
+        "publishedAt": "2026-09-15T08:00:00Z",
+        "source": {"name": "工信部"},
+    }, category_hint="政策法规")
+    assert record["relevance_score"] >= 60
+    assert record["is_published"] is True
+
+
 def test_newsapi_list_persists_items_and_detail_uses_same_slug(client, _db, monkeypatch):
     monkeypatch.setattr("app.routes.api.fetch_newsapi", lambda **kwargs: {"status": "ok", "totalResults": 1, "articles": [{
         "title": "制造企业扩建芯片产线", "description": "企业新增制造产能并完善供应链。",

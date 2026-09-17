@@ -40,6 +40,14 @@ CATEGORY_QUERY_TERMS = {
     "企业动态": "制造企业 扩产 投资 订单 上市公司",
     "出海与贸易": "制造业 出口 外贸 关税 跨境",
 }
+CATEGORY_RELEVANCE_TERMS = {
+    "政策法规": ("政策", "法规", "工信部", "规划", "补贴", "标准"),
+    "产业趋势": ("趋势", "产能", "投资", "产业"),
+    "供应链": ("供应链", "原材料", "交付", "物流", "库存"),
+    "技术创新": ("技术", "研发", "创新", "自动化", "工艺"),
+    "企业动态": ("企业", "公司", "集团", "扩产", "订单", "融资"),
+    "出海与贸易": ("出口", "外贸", "跨境", "关税", "贸易"),
+}
 
 
 def newsapi_query_for_category(category: str | None) -> str:
@@ -62,6 +70,8 @@ def build_news_record(item: dict, category_hint: str | None = None) -> dict:
     source_name = str((item.get("source") or {}).get("name") or "NewsAPI 来源")[:120]
     if any(term in source_name for term in AUTHORITATIVE_SOURCES):
         score += 10
+    if category_hint in CATEGORY_RELEVANCE_TERMS and any(term.lower() in text for term in CATEGORY_RELEVANCE_TERMS[category_hint]):
+        score += 20
     if any(term in text for term in EXCLUDED_TERMS) and not matched_chain:
         score = max(0, score - 50)
     related_enterprise_ids = []
