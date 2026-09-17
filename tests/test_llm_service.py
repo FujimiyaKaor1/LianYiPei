@@ -17,7 +17,7 @@ def test_sse_error_explains_local_ollama_connection_failure():
     payload = _event_payload(event)
 
     assert "本地 Ollama 未启动" in payload["error"]
-    assert "切换 MiMo 云端模型" in payload["error"]
+    assert "切换 DeepSeek 云端模型" in payload["error"]
 
 
 def test_sse_error_explains_cloud_auth_failure():
@@ -25,4 +25,4 @@ def test_sse_error_explains_cloud_auth_failure():
 
     payload = _event_payload(event)
 
-    assert "云端 MiMo 鉴权失败" in payload["error"]
+    assert "云端 DeepSeek 鉴权失败" in payload["error"]

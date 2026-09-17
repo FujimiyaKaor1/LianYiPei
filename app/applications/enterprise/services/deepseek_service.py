@@ -272,7 +272,7 @@ class DeepSeekProfileService:
         """
         模拟云端大模型调用生成AI洞察文本。
 
-        实际项目中应替换为真实的 MiMo API调用。
+        实际项目中应替换为真实的 DeepSeek API 调用。
         """
         return self._generate_insight_text(
             product_name=product_name,

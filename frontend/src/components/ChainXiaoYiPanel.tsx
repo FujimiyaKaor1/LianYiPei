@@ -16,7 +16,7 @@ type PanelPosition = { right: number; bottom: number };
 function readSession() {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) as { id: number; token?: string | null } : null;
+    return raw ? JSON.parse(raw) as { id: number } : null;
   } catch {
     return null;
   }
@@ -44,7 +44,7 @@ export function ChainXiaoYiPanel() {
   const [messages, setMessages] = useState<PanelMessage[]>([
     { id: 'welcome', role: 'assistant', content: '你好，我是链小易。你可以直接告诉我想采购什么、找什么工厂，或者上传一张表，我会帮你整理成下一步任务。' },
   ]);
-  const [session, setSession] = useState<{ id: number; token?: string | null } | null>(readSession);
+  const [session, setSession] = useState<{ id: number } | null>(readSession);
   const [modelStatus, setModelStatus] = useState<ChainXiaoYiModelStatus | null>(null);
   const [lastIntent, setLastIntent] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState(false);
@@ -64,7 +64,7 @@ export function ChainXiaoYiPanel() {
   const ensureSession = async () => {
     if (session) return session;
     const response = await api.createChainXiaoYiSession(user ? 'enterprise' : 'public');
-    const next = { id: response.session.id, token: response.session.token };
+    const next = { id: response.session.id };
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(next));
     setSession(next);
     setModelStatus(response.model_status);
@@ -80,7 +80,7 @@ export function ChainXiaoYiPanel() {
     setBusy(true); setNotice('');
     try {
       const currentSession = await ensureSession();
-      const response = await api.sendChainXiaoYiMessage(currentSession.id, content, currentSession.token || undefined);
+      const response = await api.sendChainXiaoYiMessage(currentSession.id, content);
       setModelStatus(response.model_status);
       setLastIntent(response.intent);
       setMessages(current => [...current, { id: `a-${Date.now()}`, role: 'assistant', content: response.reply, intent: response.intent }]);
@@ -95,7 +95,7 @@ export function ChainXiaoYiPanel() {
     setBusy(true); setNotice('');
     try {
       const currentSession = await ensureSession();
-      const response = await api.createChainXiaoYiDemandDraft(currentSession.id, lastIntent, currentSession.token || undefined);
+      const response = await api.createChainXiaoYiDemandDraft(currentSession.id, lastIntent);
       setNotice(`需求草稿已创建（#${response.inquiry.id}），正在进入匹配`);
       navigate(`/matching?query=${encodeURIComponent(String(lastIntent.product || ''))}&inquiry_id=${response.inquiry.id}&mode=agent`);
     } catch (error) {
@@ -107,7 +107,7 @@ export function ChainXiaoYiPanel() {
     setBusy(true); setNotice('正在读取文件并生成预览…');
     try {
       const currentSession = await ensureSession();
-      const response = await api.previewChainXiaoYiFile(currentSession.id, file, currentSession.token || undefined);
+      const response = await api.previewChainXiaoYiFile(currentSession.id, file);
       const preview = response.file.preview;
       const sheetCount = Array.isArray(preview.sheets) ? preview.sheets.length : 0;
       setMessages(current => [...current, { id: `f-${Date.now()}`, role: 'assistant', content: `文件已安全接收：${response.file.filename}。识别为${response.file.detected_kind === 'table' ? '表格' : '文档'}，${sheetCount ? `发现 ${sheetCount} 个工作表` : '等待人工确认导入类型'}。当前只生成预览，不会自动写入业务数据。` }]);

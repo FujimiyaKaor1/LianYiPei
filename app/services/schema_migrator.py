@@ -328,6 +328,19 @@ def ensure_schema(db) -> None:
         Quote,
         RecruitmentTask,
         Transaction,
+        IndustryNewsSource,
+        IndustryNewsArticle,
+        IndustryNewsSyncRun,
+    )
+    from app.models_chain_xiaoyi import (
+        ChainXiaoYiApproval,
+        ChainXiaoYiEvent,
+        ChainXiaoYiFileImport,
+        ChainXiaoYiGuestTrial,
+        ChainXiaoYiMessage,
+        ChainXiaoYiRun,
+        ChainXiaoYiSession,
+        ChainXiaoYiTask,
     )
 
     core_models: Iterable = (
@@ -342,6 +355,17 @@ def ensure_schema(db) -> None:
         HermesPendingAction,
         PriceIndex,
         Message,
+        IndustryNewsSource,
+        IndustryNewsArticle,
+        IndustryNewsSyncRun,
+        ChainXiaoYiSession,
+        ChainXiaoYiMessage,
+        ChainXiaoYiTask,
+        ChainXiaoYiRun,
+        ChainXiaoYiApproval,
+        ChainXiaoYiFileImport,
+        ChainXiaoYiEvent,
+        ChainXiaoYiGuestTrial,
     )
 
     with db.engine.connect() as conn:

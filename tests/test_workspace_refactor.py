@@ -67,6 +67,32 @@ def test_directory_supports_advanced_filters_and_stable_paging(client, test_ente
     assert "phone" not in payload["enterprises"][0]
 
 
+def test_directory_matches_public_factory_filter_semantics(client, test_enterprise, test_supplier):
+    test_supplier.province = "广东省"
+    test_supplier.city = "佛山市"
+    test_supplier.registered_capital = 5000
+    test_supplier.is_lead_enterprise = True
+    test_supplier.contact = "公开前不展示"
+    test_supplier.extras = {"is_export": True}
+    db.session.commit()
+    _login(client, test_enterprise)
+
+    response = client.get(
+        "/api/enterprises/directory?province=广东省&city=佛山市"
+        "&is_export=1&has_decision_maker=1&is_little_giant=1"
+        "&min_registered_capital=1000&per_page=1"
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["total"] == 1
+    item = payload["enterprises"][0]
+    assert item["registered_capital"] == 5000
+    assert item["has_decision_maker"] is True
+    assert item["is_export"] is True
+    assert item["is_little_giant"] is True
+
+
 def test_quote_selection_is_idempotent_and_notifies_supplier(client, test_enterprise, test_supplier):
     inquiry = Inquiry(
         poster_id=test_enterprise.id,

@@ -11,7 +11,8 @@
     "lint": "tsc --noEmit",
     "verify:public-home": "tsx scripts/verify-public-home.ts",
     "verify:ai-sidebar-drag": "tsx scripts/verify-ai-sidebar-drag.ts",
-    "verify:gov-screen": "tsx scripts/verify-gov-digital-screen.ts"
+    "verify:gov-screen": "tsx scripts/verify-gov-digital-screen.ts",
+    "test:e2e": "playwright test -c playwright.config.ts"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
@@ -19,6 +20,8 @@
     "@vitejs/plugin-react": "^5.0.4",
     "clsx": "^2.1.1",
     "dotenv": "^17.2.3",
+    "echarts": "^6.1.0",
+    "echarts-for-react": "^3.0.2",
     "express": "^4.21.2",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
@@ -26,17 +29,16 @@
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.13.2",
     "recharts": "^3.8.1",
-    "echarts": "^5.5.1",
-    "echarts-for-react": "^3.0.2",
     "tailwind-merge": "^3.5.0",
     "vite": "^6.2.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
     "tailwindcss": "^4.1.14",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.13",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }

@@ -610,7 +610,7 @@ export function AISidebar() {
                 disabled={isStreaming || isUploadingPdf}
               >
                 <option value="qwen">qwen（本地隐私专家）</option>
-                <option value="mimo">MiMo-V2.5-Pro（云端深度思考引擎）</option>
+                <option value="deepseek">DeepSeek（云端深度思考引擎）</option>
               </select>
             </label>
             <div className="flex flex-col gap-1 text-[10px] font-semibold text-ink-muted">

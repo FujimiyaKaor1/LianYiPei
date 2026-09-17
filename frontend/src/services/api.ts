@@ -97,7 +97,7 @@ export interface SupplierSearchParams {
   delivery_days?: number;
   min_credit?: string | number;
   algorithm?: 'rule' | 'deep_learning';
-  model_choice?: 'qwen' | 'mimo';
+  model_choice?: 'qwen' | 'deepseek';
 }
 
 export interface SupplierSearchItem {
@@ -142,8 +142,11 @@ export interface EnterpriseDirectoryItem {
   current_orders?: number;
   capacity_status?: 'ample' | 'tight' | string;
   is_export?: boolean;
+  has_decision_maker?: boolean;
   is_little_giant?: boolean;
   is_green_factory?: boolean;
+  registered_capital?: number;
+  verification_status?: string;
   business_status?: string;
   updated_at?: string | null;
   source?: string;
@@ -292,10 +295,23 @@ export interface ChainXiaoYiModelStatus {
 
 export interface ChainXiaoYiSession {
   id: number;
-  token?: string | null;
   title: string;
   surface: string;
   status: string;
+  intent?: Record<string, unknown>;
+  updated_at?: string;
+  match_count?: number;
+}
+
+export interface ChainXiaoYiMatchItem {
+  id: number; name: string; province: string; city: string; business_scope: string;
+  score: number; confidence_index: number;
+  dimensions: Record<string, { score?: number; desc?: string }>;
+  trusted_labels: string[]; reason: string; data_updated_at?: string | null; degraded: boolean;
+}
+
+export interface ChainXiaoYiMatchResult {
+  total: number; results: ChainXiaoYiMatchItem[]; degraded: boolean; explanation_provider: string;
 }
 
 export interface ChainXiaoYiTask {
@@ -309,6 +325,9 @@ export interface ChainXiaoYiMessageResponse {
   success: boolean;
   reply: string;
   intent: Record<string, unknown>;
+  needs_clarification: boolean;
+  suggestions: string[];
+  match_result: ChainXiaoYiMatchResult;
   model_status: ChainXiaoYiModelStatus;
   task: ChainXiaoYiTask;
 }
@@ -920,6 +939,22 @@ export const api = {
     );
   },
 
+  listChainXiaoYiSessions() {
+    return request<{ success: boolean; sessions: ChainXiaoYiSession[] }>('/api/chain-xiaoyi/sessions');
+  },
+
+  getChainXiaoYiSession(sessionId: number) {
+    return request<{ success: boolean; session: ChainXiaoYiSession; intent: Record<string, unknown>; match_result?: ChainXiaoYiMatchResult | null; messages: { id: number; role: string; content: string; created_at: string }[] }>(`/api/chain-xiaoyi/sessions/${sessionId}`);
+  },
+
+  claimChainXiaoYiSession(sessionId: number) {
+    return request<{ success: boolean; session: ChainXiaoYiSession }>(`/api/chain-xiaoyi/sessions/${sessionId}/claim`, { method: 'POST' });
+  },
+
+  archiveChainXiaoYiSession(sessionId: number) {
+    return request<{ success: boolean; session: ChainXiaoYiSession }>(`/api/chain-xiaoyi/sessions/${sessionId}/archive`, { method: 'POST' });
+  },
+
   createChainXiaoYiDemandDraft(sessionId: number, intent: Record<string, unknown>, token?: string) {
     return request<{ success: boolean; inquiry: { id: number; status: string; product_name: string; quantity?: number; unit?: string } }>(
       `/api/chain-xiaoyi/sessions/${sessionId}/demand-draft`,
@@ -1027,8 +1062,10 @@ export const api = {
     max_capacity?: number;
     capacity_status?: string;
     is_export?: boolean;
+    has_decision_maker?: boolean;
     is_little_giant?: boolean;
     is_green_factory?: boolean;
+    registered_capital?: number;
     business_status?: string;
     sort?: string;
   }) {
@@ -1049,8 +1086,10 @@ export const api = {
     if (params?.max_capacity !== undefined) query.set('max_capacity', String(params.max_capacity));
     if (params?.capacity_status) query.set('capacity_status', params.capacity_status);
     if (params?.is_export) query.set('is_export', '1');
+    if (params?.has_decision_maker) query.set('has_decision_maker', '1');
     if (params?.is_little_giant) query.set('is_little_giant', '1');
     if (params?.is_green_factory) query.set('is_green_factory', '1');
+    if (params?.registered_capital !== undefined) query.set('min_registered_capital', String(params.registered_capital));
     if (params?.business_status) query.set('business_status', params.business_status);
     if (params?.sort) query.set('sort', params.sort);
     const suffix = query.toString();

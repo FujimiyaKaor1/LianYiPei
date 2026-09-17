@@ -5,6 +5,7 @@ import { useAuth } from '@/src/context/AuthContext';
 import { useTheme } from '@/src/context/ThemeContext';
 import { useToast } from '@/src/components/ToastProvider';
 import { api } from '@/src/services/api';
+import { GUEST_HOME_PATH } from '@/src/lib/rbac';
 import { BrandLogo } from './BrandLogo';
 
 interface TopBarProps {
@@ -70,7 +71,7 @@ export function TopBar({ title, showSearch = true }: TopBarProps) {
 
         <div className="flex items-center gap-2">
           <Link
-            to="/"
+            to={GUEST_HOME_PATH}
             className="btn-secondary btn-sm hidden gap-1.5 sm:inline-flex"
             aria-label="回到首页"
           >

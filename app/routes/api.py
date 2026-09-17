@@ -26,7 +26,7 @@ from app.services.fulfillment_service import get_all_cases, toggle_case_visibili
 from app.services.intent_parser import extract_weights_from_nl
 from app.services.order_service import OrderService
 from app.services.matcher import DEFAULT_WEIGHTS, match_suppliers
-from app.services.mimo_client import create_mimo_chat_model_from_env
+from app.services.deepseek_client import create_deepseek_chat_model_from_env
 from app.routes.match import ai_match_view, api_inquiry_send, api_inquiry_sign
 
 api_bp = Blueprint("api", __name__)
@@ -572,12 +572,12 @@ def api_orders_by_date_api(date_str: str):
 def get_llm_instance(model_choice: str):
     """
     按前端传入 model_choice 返回 LLM 实例（工厂模式）。
-    - mimo: Xiaomi MiMo-V2.5-Pro 云端模型
+    - deepseek: DeepSeek 云端模型（mimo 作为历史兼容别名）
     - qwen: ChatOllama(本地 Ollama)
     """
     choice = (model_choice or "qwen").strip().lower()
     if choice in {"mimo", "deepseek"}:
-        return create_mimo_chat_model_from_env()
+        return create_deepseek_chat_model_from_env()
 
     if choice == "qwen":
         from langchain_ollama import ChatOllama
@@ -595,7 +595,7 @@ def get_llm_instance(model_choice: str):
             timeout=int(float(os.getenv("LLM_TIMEOUT_SECONDS", "120"))),
         )
 
-    raise ValueError("model_choice 仅支持 'mimo' 或 'qwen'")
+    raise ValueError("model_choice 仅支持 'deepseek' 或 'qwen'")
 
 
 def _extract_json_list(text: str):
@@ -619,50 +619,19 @@ def _extract_json_list(text: str):
         return []
 
 
-def _clamp_ai_score_bracket(raw: object) -> int | None:
-    try:
-        x = int(round(float(raw)))
-    except (TypeError, ValueError):
-        return None
-    return max(80, min(99, x))
-
-
-def _dedupe_ai_scores_sequential(pairs: list[tuple[int, int]]) -> dict[int, int]:
-    """保证 ai_score 互异且在 80~99；优先保留模型给出的分，冲突则向低档让位。"""
-    used: set[int] = set()
-    out: dict[int, int] = {}
-    for sid, s in pairs:
-        x = max(80, min(99, int(s)))
-        chosen: int | None = None
-        for cand in range(x, 79, -1):
-            if cand not in used:
-                chosen = cand
-                break
-        if chosen is None:
-            for cand in range(x + 1, 100):
-                if cand not in used:
-                    chosen = cand
-                    break
-        if chosen is None:
-            continue
-        used.add(chosen)
-        out[sid] = chosen
-    return out
-
-
-def _build_mimo_match_reasons(
+def _build_deepseek_match_reasons(
     keyword: str, top_results: list[dict]
 ) -> tuple[dict[int, str], dict[int, int], bool, str | None]:
-    """使用 MiMo 对 TopN 候选生成 AI 理由 + Agent 专家分（ai_score）。"""
+    """使用 DeepSeek 生成事实型理由；返回的分数字典始终为空。"""
     candidates = top_results[:5]
     if not candidates:
         return {}, {}, True, "no_candidates"
 
     try:
-        llm = get_llm_instance("mimo")
+        llm = get_llm_instance("deepseek")
     except Exception as exc:
-        current_app.logger.exception("matching.mimo.init_failed: %s", exc)
-        return {}, {}, True, f"mimo_init_failed:{type(exc).__name__}"
+        current_app.logger.warning("matching.deepseek.init_failed: %s", type(exc).__name__)
+        return {}, {}, True, f"deepseek_init_failed:{type(exc).__name__}"
 
     compact_rows = []
     for row in candidates:
@@ -684,13 +653,12 @@ def _build_mimo_match_reasons(
         )
 
     sys_prompt = (
-        "你是供应链匹配专家。请基于候选供应商信息与需求关键词，为每家输出一句简短匹配理由，并给出 Agent 专家评分。"
+        "你是供应链匹配解释助手。请仅基于候选供应商事实与需求关键词，为每家输出一句简短匹配理由。"
         "必须只输出 JSON 数组，不要输出任何数组以外的文字。"
         "数组每项格式为："
-        '{"id": 123, "reason": "不超过40字的中文理由", "ai_score": 96}。'
+        '{"id": 123, "reason": "不超过40字的中文理由"}。'
         "要求：1) id 与输入一致；2) reason 简明专业；"
-        "3) ai_score 为 80 到 99 之间的整数，表示综合匹配推荐度，数值越高越推荐；"
-        "4) 不同候选的 ai_score 必须互不相同，严禁两家分数相同。"
+        "3) 不得输出或修改评分、排序；4) 不得补充输入中不存在的企业事实。"
     )
     user_prompt = (
         f"需求关键词：{keyword or '未提供'}\n"
@@ -709,11 +677,11 @@ def _build_mimo_match_reasons(
             )
         parsed = _extract_json_list(str(content))
     except Exception as exc:
-        current_app.logger.exception("matching.mimo.invoke_failed: %s", exc)
-        return {}, {}, True, f"mimo_invoke_failed:{type(exc).__name__}"
+        current_app.logger.warning("matching.deepseek.invoke_failed: %s", type(exc).__name__)
+        return {}, {}, True, f"deepseek_invoke_failed:{type(exc).__name__}"
 
     reason_map: dict[int, str] = {}
-    score_pairs: list[tuple[int, int]] = []
+    allowed_ids = {int(row.get("id") or 0) for row in candidates}
     for item in parsed:
         if not isinstance(item, dict):
             continue
@@ -725,17 +693,12 @@ def _build_mimo_match_reasons(
             sid_int = int(sid)
         except Exception:
             continue
-        if reason:
+        if sid_int in allowed_ids and reason:
             reason_map[sid_int] = reason[:80]
-        ac_raw = _clamp_ai_score_bracket(item.get("ai_score"))
-        if ac_raw is not None:
-            score_pairs.append((sid_int, ac_raw))
 
-    score_map = _dedupe_ai_scores_sequential(score_pairs) if score_pairs else {}
-
-    if not reason_map and not score_map:
-        return {}, {}, True, "mimo_empty_output"
-    return reason_map, score_map, False, None
+    if not reason_map:
+        return {}, {}, True, "deepseek_empty_output"
+    return reason_map, {}, False, None
 
 
 def _enterprise_images(ent: Enterprise):
@@ -1072,29 +1035,13 @@ def api_matching_search():
         algorithm=algorithm,
     )
     _logger.debug("matching/search match_suppliers done count=%s", len(results))
-    mimo_reasons: dict[int, str] = {}
+    deepseek_reasons: dict[int, str] = {}
     is_basic_match = False
     fallback_reason = None
-    mimo_ai_scores: dict[int, int] = {}
     if algorithm == "deep_learning":
-        mimo_reasons, mimo_ai_scores, is_basic_match, fallback_reason = _build_mimo_match_reasons(
+        deepseek_reasons, _, is_basic_match, fallback_reason = _build_deepseek_match_reasons(
             core_product, results[:5]
         )
-        for row in results:
-            sid = int(row.get("id") or 0)
-            if sid in mimo_ai_scores:
-                s = float(mimo_ai_scores[sid])
-                row["score"] = s
-                row["total_score"] = s
-                row["confidence_index"] = round(s, 2)
-                row["deep_learning_explain"] = (
-                    f"{row.get('deep_learning_explain') or ''} · Agent评分{int(s)}"
-                ).strip(" ·")
-        if mimo_ai_scores:
-            results.sort(
-                key=lambda r: float(r.get("confidence_index") or r.get("score") or 0.0),
-                reverse=True,
-            )
 
     return jsonify(
         {
@@ -1120,7 +1067,7 @@ def api_matching_search():
                     "match": f"{int(round(float(row.get('confidence_index', row.get('score')) or 0)))}%",
                     "distance_km": row.get("distance_km"),
                     "desc": row.get("match_reason") or "智能匹配供应商",
-                    "ai_match_reason": mimo_reasons.get(int(row.get("id") or 0))
+                    "ai_match_reason": deepseek_reasons.get(int(row.get("id") or 0))
                     or row.get("ai_match_reason"),
                     "tags": row.get("reasons") or [],
                     "deep_learning_score": row.get("deep_learning_score"),
@@ -1175,10 +1122,14 @@ def api_enterprises_directory():
     max_capacity = request.args.get("max_capacity", type=float)
     capacity_status = (request.args.get("capacity_status") or "").strip()
     business_status = (request.args.get("business_status") or "").strip()
-    sort = (request.args.get("sort") or "credit").strip()
-    is_export = request.args.get("is_export") in {"1", "true", "yes"}
-    is_little_giant = request.args.get("is_little_giant") in {"1", "true", "yes"}
-    is_green_factory = request.args.get("is_green_factory") in {"1", "true", "yes"}
+    sort = (request.args.get("sort") or "credit").strip().lower()
+    is_export = request.args.get("is_export", "").lower() in {"1", "true", "yes"}
+    has_decision_maker = request.args.get("has_decision_maker", "").lower() in {"1", "true", "yes"}
+    is_little_giant = request.args.get("is_little_giant", "").lower() in {"1", "true", "yes"}
+    is_green_factory = request.args.get("is_green_factory", "").lower() in {"1", "true", "yes"}
+    min_registered_capital = request.args.get("min_registered_capital", type=float)
+    if min_registered_capital is not None and min_registered_capital < 0:
+        min_registered_capital = None
     page = request.args.get("page", default=1, type=int) or 1
     per_page = request.args.get("per_page", type=int)
     legacy_limit = request.args.get("limit", type=int)
@@ -1244,14 +1195,46 @@ def api_enterprises_directory():
             query = query.filter(func.coalesce(Enterprise.capacity, 0) <= func.coalesce(Enterprise.current_orders, 0))
     if business_status:
         query = query.filter(Enterprise.business_status == business_status)
+    if min_registered_capital is not None:
+        query = query.filter(Enterprise.registered_capital >= min_registered_capital)
     if is_green_factory:
         query = query.filter(Enterprise.is_green_factory.is_(True))
-    # 当前数据模型使用 is_lead_enterprise 表示重点/专精特新企业标记。
+    if has_decision_maker:
+        query = query.filter(
+            or_(
+                and_(Enterprise.contact.isnot(None), Enterprise.contact != ""),
+                and_(Enterprise.phone.isnot(None), Enterprise.phone != ""),
+            )
+        )
     if is_little_giant:
-        query = query.filter(Enterprise.is_lead_enterprise.is_(True))
+        query = query.filter(
+            or_(
+                Enterprise.is_lead_enterprise.is_(True),
+                cast(Enterprise.qualifications, String).contains("little_giant"),
+                cast(Enterprise.qualifications, String).contains("专精特新"),
+                cast(Enterprise.qualifications, String).contains("小巨人"),
+                _json_true_marker(Enterprise.extras, "is_little_giant"),
+            )
+        )
     if is_export:
-        query = query.filter(Enterprise.extras.isnot(None)).filter(
-            cast(Enterprise.extras, String).ilike('%"is_export": true%')
+        query = query.filter(
+            or_(
+                Enterprise.business_scope.contains("出口"),
+                Enterprise.business_scope.contains("外贸"),
+                Enterprise.business_scope.contains("国际贸易"),
+                Enterprise.business_scope.contains("跨境"),
+                Enterprise.tech_keywords.contains("出口"),
+                Enterprise.tech_keywords.contains("外贸"),
+                Enterprise.tech_keywords.contains("国际贸易"),
+                Enterprise.tech_keywords.contains("跨境"),
+                _json_true_marker(
+                    Enterprise.extras,
+                    "is_export",
+                    "is_foreign_trade",
+                    "export_capable",
+                    "foreign_trade",
+                ),
+            )
         )
 
     if min_credit is not None and min_credit > 0:
@@ -1295,9 +1278,12 @@ def api_enterprises_directory():
                     "max_capacity": float(ent.max_capacity or ent.capacity or 0),
                     "current_orders": int(ent.current_orders or 0),
                     "capacity_status": "ample" if (ent.capacity or 0) > (ent.current_orders or 0) else "tight",
-                    "is_export": bool(isinstance(ent.extras, dict) and ent.extras.get("is_export") is True),
-                    "is_little_giant": bool(ent.is_lead_enterprise),
+                    "is_export": _enterprise_is_export_capable(ent),
+                    "has_decision_maker": _enterprise_has_decision_maker(ent),
+                    "is_little_giant": _enterprise_is_little_giant(ent),
                     "is_green_factory": bool(ent.is_green_factory),
+                    "registered_capital": float(ent.registered_capital or 0),
+                    "verification_status": ent.verification_status or ("approved" if ent.is_verified else "pending"),
                     "business_status": ent.business_status or "待核验",
                     "updated_at": (ent.last_data_update or ent.biz_data_updated_at or ent.created_at).isoformat() if (ent.last_data_update or ent.biz_data_updated_at or ent.created_at) else None,
                     "source": "企业档案",
@@ -1359,6 +1345,18 @@ def _enterprise_has_label(ent: Enterprise, *terms: str) -> bool:
     return any(term.lower() in haystack for term in terms)
 
 
+def _json_true_marker(column, *keys: str):
+    """Match JSON boolean markers across SQLite/MySQL JSON serialization."""
+    text = cast(column, String)
+    return or_(*[
+        text.ilike(f'%"{key}": true%')
+        for key in keys
+    ] + [
+        text.ilike(f'%"{key}":true%')
+        for key in keys
+    ])
+
+
 def _enterprise_is_export_capable(ent: Enterprise) -> bool:
     extras = ent.extras if isinstance(ent.extras, dict) else {}
     explicit = any(
@@ -1375,7 +1373,7 @@ def _enterprise_has_decision_maker(ent: Enterprise) -> bool:
 
 def _enterprise_is_little_giant(ent: Enterprise) -> bool:
     extras = ent.extras if isinstance(ent.extras, dict) else {}
-    return bool(extras.get("is_little_giant")) or _enterprise_has_label(
+    return bool(ent.is_lead_enterprise) or bool(extras.get("is_little_giant")) or _enterprise_has_label(
         ent, "little_giant", "专精特新", "小巨人"
     )
 
@@ -1557,14 +1555,14 @@ def _public_enterprise_constraints(
         )
     # JSON 标签来自企业画像；CAST 保持 SQLite 测试库和 MySQL 生产库行为一致。
     qualifications_text = cast(Enterprise.qualifications, String)
-    extras_text = cast(Enterprise.extras, String)
     if is_little_giant:
         query = query.filter(
             or_(
+                Enterprise.is_lead_enterprise.is_(True),
                 qualifications_text.contains("little_giant"),
                 qualifications_text.contains("专精特新"),
                 qualifications_text.contains("小巨人"),
-                extras_text.contains("is_little_giant"),
+                _json_true_marker(Enterprise.extras, "is_little_giant"),
             )
         )
     if is_export:
@@ -1574,8 +1572,17 @@ def _public_enterprise_constraints(
                 Enterprise.business_scope.contains("外贸"),
                 Enterprise.business_scope.contains("国际贸易"),
                 Enterprise.business_scope.contains("跨境"),
-                extras_text.contains("is_export"),
-                extras_text.contains("is_foreign_trade"),
+                Enterprise.tech_keywords.contains("出口"),
+                Enterprise.tech_keywords.contains("外贸"),
+                Enterprise.tech_keywords.contains("国际贸易"),
+                Enterprise.tech_keywords.contains("跨境"),
+                _json_true_marker(
+                    Enterprise.extras,
+                    "is_export",
+                    "is_foreign_trade",
+                    "export_capable",
+                    "foreign_trade",
+                ),
             )
         )
     return query
@@ -1636,7 +1643,9 @@ def _public_inquiry_query(
     direction: str | None = None,
     **filters,
 ):
-    query = Inquiry.query.join(Enterprise, Inquiry.poster_id == Enterprise.id).filter(
+    query = Inquiry.query.join(Enterprise, Inquiry.poster_id == Enterprise.id).outerjoin(
+        Product, Inquiry.product_id == Product.id
+    ).filter(
         Enterprise.role == "enterprise",
         Inquiry.status.in_(("open", "active")),
     )
@@ -1772,14 +1781,19 @@ def api_public_search():
     city = (request.args.get("city") or "").strip()[:50]
     industry_key = (request.args.get("industry") or "").strip().lower()
     sort = (request.args.get("sort") or "relevance").strip().lower()
+    if sort not in {"relevance", "name"}:
+        sort = "relevance"
     is_export = request.args.get("is_export", "").lower() in {"1", "true", "yes"}
     has_decision_maker = request.args.get("has_decision_maker", "").lower() in {"1", "true", "yes"}
     is_little_giant = request.args.get("is_little_giant", "").lower() in {"1", "true", "yes"}
     is_green_factory = request.args.get("is_green_factory", "").lower() in {"1", "true", "yes"}
     company_status = (request.args.get("company_status") or "").strip()[:20]
     min_registered_capital = request.args.get("min_registered_capital", type=float)
+    if min_registered_capital is not None and min_registered_capital < 0:
+        min_registered_capital = None
     page = max(1, request.args.get("page", default=1, type=int) or 1)
-    per_page = max(1, min(50, request.args.get("per_page", default=20, type=int) or 20))
+    requested_per_page = request.args.get("per_page", default=20, type=int)
+    per_page = max(1, min(50, requested_per_page if requested_per_page is not None else 20))
 
     if search_type not in PUBLIC_SEARCH_TYPES:
         return jsonify({"error": "type 必须是 all、enterprise、product、supply 或 demand"}), 400
@@ -1812,27 +1826,44 @@ def api_public_search():
     start = (page - 1) * per_page
     end = start + per_page
     page_results = []
-    cursor = 0
-    for source_name, source_total, query in sources:
-        segment_start = max(0, start - cursor)
-        segment_end = min(source_total, end - cursor)
-        if segment_start < segment_end:
-            limit = segment_end - segment_start
-            if source_name == "enterprise":
-                rows = query.order_by(Enterprise.credit_score.desc(), Enterprise.id.desc()).offset(segment_start).limit(limit).all()
-                page_results.extend(_public_enterprise_item(row) for row in rows)
-            elif source_name == "product":
-                rows = query.order_by(Product.created_at.desc(), Product.id.desc()).offset(segment_start).limit(limit).all()
-                page_results.extend(_public_product_item(row) for row in rows)
-            else:
-                rows = query.order_by(Inquiry.created_at.desc(), Inquiry.id.desc()).offset(segment_start).limit(limit).all()
-                page_results.extend(_public_inquiry_item(row) for row in rows)
-        cursor += source_total
-        if cursor >= end:
-            break
-
     if sort == "name":
-        page_results.sort(key=lambda item: item["title"])
+        # Fetch the prefix from each independently sorted source, then merge it
+        # before slicing so a later resource type cannot be hidden on page 1.
+        name_rows = []
+        for source_name, source_total, query in sources:
+            limit = min(source_total, end)
+            if source_name == "enterprise":
+                rows = query.order_by(Enterprise.name.asc(), Enterprise.id.asc()).limit(limit).all()
+                name_rows.extend(_public_enterprise_item(row) for row in rows)
+            elif source_name == "product":
+                rows = query.order_by(Product.name.asc(), Product.id.asc()).limit(limit).all()
+                name_rows.extend(_public_product_item(row) for row in rows)
+            else:
+                rows = query.order_by(
+                    func.coalesce(Inquiry.product_name, Product.name).asc(), Inquiry.id.asc()
+                ).limit(limit).all()
+                name_rows.extend(_public_inquiry_item(row) for row in rows)
+        name_rows.sort(key=lambda item: (item["title"], item["kind"], item["id"]))
+        page_results = name_rows[start:end]
+    else:
+        cursor = 0
+        for source_name, source_total, query in sources:
+            segment_start = max(0, start - cursor)
+            segment_end = min(source_total, end - cursor)
+            if segment_start < segment_end:
+                limit = segment_end - segment_start
+                if source_name == "enterprise":
+                    rows = query.order_by(Enterprise.credit_score.desc(), Enterprise.id.desc()).offset(segment_start).limit(limit).all()
+                    page_results.extend(_public_enterprise_item(row) for row in rows)
+                elif source_name == "product":
+                    rows = query.order_by(Product.created_at.desc(), Product.id.desc()).offset(segment_start).limit(limit).all()
+                    page_results.extend(_public_product_item(row) for row in rows)
+                else:
+                    rows = query.order_by(Inquiry.created_at.desc(), Inquiry.id.desc()).offset(segment_start).limit(limit).all()
+                    page_results.extend(_public_inquiry_item(row) for row in rows)
+            cursor += source_total
+            if cursor >= end:
+                break
     return jsonify(
         {
             "query": q,

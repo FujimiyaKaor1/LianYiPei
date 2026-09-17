@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/src/lib/utils';
+import { GUEST_HOME_PATH } from '@/src/lib/rbac';
 import { Link } from 'react-router-dom';
 
 interface BrandLogoProps {
@@ -25,7 +26,7 @@ export function BrandLogo({
 }: BrandLogoProps) {
   return (
     <Link
-      to="/"
+      to={GUEST_HOME_PATH}
       aria-label="返回链易配首页"
       className={cn('flex min-w-0 items-center gap-3', className)}
     >

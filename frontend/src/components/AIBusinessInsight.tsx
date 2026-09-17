@@ -119,7 +119,7 @@ export function AIBusinessInsightCard({
           </div>
           <span className="text-sm font-bold text-blue-900">AI商机洞察</span>
           <div className="ml-auto px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full">
-            MiMo
+            DeepSeek
           </div>
         </div>
 

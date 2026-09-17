@@ -27,7 +27,6 @@ import CapacityCalendar from './pages/CapacityCalendar';
 import EnterpriseDirectory from './pages/EnterpriseDirectory';
 import AlertWorkflow from './pages/AlertWorkflow';
 import PublicHome from './pages/PublicHome';
-import PublicHomePlaceholder from './pages/PublicHomePlaceholder';
 import IndustryNews from './pages/IndustryNews';
 import PublicSearch from './pages/PublicSearch';
 import PublicAia from './pages/PublicAia';
@@ -88,7 +87,7 @@ function GovLayoutGuard() {
 function PublicOrRoleHome() {
   const { user, loading } = useAuth();
   if (loading) return <AuthLoadingShell />;
-  if (!user) return <PublicHomePlaceholder />;
+  if (!user) return <PublicHome />;
   return <Navigate to={loginHomePathForRole(user.role)} replace />;
 }
 
@@ -98,7 +97,7 @@ export default function App() {
       <Route path="/" element={<PublicOrRoleHome />} />
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="/search" element={<PublicSearch />} />
-      <Route path="/aia" element={<PublicHome />} />
+      <Route path="/aia" element={<PublicAia />} />
       <Route path="/industry-news/:slug" element={<IndustryNewsDetail />} />
       <Route path="/industry-news" element={<IndustryNews />} />
       <Route path="/agent-market" element={<AgentMarket />} />

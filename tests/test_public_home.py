@@ -1,5 +1,7 @@
 """公共平台首页与统一搜索接口测试。"""
 
+from datetime import datetime, timedelta
+
 from app import db
 from app.models import Enterprise, Inquiry, Product, Transaction
 
@@ -173,6 +175,63 @@ def test_public_search_supports_factory_filters_without_exposing_contact(
     assert item["public_signals"]["is_green_factory"] is True
     assert "phone" not in item
     assert "contact" not in item
+
+
+def test_public_search_requires_true_json_markers_for_boolean_filters(client, test_supplier):
+    test_supplier.extras = {"is_export": False, "is_little_giant": False, "other": True}
+    db.session.commit()
+
+    export_response = client.get("/api/public/search?type=enterprise&is_export=1")
+    little_giant_response = client.get(
+        "/api/public/search?type=enterprise&is_little_giant=1"
+    )
+
+    assert export_response.status_code == 200
+    assert little_giant_response.status_code == 200
+    assert export_response.get_json()["total"] == 0
+    assert little_giant_response.get_json()["total"] == 0
+
+
+def test_public_search_name_sort_is_global_before_pagination(client, test_supplier):
+    now = datetime.utcnow()
+    db.session.add_all(
+        [
+            Product(
+                name="A排序产品",
+                category="机械制造",
+                enterprise_id=test_supplier.id,
+                created_at=now - timedelta(days=1),
+            ),
+            Product(
+                name="Z排序产品",
+                category="机械制造",
+                enterprise_id=test_supplier.id,
+                created_at=now,
+            ),
+        ]
+    )
+    db.session.commit()
+
+    response = client.get(
+        "/api/public/search?type=product&sort=name&page=1&per_page=1"
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["total"] == 2
+    assert payload["results"][0]["title"] == "A排序产品"
+
+
+def test_public_search_rejects_invalid_paging_values(client):
+    response = client.get(
+        "/api/public/search?type=product&min_registered_capital=-1&page=0&per_page=0"
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["page"] == 1
+    assert payload["per_page"] == 1
+    assert payload["filters"]["min_registered_capital"] is None
 
 
 def test_public_factory_detail_is_redacted_and_includes_products(client, test_supplier):

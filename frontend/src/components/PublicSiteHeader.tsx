@@ -15,7 +15,7 @@ export function PublicSiteHeader({ onLogin }: { onLogin?: () => void }) {
         />
         <nav className="hidden flex-1 items-center gap-6 text-sm font-semibold text-public-muted lg:flex" aria-label="公共平台导航">
           <Link className="transition hover:text-public-brand" to="/">首页</Link>
-          <Link className="transition hover:text-public-brand" to="/search">搜索工厂</Link>
+          <Link className="transition hover:text-public-brand" to="/aia">搜索工厂</Link>
           <Link className="flex items-center gap-1 transition hover:text-public-brand" to="/aia"><Sparkles className="h-3.5 w-3.5" /> AI 找工厂</Link>
           <Link className="transition hover:text-public-brand" to="/agent-market">AI 智能体</Link>
           <EnterpriseNavMenu />
@@ -25,7 +25,7 @@ export function PublicSiteHeader({ onLogin }: { onLogin?: () => void }) {
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <div className="lg:hidden"><EnterpriseNavMenu /></div>
-          <Link className="hidden items-center gap-1.5 rounded-full border border-public-border px-3 py-2 text-xs font-bold text-public-muted transition hover:border-public-brand hover:text-public-brand md:flex" to="/search">
+          <Link className="hidden items-center gap-1.5 rounded-full border border-public-border px-3 py-2 text-xs font-bold text-public-muted transition hover:border-public-brand hover:text-public-brand md:flex" to="/aia">
             <Search className="h-3.5 w-3.5" /> 搜索工厂
           </Link>
           <button type="button" onClick={onLogin} className="btn-secondary btn-sm">登录 / 入驻</button>

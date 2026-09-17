@@ -20,6 +20,7 @@ class ChainXiaoYiSession(db.Model):
     surface = db.Column(db.String(40), nullable=False, default="public")
     status = db.Column(db.String(24), nullable=False, default="active")
     context = db.Column(db.JSON, nullable=True)
+    anonymous_expires_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -30,6 +31,21 @@ class ChainXiaoYiSession(db.Model):
     @staticmethod
     def issue_token() -> str:
         return secrets.token_urlsafe(48)
+
+
+class ChainXiaoYiGuestTrial(db.Model):
+    """Privacy-preserving guest quota record; raw browser tokens/IPs are never stored."""
+    __tablename__ = "chain_xiaoyi_guest_trials"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    browser_token_hash = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    ip_hmac_hash = db.Column(db.String(64), nullable=False, index=True)
+    match_count = db.Column(db.Integer, nullable=False, default=0)
+    minute_count = db.Column(db.Integer, nullable=False, default=0)
+    minute_started_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    used_at = db.Column(db.DateTime, nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
 class ChainXiaoYiMessage(db.Model):

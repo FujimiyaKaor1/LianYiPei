@@ -756,6 +756,24 @@ def match_suppliers(demand_product, demand_location=None, demand_quantity=100, d
 
     results = []
     for supplier in suppliers:
+        region = str(filters.get('region') or '').strip()
+        if region and region not in str(supplier.province or '') and region not in str(supplier.city or '') and region not in str(supplier.address or ''):
+            continue
+        if filters.get('min_credit') is not None and float(supplier.credit_score or 0) < float(filters['min_credit']):
+            continue
+        if filters.get('min_registered_capital') is not None and float(supplier.registered_capital or 0) < float(filters['min_registered_capital']):
+            continue
+        if filters.get('export_only') and not bool((supplier.extras or {}).get('is_export')):
+            continue
+        if filters.get('little_giant_only'):
+            qualification_text = json.dumps(supplier.qualifications or [], ensure_ascii=False)
+            if not supplier.is_lead_enterprise and not bool((supplier.extras or {}).get('is_little_giant')) and not any(marker in qualification_text for marker in ('专精特新', '小巨人', 'little_giant')):
+                continue
+        required_certifications = filters.get('certifications') or []
+        if required_certifications:
+            qualification_text = json.dumps(supplier.qualifications or [], ensure_ascii=False).lower()
+            if any(str(cert).lower().replace(' ', '') not in qualification_text.replace(' ', '') for cert in required_certifications):
+                continue
         if filters.get('min_patent') and (supplier.patent_count or 0) < filters['min_patent']:
             continue
         if filters.get('min_capacity') and (supplier.capacity or 0) < filters['min_capacity']:
@@ -814,7 +832,7 @@ def match_suppliers(demand_product, demand_location=None, demand_quantity=100, d
         green_score, green_desc = _calc_green_score(supplier)
         carbon = estimate_carbon(supplier, demand_location, demand_quantity)
 
-        if filters.get('max_distance') and dist_km is not None and dist_km > filters['max_distance']:
+        if filters.get('max_distance') and (dist_km is None or dist_km > filters['max_distance']):
             continue
         if filters.get('green_only') and not getattr(supplier, 'is_green_factory', False):
             continue
@@ -882,6 +900,10 @@ def match_suppliers(demand_product, demand_location=None, demand_quantity=100, d
             'enterprise_id': supplier.id,
             'enterprise_name': supplier.name,
             'address': supplier.address,
+            'province': supplier.province,
+            'city': supplier.city,
+            'business_scope': supplier.business_scope,
+            'data_updated_at': (supplier.biz_data_updated_at or supplier.last_data_update or supplier.created_at).isoformat() if (supplier.biz_data_updated_at or supplier.last_data_update or supplier.created_at) else None,
             'contact': supplier.contact,
             'phone': supplier.phone,
             'credit_score': supplier.credit_score,

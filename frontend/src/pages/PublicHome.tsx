@@ -66,7 +66,20 @@ export default function PublicHome() {
     event?.preventDefault();
     const nextKeyword = (override?.keyword ?? keyword).trim();
     const nextIndustry = override?.industry ?? industry;
-    if (searchMode === 'agent') { navigate(`/aia${nextKeyword ? `?query=${encodeURIComponent(nextKeyword)}` : ''}`); return; }
+    // All factory searches now enter the conversational Agent; keep filters in the natural-language request.
+    const filterText = [
+      province && `地区限定为${province}`,
+      nextIndustry && `行业限定为${nextIndustry}`,
+      filters.is_export && '要求支持出口',
+      filters.has_decision_maker && '要求有决策人联系方式',
+      filters.is_little_giant && '要求专精特新',
+      filters.is_green_factory && '要求绿色工厂',
+    ].filter(Boolean).join('，');
+    if (nextKeyword || filterText || searchMode === 'agent') {
+      const agentQuery = [nextKeyword || '帮我找合适的工厂', filterText].filter(Boolean).join('，');
+      navigate(`/aia?q=${encodeURIComponent(agentQuery)}`);
+      return;
+    }
     if (!nextKeyword && !nextIndustry && !province && !Object.values(filters).some(Boolean)) { navigate('/search'); return; }
     setSearchLoading(true);
     try { const result = await api.searchPublicResources({ q: nextKeyword, province, industry: nextIndustry, ...filters, page: 1, per_page: 6 }); setSearch(result); window.setTimeout(() => document.getElementById('home-search-results')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 0); }

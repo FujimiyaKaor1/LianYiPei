@@ -38,8 +38,10 @@ def _enabled(name: str) -> bool:
 
 
 def get_model_status() -> ModelStatus:
-    local_enabled = _enabled("CHAINXIAOYI_LOCAL_ENABLED") and bool(os.getenv("CHAINXIAOYI_LOCAL_MODEL", "").strip())
-    cloud_enabled = _enabled("CHAINXIAOYI_CLOUD_ENABLED") and bool(os.getenv("CHAINXIAOYI_CLOUD_API_KEY", "").strip())
+    local_model = (os.getenv("CHAINXIAOYI_LOCAL_MODEL") or os.getenv("BIZMIND_OLLAMA_MODEL") or "").strip()
+    local_enabled = _enabled("CHAINXIAOYI_LOCAL_ENABLED") and bool(local_model)
+    cloud_key = (os.getenv("DEEPSEEK_API_KEY") or "").strip()
+    cloud_enabled = _enabled("CHAINXIAOYI_CLOUD_ENABLED") and bool(cloud_key)
     routing_mode = os.getenv("CHAINXIAOYI_ROUTING_MODE", "local_first").strip().lower()
     # Provider calls remain deliberately disabled until their adapters are
     # implemented and reviewed. Environment variables alone must not make the
@@ -49,9 +51,9 @@ def get_model_status() -> ModelStatus:
     return ModelStatus(
         local_enabled=local_enabled,
         cloud_enabled=cloud_enabled,
-        local_model=os.getenv("CHAINXIAOYI_LOCAL_MODEL", "").strip(),
-        cloud_provider=os.getenv("CHAINXIAOYI_CLOUD_PROVIDER", "deepseek").strip() or "deepseek",
-        cloud_model=os.getenv("CHAINXIAOYI_CLOUD_MODEL", "deepseek-chat").strip() or "deepseek-chat",
+        local_model=local_model,
+        cloud_provider="deepseek",
+        cloud_model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat").strip() or "deepseek-chat",
         configured_provider=configured_provider,
         active_provider=active_provider,
     )

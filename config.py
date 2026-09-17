@@ -207,8 +207,14 @@ class Config:
     # 为扩展注入的 /hybridaction/* JSONP 探测提供空响应；与业务无关，可减少本地 404
     BROWSER_EXTENSION_PROBE_NOOP = True
 
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'mysql+pymysql://root:password@localhost/lianyipei'
+    # 本地开发可显式启用项目自带 SQLite，避免 MySQL 凭据失效时页面完全无法启动。
+    # 生产环境不允许静默回退，必须显式提供 DATABASE_URL。
+    _configured_database_url = os.environ.get('DATABASE_URL')
+    SQLALCHEMY_DATABASE_URI = _configured_database_url or (
+        f"sqlite:///{os.path.join(basedir, 'instance', 'lianyipei-dev.sqlite')}"
+        if _env_bool('LIANYIPEI_DEV_SQLITE_FALLBACK', False)
+        else 'mysql+pymysql://root:password@localhost/lianyipei'
+    )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     NEO4J_URI = os.environ.get('NEO4J_URI') or 'bolt://localhost:7687'

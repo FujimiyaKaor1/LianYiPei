@@ -1,20 +1,20 @@
-Flask==2.3.3
+Flask==3.1.3
 gunicorn>=22.0
-Flask-Login==0.6.2
+Flask-Login==0.6.3
 Flask-SQLAlchemy==3.1.1
 Flask-Migrate>=4.0.0
 SQLAlchemy>=2.0.36
-pymysql==1.1.0
-cryptography==41.0.3
+pymysql==1.1.1
+cryptography==50.0.0
 neo4j==5.14.0
 APScheduler==3.10.4
 # 地理编码 / 球面距离（高德地图 Web 服务配合 requests 使用）
 geopy==2.4.1
-python-dotenv==1.0.0
+python-dotenv==1.2.2
 pandas>=2.0
 openpyxl>=3.1.0
 pyecharts==2.0.4
-werkzeug==2.3.7
+werkzeug==3.1.6
 email-validator==2.0.0
 # 新增技术栈依赖
 networkx>=3.0
