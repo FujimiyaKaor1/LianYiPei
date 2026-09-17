@@ -32,13 +32,25 @@ CHAIN_TERMS = {
 MANUFACTURING_TERMS = ("制造", "工业", "工厂", "供应链", "产能", "生产", "加工", "设备", "芯片", "材料", "零部件", "汽车", "新能源", "出口", "产线")
 EXCLUDED_TERMS = ("明星", "综艺", "演唱会", "球赛", "电影", "电视剧", "游戏娱乐")
 AUTHORITATIVE_SOURCES = ("政府", "工信", "协会", "证券", "公告", "新华社", "人民日报", "财经")
+CATEGORY_QUERY_TERMS = {
+    "政策法规": "制造业 政策 法规 工信部",
+    "产业趋势": "制造业 产业趋势 产能 技术",
+    "供应链": "制造业 供应链 原材料 物流",
+    "技术创新": "制造业 技术创新 工业自动化 芯片",
+    "企业动态": "制造企业 扩产 投资 订单 上市公司",
+    "出海与贸易": "制造业 出口 外贸 关税 跨境",
+}
+
+
+def newsapi_query_for_category(category: str | None) -> str:
+    return CATEGORY_QUERY_TERMS.get(category or "", "制造业 供应链 工业 工厂")
 
 
 def _news_text(item: dict) -> str:
     return _clean(f"{item.get('title') or ''} {item.get('description') or item.get('summary') or ''}", 4000)
 
 
-def build_news_record(item: dict) -> dict:
+def build_news_record(item: dict, category_hint: str | None = None) -> dict:
     """Normalize a NewsAPI item and associate it with public enterprise data."""
     title = _clean(str(item.get("title") or ""), 500)
     summary = _clean(str(item.get("description") or item.get("summary") or ""), 2000)
@@ -69,7 +81,7 @@ def build_news_record(item: dict) -> dict:
         "title": title, "summary": summary, "source_url": url, "canonical_url": url,
         "source_name": source_name, "published_at": _parse_date(str(item.get("publishedAt") or item.get("published") or "")),
         "provider_article_id": str(item.get("url") or digest)[:255], "content_hash": digest,
-        "category": "企业动态" if related_enterprise_ids else ("出海与贸易" if "出口贸易" in matched_chain else "产业趋势"),
+        "category": category_hint if category_hint in ALLOWED_CATEGORIES else ("企业动态" if related_enterprise_ids else ("出海与贸易" if "出口贸易" in matched_chain else "产业趋势")),
         "content_excerpt": summary,
         "cover_image_url": str(item.get("urlToImage") or "")[:1000] if str(item.get("urlToImage") or "").startswith("https://") else None,
         "industry_tags": matched_chain + (["制造业"] if manufacturing_hits else []),
@@ -81,11 +93,11 @@ def build_news_record(item: dict) -> dict:
     }
 
 
-def persist_newsapi_articles(items: list[dict]) -> list[IndustryNewsArticle]:
+def persist_newsapi_articles(items: list[dict], category_hint: str | None = None) -> list[IndustryNewsArticle]:
     """Persist provider results before they are exposed, making detail URLs stable."""
     saved = []
     for item in items:
-        record = build_news_record(item)
+        record = build_news_record(item, category_hint=category_hint)
         if not record["source_url"] or not record["title"]:
             continue
         article = IndustryNewsArticle.query.filter(

@@ -18,7 +18,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.authz import role_required, user_effective_role, user_session_role
 from app.models import Enterprise, Inquiry, Product, Quote, Transaction, IndustryNewsArticle, IndustryNewsSource
-from app.services.industry_news_service import ALLOWED_CATEGORIES, fetch_newsapi, persist_newsapi_articles
+from app.services.industry_news_service import ALLOWED_CATEGORIES, fetch_newsapi, newsapi_query_for_category, persist_newsapi_articles
 from app.services import map_service
 from app.services import finance_service
 from app.services.fulfillment_dashboard import get_active_fulfillments, get_dashboard_payload
@@ -69,13 +69,14 @@ def api_public_industry_news():
     total = query.count()
     items = query.order_by(IndustryNewsArticle.published_at.desc(), IndustryNewsArticle.id.desc()).offset((page - 1) * per_page).limit(per_page).all()
     latest = IndustryNewsArticle.query.filter(IndustryNewsArticle.is_published.is_(True)).order_by(IndustryNewsArticle.fetched_at.desc()).first()
-    if total == 0 and not category and not source:
+    if total == 0 and not source:
         try:
-            remote = fetch_newsapi(keyword=keyword or "制造业 OR manufacturing", page=page, page_size=per_page)
-            remote_articles = persist_newsapi_articles(remote.get("articles") or [])
+            remote = fetch_newsapi(keyword=keyword or newsapi_query_for_category(category), page=page, page_size=per_page)
+            remote_articles = persist_newsapi_articles(remote.get("articles") or [], category_hint=category or None)
             # Re-query the database: only persisted, screened rows are exposed and
             # their slugs are guaranteed to work in the detail endpoint.
             query = IndustryNewsArticle.query.filter(IndustryNewsArticle.is_published.is_(True))
+            if category and category in ALLOWED_CATEGORIES: query = query.filter(IndustryNewsArticle.category == category)
             if keyword: query = query.filter(or_(IndustryNewsArticle.title.contains(keyword), IndustryNewsArticle.summary.contains(keyword)))
             total = query.count()
             cached_items = query.order_by(IndustryNewsArticle.published_at.desc(), IndustryNewsArticle.id.desc()).offset((page - 1) * per_page).limit(per_page).all()

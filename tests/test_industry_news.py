@@ -4,6 +4,7 @@ from app import db
 from app.models import Enterprise, IndustryNewsArticle, IndustryNewsSource
 from app.services.industry_news_service import (
     build_news_record,
+    newsapi_query_for_category,
     parse_feed,
     validate_feed_url,
 )
@@ -90,3 +91,24 @@ def test_newsapi_list_persists_items_and_detail_uses_same_slug(client, _db, monk
     article = detail.get_json()["article"]
     assert article["title"] == "制造企业扩建芯片产线"
     assert article["chain_stage"]
+
+
+def test_category_filter_changes_newsapi_query_and_results(client, _db, monkeypatch):
+    captured = {}
+
+    def fake_newsapi(**kwargs):
+        captured.update(kwargs)
+        return {"status": "ok", "totalResults": 1, "articles": [{
+            "title": "工信部发布制造业设备更新政策", "description": "政策支持工业设备和产线升级。",
+            "url": "https://example.com/news/policy", "publishedAt": "2026-09-15T08:00:00Z",
+            "source": {"name": "工信部"},
+        }]}
+
+    monkeypatch.setattr("app.routes.api.fetch_newsapi", fake_newsapi)
+    assert "政策" in newsapi_query_for_category("政策法规")
+    response = client.get("/api/public/industry-news?category=政策法规")
+    data = response.get_json()
+    assert response.status_code == 200
+    assert captured["keyword"] == newsapi_query_for_category("政策法规")
+    assert data["items"][0]["category"] == "政策法规"
+    assert data["items"][0]["slug"]
