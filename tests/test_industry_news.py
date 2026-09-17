@@ -16,7 +16,7 @@ def test_public_news_hides_unpublished_and_paginates(client, _db):
             slug=f"news-{index}", title=f"制造业资讯 {index}", summary="摘要",
             category="产业趋势", source_name="测试来源", source_url=f"https://example.com/{index}",
             canonical_url=f"https://example.com/{index}", content_hash=f"{index:064d}",
-            published_at=datetime(2026, 1, 1), is_published=index != 204,
+            published_at=datetime(2026, 1, 1), is_published=index != 204, relevance_score=80,
         ))
     db.session.commit()
     response = client.get("/api/public/industry-news?page=2&per_page=20")
@@ -112,3 +112,15 @@ def test_category_filter_changes_newsapi_query_and_results(client, _db, monkeypa
     assert captured["keyword"] == newsapi_query_for_category("政策法规")
     assert data["items"][0]["category"] == "政策法规"
     assert data["items"][0]["slug"]
+
+
+def test_low_relevance_legacy_news_is_excluded_from_public_filters(client, _db):
+    db.session.add(IndustryNewsArticle(
+        slug="legacy-noise", title="娱乐节目发布新消息", summary="与制造业无关",
+        category="产业趋势", source_name="无关来源", source_url="https://example.com/noise",
+        canonical_url="https://example.com/noise", content_hash="a" * 64,
+        published_at=datetime(2026, 1, 1), is_published=True, relevance_score=0,
+    ))
+    db.session.commit()
+    data = client.get("/api/public/industry-news?category=产业趋势").get_json()
+    assert all(item["slug"] != "legacy-noise" for item in data["items"])

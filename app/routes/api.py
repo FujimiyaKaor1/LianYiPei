@@ -59,7 +59,10 @@ def _news_item(article):
 def api_public_industry_news():
     page = max(request.args.get("page", 1, type=int), 1)
     per_page = min(max(request.args.get("per_page", 12, type=int), 1), 50)
-    query = IndustryNewsArticle.query.filter(IndustryNewsArticle.is_published.is_(True))
+    query = IndustryNewsArticle.query.filter(
+        IndustryNewsArticle.is_published.is_(True),
+        IndustryNewsArticle.relevance_score >= 60,
+    )
     category = (request.args.get("category") or "").strip()
     keyword = (request.args.get("q") or "").strip()[:100]
     source = (request.args.get("source") or "").strip()[:120]
@@ -75,7 +78,10 @@ def api_public_industry_news():
             remote_articles = persist_newsapi_articles(remote.get("articles") or [], category_hint=category or None)
             # Re-query the database: only persisted, screened rows are exposed and
             # their slugs are guaranteed to work in the detail endpoint.
-            query = IndustryNewsArticle.query.filter(IndustryNewsArticle.is_published.is_(True))
+            query = IndustryNewsArticle.query.filter(
+                IndustryNewsArticle.is_published.is_(True),
+                IndustryNewsArticle.relevance_score >= 60,
+            )
             if category and category in ALLOWED_CATEGORIES: query = query.filter(IndustryNewsArticle.category == category)
             if keyword: query = query.filter(or_(IndustryNewsArticle.title.contains(keyword), IndustryNewsArticle.summary.contains(keyword)))
             total = query.count()
@@ -93,7 +99,11 @@ def api_public_industry_news():
 
 @api_bp.route("/public/industry-news/<string:slug>", methods=["GET"])
 def api_public_industry_news_detail(slug):
-    article = IndustryNewsArticle.query.filter_by(slug=slug, is_published=True).first()
+    article = IndustryNewsArticle.query.filter(
+        IndustryNewsArticle.slug == slug,
+        IndustryNewsArticle.is_published.is_(True),
+        IndustryNewsArticle.relevance_score >= 60,
+    ).first()
     if not article:
         hidden = IndustryNewsArticle.query.filter_by(slug=slug).first()
         return jsonify({"error": "新闻已下架" if hidden else "新闻暂未同步或链接已失效", "status": "unpublished" if hidden else "not_found"}), 404
