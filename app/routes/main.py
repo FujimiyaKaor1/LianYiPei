@@ -277,6 +277,14 @@ def api_enterprise_tags():
     )
 
 
+@main.route('/indisea')
+@main.route('/indisea/')
+def indisea_replica():
+    """独立的 Indisea 前端复刻站，不注入链易配业务数据。"""
+    static_dir = os.path.join(current_app.static_folder, 'frontend')
+    return send_from_directory(static_dir, 'indisea/index.html')
+
+
 @main.route('/<path:path>')
 def spa_catchall(path):
     """兜底路由：所有未命中的 GET 请求返回 React SPA（支持前端路由刷新）。"""
