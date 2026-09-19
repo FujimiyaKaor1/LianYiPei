@@ -205,6 +205,7 @@ def api_accept_intent_quote(quote_id: int):
         seller_id=current_id,
         reply_price=data.get("reply_price"),
         reply_notes=data.get("reply_notes"),
+        reply_details=data.get("reply_details"),
     )
 
     if error:
@@ -214,6 +215,7 @@ def api_accept_intent_quote(quote_id: int):
         "success": True,
         "quote_id": quote.id,
         "status": quote.status,
+        "reply_details": quote.seller_reply_details or {},
         "message": "已接受意向报价，可交换名片",
     })
 

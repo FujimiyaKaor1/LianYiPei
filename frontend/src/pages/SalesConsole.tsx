@@ -108,6 +108,41 @@ function extractEnterpriseId(message: SalesMessageItem): number | null {
   return m ? Number(m[1]) : null;
 }
 
+function SupplierQuoteResponseModal({ quoteId, onClose, onSuccess }: { quoteId: number | null; onClose: () => void; onSuccess: () => void }) {
+  const { showToast } = useToast();
+  const [form, setForm] = useState({ price: '', taxIncluded: true, taxRate: '13', moq: '', deliveryDays: '', moldFee: '0', freight: '0', paymentTerms: '', validUntil: '', notes: '' });
+  const [submitting, setSubmitting] = useState(false);
+  useEffect(() => {
+    if (quoteId) setForm({ price: '', taxIncluded: true, taxRate: '13', moq: '', deliveryDays: '', moldFee: '0', freight: '0', paymentTerms: '', validUntil: '', notes: '' });
+  }, [quoteId]);
+  if (!quoteId) return null;
+  const numberOrUndefined = (value: string) => value.trim() === '' ? undefined : Number(value);
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const price = Number(form.price);
+    const deliveryDays = Number(form.deliveryDays);
+    if (!(price > 0) || !(deliveryDays > 0)) { showToast('请填写有效的单价和交期', 'error'); return; }
+    setSubmitting(true);
+    try {
+      await api.acceptIntentQuote(quoteId, price, form.notes, {
+        tax_included: form.taxIncluded,
+        tax_rate: numberOrUndefined(form.taxRate),
+        moq: numberOrUndefined(form.moq),
+        delivery_days: deliveryDays,
+        mold_fee: numberOrUndefined(form.moldFee),
+        freight: numberOrUndefined(form.freight),
+        payment_terms: form.paymentTerms || undefined,
+        valid_until: form.validUntil || undefined,
+        currency: 'CNY',
+      });
+      showToast('结构化报价已提交', 'success'); onSuccess(); onClose();
+    } catch (error) { showToast(error instanceof Error ? error.message : '报价提交失败', 'error'); }
+    finally { setSubmitting(false); }
+  };
+  const field = (key: keyof typeof form, label: string, type = 'text', required = false) => <label className="text-xs text-neutral-600"><span>{label}{required ? ' *' : ''}</span><input type={type} required={required} min={type === 'number' ? '0' : undefined} value={String(form[key])} onChange={event => setForm(current => ({ ...current, [key]: event.target.value }))} className="mt-1 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-blue-500" /></label>;
+  return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"><form onSubmit={submit} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-center justify-between"><div><h2 className="text-lg font-black">提交供应商报价</h2><p className="mt-1 text-xs text-neutral-500">这些字段将进入采购方报价对比和自然语言筛选。</p></div><button type="button" onClick={onClose} className="rounded-lg p-2 hover:bg-neutral-100"><X className="h-4 w-4" /></button></div><div className="mt-5 grid grid-cols-2 gap-3">{field('price', '单价（元）', 'number', true)}{field('deliveryDays', '交期（天）', 'number', true)}{field('taxRate', '税率（%）', 'number')}{field('moq', '最小起订量 MOQ', 'number')}{field('moldFee', '模具费（元）', 'number')}{field('freight', '运费（元）', 'number')}{field('paymentTerms', '付款条件')}{field('validUntil', '报价有效期', 'date')}</div><label className="mt-3 flex items-center gap-2 text-xs text-neutral-700"><input type="checkbox" checked={form.taxIncluded} onChange={event => setForm(current => ({ ...current, taxIncluded: event.target.checked }))} />当前单价为含税价</label><label className="mt-3 block text-xs text-neutral-600"><span>补充说明</span><textarea rows={3} value={form.notes} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} className="mt-1 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-blue-500" /></label><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="btn-secondary">取消</button><button type="submit" disabled={submitting} className="btn-primary">{submitting ? '提交中…' : '确认并提交报价'}</button></div></form></div>;
+}
+
 function getRiskStyle(risk: CreditRiskResult | null) {
   if (!risk) return { value: '评估中', text: '正在计算风险等级', color: 'text-neutral-500' };
   if (risk.risk_level === '低风险') {
@@ -470,6 +505,7 @@ export default function SalesConsole() {
   const [cardExchangeLoading, setCardExchangeLoading] = useState(false);
   const [cardExchangeError, setCardExchangeError] = useState('');
   const [sellerAcceptLoading, setSellerAcceptLoading] = useState(false);
+  const [supplierQuoteResponseId, setSupplierQuoteResponseId] = useState<number | null>(null);
   // 保存已交换的名片（关闭弹窗后仍可再次查看）
   const [savedMyCard, setSavedMyCard] = useState<BusinessCardData | undefined>();
   const [savedTheirCard, setSavedTheirCard] = useState<BusinessCardData | undefined>();
@@ -1127,6 +1163,12 @@ export default function SalesConsole() {
         onSuccess={handleQuoteSuccess}
       />
 
+      <SupplierQuoteResponseModal
+        quoteId={supplierQuoteResponseId}
+        onClose={() => setSupplierQuoteResponseId(null)}
+        onSuccess={() => { if (activeInquiryChatId) void loadInquiryMessages(activeInquiryChatId); }}
+      />
+
       {/* 名片交换弹窗 */}
       <BusinessCardModal
         open={showCardModal}
@@ -1452,27 +1494,14 @@ export default function SalesConsole() {
                                 <div className="flex gap-2 pt-1">
                                   <button
                                     type="button"
-                                    onClick={() => {
-                                      setSellerAcceptLoading(true);
-                                      api.acceptIntentQuote(quoteId)
-                                        .then(() => {
-                                          if (activeInquiryChatId) {
-                                            void loadInquiryMessages(activeInquiryChatId);
-                                          }
-                                        })
-                                        .catch((err) => {
-                                          showToast('同意报价失败，请重试', 'error');
-                                          console.error('acceptIntentQuote failed:', err);
-                                        })
-                                        .finally(() => setSellerAcceptLoading(false));
-                                    }}
+                                    onClick={() => setSupplierQuoteResponseId(quoteId)}
                                     disabled={sellerAcceptLoading}
                                     className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-blue-300 text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-1.5"
                                   >
                                     {sellerAcceptLoading ? (
                                       <><Loader2 className="w-3.5 h-3.5 animate-spin" /> 处理中...</>
                                     ) : (
-                                      <><CheckCircle2 className="w-3.5 h-3.5" /> 同意意向报价</>
+                                      <><CheckCircle2 className="w-3.5 h-3.5" /> 填写并提交报价</>
                                     )}
                                   </button>
                                   <button

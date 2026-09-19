@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.events import EVENT_JOB_EXECUTED, EVENT_JOB_ERROR
 
 # 配置日志
@@ -196,6 +197,59 @@ def _register_jobs(app):
         args=[app]
     )
     logger.info("已注册任务: 每日04:00清理超过90天的消息")
+
+    scheduler.add_job(
+        func=_cleanup_callback_receipts_job,
+        trigger=CronTrigger(hour=4, minute=10),
+        id='cleanup_callback_receipts',
+        name='清理第三方回调防重放收据',
+        replace_existing=True,
+        args=[app],
+    )
+    logger.info("已注册任务: 每日04:10清理过期第三方回调收据")
+
+    # Durable Agent queue. In production this scheduler should run in the
+    # dedicated worker process selected by LIANYIPEI_SCHEDULER_ENABLED.
+    scheduler.add_job(
+        func=_process_chain_xiaoyi_queue_job,
+        trigger=IntervalTrigger(seconds=5),
+        id='process_chain_xiaoyi_queue',
+        name='处理链小易后台任务队列',
+        replace_existing=True,
+        args=[app],
+    )
+    logger.info("已注册任务: 每5秒处理链小易后台任务队列")
+
+    scheduler.add_job(
+        func=_expire_chain_xiaoyi_rfq_job,
+        trigger=IntervalTrigger(seconds=60),
+        id='expire_chain_xiaoyi_rfq_quotes',
+        name='关闭已超时报价任务',
+        replace_existing=True,
+        args=[app],
+    )
+    logger.info("已注册任务: 每60秒检查链小易询价截止时间")
+
+
+def _process_chain_xiaoyi_queue_job(app):
+    with app.app_context():
+        from app.services.chain_xiaoyi import ChainXiaoYiOrchestrator
+        return ChainXiaoYiOrchestrator.process_queued_rfq_tasks()
+
+
+def _expire_chain_xiaoyi_rfq_job(app):
+    with app.app_context():
+        from app.services.chain_xiaoyi import ChainXiaoYiOrchestrator
+        return ChainXiaoYiOrchestrator.expire_rfq_tasks()
+
+
+def _cleanup_callback_receipts_job(app):
+    with app.app_context():
+        from app.services.callback_receipts import cleanup_callback_receipts
+
+        removed = cleanup_callback_receipts()
+        logger.info("第三方回调收据清理完成: removed=%s", removed)
+        return removed
 
 
 
@@ -607,4 +661,3 @@ def _cleanup_old_messages_job(app):
     except Exception as e:
         logger.error(f"[定时任务] 失败: 清理旧消息 - {str(e)}", exc_info=True)
         raise
-

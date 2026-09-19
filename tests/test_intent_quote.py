@@ -1,5 +1,5 @@
 from app import db
-from app.models import ChatMessage, InquiryChat, MatchRecord
+from app.models import ChatMessage, InquiryChat, IntentQuote, MatchRecord
 
 
 def _login_as(client, enterprise):
@@ -67,3 +67,20 @@ def test_resending_existing_pending_intent_quote_is_idempotent(
     ).all()
     assert len(sent_messages) == 1
     assert sent_messages[0].msg_metadata["event"] == "intent_quote_sent"
+
+    client.get("/auth/logout")
+    test_supplier.verification_status = "approved"
+    test_supplier.is_verified = True
+    db.session.commit()
+    login = client.post("/auth/login", data={"name": test_supplier.name, "password": "test123456"}, headers={"X-Login-Modal": "1"})
+    assert login.status_code == 200
+    accepted = client.post(f"/api/intent-quote/{quote_id}/accept", json={
+        "reply_price": 276.8,
+        "reply_notes": "含税含运费",
+        "reply_details": {"tax_included": True, "tax_rate": 13, "moq": 500, "delivery_days": 25, "mold_fee": 1200, "freight": 0, "payment_terms": "30%预付，验收后付清", "valid_until": "2026-12-31", "currency": "CNY"},
+    })
+    assert accepted.status_code == 200, accepted.get_json()
+    assert accepted.get_json()["reply_details"]["delivery_days"] == 25
+    persisted = db.session.get(IntentQuote, quote_id)
+    assert persisted.seller_reply_price == 276.8
+    assert persisted.seller_reply_details["tax_rate"] == 13

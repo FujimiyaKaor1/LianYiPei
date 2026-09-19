@@ -29,6 +29,45 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    # Config subclasses commonly override APP_ENV without redeclaring every
+    # derived safety flag. Recompute the cloud-model fail-closed default for
+    # that case while preserving an explicit CHAINXIAOYI_CLOUD_REQUIRED=false
+    # emergency override on the subclass itself.
+    if "CHAINXIAOYI_CLOUD_REQUIRED" not in getattr(config_class, "__dict__", {}):
+        app.config["CHAINXIAOYI_CLOUD_REQUIRED"] = str(app.config.get("APP_ENV") or "development").lower() == "production"
+    if "AUTO_CREATE_SCHEMA" not in getattr(config_class, "__dict__", {}):
+        app.config["AUTO_CREATE_SCHEMA"] = str(app.config.get("APP_ENV") or "development").lower() != "production"
+
+    if app.config.get("APP_ENV") == "production":
+        unsafe = []
+        if app.config.get("SECRET_KEY_IS_DEFAULT"):
+            unsafe.append("SECRET_KEY")
+        if not app.config.get("DATABASE_URL_CONFIGURED"):
+            unsafe.append("DATABASE_URL")
+        if app.config.get("DISABLE_API_AUTH"):
+            unsafe.append("DISABLE_API_AUTH")
+        if app.config.get("ENABLE_MOCK_API"):
+            unsafe.append("ENABLE_MOCK_API")
+        if app.config.get("AUTO_CREATE_SCHEMA"):
+            unsafe.append("AUTO_CREATE_SCHEMA")
+        if app.config.get("MATERIAL_AV_MODE") != "clamav":
+            unsafe.append("MATERIAL_AV_MODE")
+        if app.config.get("MATERIAL_STORAGE_BACKEND") != "s3":
+            unsafe.append("MATERIAL_STORAGE_BACKEND")
+        if not app.config.get("MATERIAL_ENCRYPTION_KEY"):
+            unsafe.append("MATERIAL_ENCRYPTION_KEY")
+        else:
+            try:
+                from cryptography.fernet import Fernet
+
+                Fernet(str(app.config.get("MATERIAL_ENCRYPTION_KEY")).encode("ascii"))
+            except (ValueError, TypeError):
+                unsafe.append("MATERIAL_ENCRYPTION_KEY")
+        if not app.config.get("MATERIAL_S3_BUCKET"):
+            unsafe.append("MATERIAL_S3_BUCKET")
+        if unsafe:
+            raise RuntimeError("生产环境安全配置不完整或不安全：" + ", ".join(unsafe))
+
     # 开发模式下把业务 logger 打到终端（否则默认 root=WARNING，看不到 [WeChatPush] 等排查信息）
     if app.debug:
         root = logging.getLogger()
@@ -140,7 +179,6 @@ def create_app(config_class=Config):
     from app.routes.match import match as match_bp
     from app.routes.dashboard import dashboard as dashboard_bp
     from app.routes.main import main as main_bp
-    from app.routes.mock_api import mock_api as mock_bp
     from app.routes.api import api_bp
     from app.routes.credit import credit_bp
     from app.routes.collab import collab_bp
@@ -170,7 +208,11 @@ def create_app(config_class=Config):
     # dashboard 蓝图内路由已含 /dashboard/... 前缀，便于 SPA 通配与字面路径一致
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(main_bp)
-    app.register_blueprint(mock_bp, url_prefix='/mock')
+    # Mock endpoints include simulated companies and contract responses. Keep
+    # them completely absent from production unless explicitly enabled.
+    if app.testing or app.config.get("ENABLE_MOCK_API"):
+        from app.routes.mock_api import mock_api as mock_bp
+        app.register_blueprint(mock_bp, url_prefix='/mock')
     app.register_blueprint(api_bp, url_prefix='/api')
     app.register_blueprint(credit_bp)
     app.register_blueprint(collab_bp)
@@ -206,14 +248,19 @@ def create_app(config_class=Config):
     register_error_handlers(app)
 
     with app.app_context():
-        db.create_all()
-        # 自动补齐缺失列：避免升级模型后 Unknown column 直接导致页面崩溃
-        try:
-            from app.services.schema_migrator import ensure_schema
+        if app.config.get("AUTO_CREATE_SCHEMA"):
+            db.create_all()
+            # Development compatibility shim: production schema changes must
+            # be applied through Alembic, while local demos may still need
+            # additive columns when using an old SQLite fixture.
+            try:
+                from app.services.schema_migrator import ensure_schema
 
-            ensure_schema(db)
-        except Exception as e:
-            _logger.warning("ensure_schema failed (DB may be missing columns): %s", e, exc_info=True)
+                ensure_schema(db)
+            except Exception as e:
+                _logger.warning("ensure_schema failed (DB may be missing columns): %s", e, exc_info=True)
+        else:
+            _logger.info("AUTO_CREATE_SCHEMA disabled; waiting for Alembic migrations")
     
     return app
 

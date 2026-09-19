@@ -1,5 +1,6 @@
 import pytest
 import json
+import requests
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -34,6 +35,17 @@ def test_get_llm_instance_requires_deepseek_api_key(monkeypatch):
 
     with pytest.raises(ValueError, match="DEEPSEEK_API_KEY"):
         get_llm_instance("deepseek")
+
+
+def test_deepseek_model_reads_bounded_retry_settings(monkeypatch):
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "deepseek-test-key")
+    monkeypatch.setenv("DEEPSEEK_MAX_RETRIES", "4")
+    monkeypatch.setenv("DEEPSEEK_RETRY_BACKOFF_SECONDS", "1.25")
+
+    llm = get_llm_instance("deepseek")
+
+    assert llm.max_retries == 4
+    assert llm.retry_backoff_seconds == 1.25
 
 
 def test_deepseek_chat_model_posts_bearer_authorization(monkeypatch):
@@ -75,6 +87,60 @@ def test_deepseek_chat_model_posts_bearer_authorization(monkeypatch):
         {"role": "system", "content": "你是链易配助手"},
         {"role": "user", "content": "生成供应商推荐理由"},
     ]
+
+
+def test_deepseek_chat_model_retries_transient_http_failures(monkeypatch):
+    attempts = []
+
+    class FakeResponse:
+        def __init__(self, status_code, content="ok"):
+            self.status_code = status_code
+            self._content = content
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise requests.HTTPError(response=self)
+
+        def json(self):
+            return {"choices": [{"message": {"content": self._content}}]}
+
+    responses = [FakeResponse(503), FakeResponse(200, "recovered")]
+
+    def fake_post(*_args, **_kwargs):
+        attempts.append(1)
+        return responses.pop(0)
+
+    monkeypatch.setattr("app.services.deepseek_client.requests.post", fake_post)
+    monkeypatch.setattr("app.services.deepseek_client.time.sleep", lambda _seconds: None)
+    llm = DeepSeekChatModel(api_key="deepseek-test-key", max_retries=1, retry_backoff_seconds=0)
+
+    response = llm.invoke([HumanMessage(content="重试测试")])
+
+    assert response.content == "recovered"
+    assert len(attempts) == 2
+
+
+def test_deepseek_chat_model_does_not_retry_authentication_errors(monkeypatch):
+    attempts = []
+
+    class FakeResponse:
+        status_code = 401
+
+        def raise_for_status(self):
+            raise requests.HTTPError(response=self)
+
+    def fake_post(*_args, **_kwargs):
+        attempts.append(1)
+        return FakeResponse()
+
+    monkeypatch.setattr("app.services.deepseek_client.requests.post", fake_post)
+    monkeypatch.setattr("app.services.deepseek_client.time.sleep", lambda _seconds: None)
+    llm = DeepSeekChatModel(api_key="deepseek-test-key", max_retries=3, retry_backoff_seconds=0)
+
+    with pytest.raises(requests.HTTPError):
+        llm.invoke([HumanMessage(content="鉴权失败")])
+
+    assert len(attempts) == 1
 
 
 def test_deepseek_stream_decodes_utf8_sse_bytes_without_charset(monkeypatch):

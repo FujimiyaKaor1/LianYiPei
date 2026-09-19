@@ -28,6 +28,18 @@ cd ..
 .venv/bin/python scripts/seed/seed_all_data.py
 ```
 
+### 链小易广东电子/五金 Agent 演示
+
+要演示“文件即任务 → 找厂 → 一次审批询价 → 报价筛选 → 订单草稿”的主链路，可额外执行：
+
+```bash
+.venv/bin/python scripts/seed/seed_guangdong_agent_demo.py
+```
+
+该脚本创建的企业名称都带有“演示”标记，来源明确标记为 `is_mock=true`，只用于本地演示，不会进入生产环境推荐。演示账号密码由脚本输出；登录后打开 `/aia`，上传 Excel/CSV/PDF/Word 采购材料，确认字段和候选企业，生成批量询价预览并完成一次审批。报价回收后可用一句话筛选各采购项，再生成订单草稿；正式订单、合同和付款仍分别需要人工确认。
+
+启用云端模型时，只在运行环境的密钥管理系统注入 `DEEPSEEK_API_KEY`；链小易会自动启用 DeepSeek，也可用 `CHAINXIAOYI_CLOUD_ENABLED=false` 紧急关闭。不要把密钥写入 `.env.example`、代码、日志或演示数据。完整演示步骤见 [`docs/CHAIN_XIAOYI_CORE_DEMO.md`](docs/CHAIN_XIAOYI_CORE_DEMO.md)。
+
 Windows 用户可使用根目录的 `启动.bat`。数据库、Neo4j、模型服务和演示账号的完整说明见 [`docs/启动说明.md`](docs/启动说明.md)。
 
 ## 目录地图

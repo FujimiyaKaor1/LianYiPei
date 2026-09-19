@@ -44,6 +44,7 @@ class IntentQuoteService:
         unit: Optional[str] = None,
         target_price: Optional[float] = None,
         budget_range: Optional[str] = None,
+        source_rfq_task_id: Optional[int] = None,
     ) -> tuple[IntentQuote | None, str]:
         """
         创建意向报价（草稿状态）。
@@ -53,13 +54,20 @@ class IntentQuoteService:
         if buyer_id == seller_id:
             return None, "不能向自己发起意向报价"
 
-        # 检查是否已有待处理的意向报价
-        existing = IntentQuote.query.filter(
-            IntentQuote.buyer_id == buyer_id,
-            IntentQuote.seller_id == seller_id,
-            IntentQuote.product_name == product_name,
-            IntentQuote.status.in_(["draft", "pending"]),
-        ).first()
+        # Agent RFQs are idempotent within one task/supplier pair. Without a
+        # source task, preserve the legacy buyer/seller/product deduplication.
+        if source_rfq_task_id is not None:
+            existing = IntentQuote.query.filter_by(
+                source_rfq_task_id=int(source_rfq_task_id),
+                seller_id=seller_id,
+            ).first()
+        else:
+            existing = IntentQuote.query.filter(
+                IntentQuote.buyer_id == buyer_id,
+                IntentQuote.seller_id == seller_id,
+                IntentQuote.product_name == product_name,
+                IntentQuote.status.in_(["draft", "pending"]),
+            ).first()
 
         if existing:
             return existing, ""
@@ -74,6 +82,7 @@ class IntentQuoteService:
             unit=unit,
             target_price=target_price,
             budget_range=budget_range,
+            source_rfq_task_id=int(source_rfq_task_id) if source_rfq_task_id is not None else None,
             status="draft",
             expires_at=datetime.utcnow() + timedelta(days=self.DEFAULT_VALIDITY_DAYS),
         )
@@ -161,6 +170,8 @@ class IntentQuoteService:
         seller_id: int,
         reply_price: Optional[float] = None,
         reply_notes: Optional[str] = None,
+        reply_details: Optional[dict] = None,
+        reply_channel: str = "site",
     ) -> tuple[IntentQuote | None, str]:
         """
         供应商接受意向报价。
@@ -177,12 +188,88 @@ class IntentQuoteService:
         if quote.status != "pending":
             return None, f"当前状态为 {quote.status}，无法接受"
 
+        # Chain XiaoYi RFQs have an explicit supplier reply window. A late
+        # callback must not silently turn an expired sourcing task into a
+        # commercial quote; the buyer can issue a fresh RFQ instead.
+        from app.models_chain_xiaoyi import ChainXiaoYiOutboundRecord, ChainXiaoYiTask
+        rfq_outbound = ChainXiaoYiOutboundRecord.query.filter_by(intent_quote_id=quote.id).first()
+        if rfq_outbound:
+            rfq_task = ChainXiaoYiTask.query.get(rfq_outbound.task_id)
+            if rfq_task and rfq_task.quote_deadline_at and rfq_task.quote_deadline_at <= datetime.utcnow():
+                return None, "报价截止时间已过，无法接受迟到报价"
+
+        if reply_price is not None:
+            try:
+                reply_price = float(reply_price)
+            except (TypeError, ValueError):
+                return None, "回复报价必须是有效数字"
+            if reply_price <= 0 or reply_price > 1_000_000_000:
+                return None, "回复报价必须大于0且不超过10亿元"
+        if reply_notes is not None:
+            reply_notes = str(reply_notes).strip()[:2000]
+        details = {}
+        if reply_details is not None:
+            if not isinstance(reply_details, dict):
+                return None, "结构化报价必须是对象"
+            numeric_limits = {
+                "tax_rate": (0, 100), "moq": (0, 1_000_000_000),
+                "delivery_days": (1, 3650), "mold_fee": (0, 1_000_000_000),
+                "freight": (0, 1_000_000_000),
+            }
+            for key, (minimum, maximum) in numeric_limits.items():
+                if reply_details.get(key) is None:
+                    continue
+                try:
+                    number = float(reply_details[key])
+                except (TypeError, ValueError):
+                    return None, f"{key} 必须是有效数字"
+                if number < minimum or number > maximum:
+                    return None, f"{key} 超出有效范围"
+                details[key] = int(number) if number.is_integer() else number
+            if "tax_included" in reply_details:
+                if not isinstance(reply_details["tax_included"], bool):
+                    return None, "tax_included 必须是布尔值"
+                details["tax_included"] = reply_details["tax_included"]
+            for key in ("payment_terms", "valid_until", "currency"):
+                if reply_details.get(key) is not None:
+                    details[key] = str(reply_details[key]).strip()[:200]
+
         quote.status = "accepted"
         quote.seller_confirmed = True
         quote.seller_reply_price = reply_price
         quote.seller_reply_notes = reply_notes
+        quote.seller_reply_details = details or None
+        if details.get("delivery_days") is not None:
+            quote.ai_delivery_estimate = str(details["delivery_days"])
         quote.updated_at = datetime.utcnow()
-        db.session.commit()
+
+        # Chain XiaoYi RFQs reuse IntentQuote as their supplier reply channel.
+        # Reflect the reply in the orchestration audit trail so buyers can poll
+        # one progress endpoint instead of reconciling separate subsystems.
+        from app.models_chain_xiaoyi import ChainXiaoYiEvent, ChainXiaoYiOutboundRecord, ChainXiaoYiTask
+        outbound = ChainXiaoYiOutboundRecord.query.filter_by(intent_quote_id=quote.id).first()
+        if outbound:
+            outbound.status = "replied"
+            outbound.replied_at = datetime.utcnow()
+            channel_state = dict(outbound.channel_status_json or {})
+            channels = dict(channel_state.get("channels") or {})
+            normalized_reply_channel = {
+                "service_account": "wechat",
+                "work_wechat": "wechat",
+            }.get(str(reply_channel or "site").strip().lower(), str(reply_channel or "site").strip().lower())
+            if normalized_reply_channel not in {"site", "email", "wechat"}:
+                normalized_reply_channel = "site"
+            channel_status = dict(channels.get(normalized_reply_channel) or {})
+            channel_status.update({"status": "replied", "replied_at": outbound.replied_at.isoformat()})
+            channels[normalized_reply_channel] = channel_status
+            channel_state["channels"] = channels
+            channel_state["reply_channel"] = normalized_reply_channel
+            outbound.channel_status_json = channel_state
+            task = ChainXiaoYiTask.query.get(outbound.task_id)
+            if task:
+                db.session.add(ChainXiaoYiEvent(session_id=task.session_id, event_type="supplier_quote_received", actor_id=seller_id, payload={"task_id": task.id, "supplier_id": seller_id, "quote_id": quote.id, "has_price": reply_price is not None, "reply_channel": normalized_reply_channel}))
+                from app.services.chain_xiaoyi.orchestrator import ChainXiaoYiOrchestrator
+                ChainXiaoYiOrchestrator.refresh_rfq_task_status(task)
 
         # 更新 MatchRecord 状态
         if quote.match_record_id:
@@ -199,6 +286,8 @@ class IntentQuoteService:
                 event="intent_quote_accepted",
                 metadata={"quote_id": quote.id},
             )
+
+        db.session.commit()
 
         return quote, ""
 
@@ -224,9 +313,25 @@ class IntentQuoteService:
             return None, f"当前状态为 {quote.status}，无法拒绝"
 
         quote.status = "rejected"
-        quote.seller_reply_notes = reason
+        quote.seller_reply_notes = str(reason).strip()[:2000] if reason else None
         quote.updated_at = datetime.utcnow()
-        db.session.commit()
+        from app.models_chain_xiaoyi import ChainXiaoYiEvent, ChainXiaoYiOutboundRecord, ChainXiaoYiTask
+        outbound = ChainXiaoYiOutboundRecord.query.filter_by(intent_quote_id=quote.id).first()
+        if outbound:
+            outbound.status = "rejected"
+            outbound.rejected_at = datetime.utcnow()
+            channel_state = dict(outbound.channel_status_json or {})
+            channels = dict(channel_state.get("channels") or {})
+            site = dict(channels.get("site") or {})
+            site.update({"status": "rejected", "rejected_at": outbound.rejected_at.isoformat()})
+            channels["site"] = site
+            channel_state["channels"] = channels
+            outbound.channel_status_json = channel_state
+            task = ChainXiaoYiTask.query.get(outbound.task_id)
+            if task:
+                db.session.add(ChainXiaoYiEvent(session_id=task.session_id, event_type="supplier_quote_rejected", actor_id=seller_id, payload={"task_id": task.id, "supplier_id": seller_id, "quote_id": quote.id}))
+                from app.services.chain_xiaoyi.orchestrator import ChainXiaoYiOrchestrator
+                ChainXiaoYiOrchestrator.refresh_rfq_task_status(task)
 
         # 发送系统消息
         if quote.chat_id:
@@ -237,6 +342,8 @@ class IntentQuoteService:
                 event="intent_quote_rejected",
                 metadata={"quote_id": quote.id},
             )
+
+        db.session.commit()
 
         return quote, ""
 
@@ -465,6 +572,7 @@ class IntentQuoteService:
             "seller_confirmed": quote.seller_confirmed,
             "seller_reply_price": quote.seller_reply_price,
             "seller_reply_notes": quote.seller_reply_notes,
+            "seller_reply_details": quote.seller_reply_details or {},
             "is_buyer": is_buyer,
             "created_at": quote.created_at.isoformat() if quote.created_at else None,
             "expires_at": quote.expires_at.isoformat() if quote.expires_at else None,

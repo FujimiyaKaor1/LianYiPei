@@ -70,6 +70,10 @@ class ChainXiaoYiTask(db.Model):
     input_json = db.Column(db.JSON, nullable=True)
     output_json = db.Column(db.JSON, nullable=True)
     error_message = db.Column(db.Text, nullable=True)
+    # RFQ tasks must have a bounded reply window so they cannot remain in
+    # ``sent`` forever.  The field is nullable for non-RFQ tasks and for old
+    # records created before deadline enforcement was introduced.
+    quote_deadline_at = db.Column(db.DateTime, nullable=True, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -108,6 +112,9 @@ class ChainXiaoYiFileImport(db.Model):
     content_type = db.Column(db.String(120), nullable=True)
     sha256 = db.Column(db.String(64), nullable=False, index=True)
     size_bytes = db.Column(db.Integer, nullable=False, default=0)
+    storage_key = db.Column(db.String(512), nullable=True)
+    scan_status = db.Column(db.String(24), nullable=True)
+    scan_engine = db.Column(db.String(60), nullable=True)
     status = db.Column(db.String(24), nullable=False, default="preview")
     detected_kind = db.Column(db.String(60), nullable=True)
     preview_json = db.Column(db.JSON, nullable=True)
@@ -124,3 +131,37 @@ class ChainXiaoYiEvent(db.Model):
     payload = db.Column(db.JSON, nullable=True)
     actor_id = db.Column(db.Integer, db.ForeignKey("enterprises.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class ChainXiaoYiCandidateSnapshot(db.Model):
+    """Immutable supplier snapshot used by an RFQ task."""
+    __tablename__ = "chain_xiaoyi_candidate_snapshots"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    task_id = db.Column(db.Integer, db.ForeignKey("chain_xiaoyi_tasks.id", ondelete="CASCADE"), nullable=False, index=True)
+    supplier_id = db.Column(db.Integer, db.ForeignKey("enterprises.id"), nullable=False, index=True)
+    payload = db.Column(db.JSON, nullable=False, default=dict)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class ChainXiaoYiOutboundRecord(db.Model):
+    """Idempotent audit record for every attempted external RFQ."""
+    __tablename__ = "chain_xiaoyi_outbound_records"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    task_id = db.Column(db.Integer, db.ForeignKey("chain_xiaoyi_tasks.id", ondelete="CASCADE"), nullable=False, index=True)
+    supplier_id = db.Column(db.Integer, db.ForeignKey("enterprises.id"), nullable=False, index=True)
+    intent_quote_id = db.Column(db.Integer, db.ForeignKey("intent_quotes.id"), nullable=True)
+    status = db.Column(db.String(24), nullable=False, default="pending")
+    channel = db.Column(db.String(24), nullable=False, default="site")
+    channel_status_json = db.Column(db.JSON, nullable=True)
+    error_message = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    sent_at = db.Column(db.DateTime, nullable=True)
+    delivered_at = db.Column(db.DateTime, nullable=True)
+    read_at = db.Column(db.DateTime, nullable=True)
+    replied_at = db.Column(db.DateTime, nullable=True)
+    rejected_at = db.Column(db.DateTime, nullable=True)
+    timed_out_at = db.Column(db.DateTime, nullable=True)
+
+    __table_args__ = (db.UniqueConstraint("task_id", "supplier_id", name="uq_chain_xiaoyi_outbound_task_supplier"),)

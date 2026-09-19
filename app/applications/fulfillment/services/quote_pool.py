@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import statistics
-import random
+from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -17,22 +17,17 @@ from app.services.credit_engine import can_submit_quote, increment_quote_count
 logger = logging.getLogger(__name__)
 
 
-def _generate_historical_trend(base_price: float | None) -> list[dict]:
-    """生成平滑的历史趋势价格锚点（补充真实历史表建立前的空白）"""
-    base = base_price or 4200.0
-    history = []
-    # 生成近7天的数据
-    for i in range(7):
-        d = datetime.utcnow() - timedelta(days=6 - i)
-        day_str = f"{d.month:02d}.{d.day:02d}"
-        # 伪随机，基于当前日期和 base 保持稳定（在同一天内）固定，但随时间略有波动
-        # 这里用简单随机作为过渡
-        jitter = (random.random() - 0.5) * (base * 0.05)
-        history.append({
-            'name': day_str,
-            'price': round(base + jitter)
-        })
-    return history
+def _actual_history(quotes: list[Quote]) -> list[dict]:
+    """Build a chart series only from persisted quote observations."""
+    by_day: dict[str, list[float]] = defaultdict(list)
+    for quote in quotes:
+        if quote.created_at and quote.price is not None:
+            day = quote.created_at.date().isoformat()
+            by_day[day].append(float(quote.price))
+    return [
+        {'name': day, 'price': round(statistics.median(prices), 2), 'sample_count': len(prices)}
+        for day, prices in sorted(by_day.items())
+    ]
 
 
 # ── 冷启动价格锚点配置（优先级：政府指导价 > 行业均价 > 链主采购价） ──────────
@@ -150,11 +145,12 @@ class QuotePoolManager:
                 'data_source': 'realtime',
                 'last_updated': datetime.utcnow().isoformat(),
                 'is_cold_start': False,
-                'history': _generate_historical_trend(median),
+                'history': _actual_history(cleaned),
             }
 
         # 数据不足，尝试冷启动锚点
         anchor = self._get_cold_start_anchor(product_name)
+        history = _actual_history(cleaned)
         if anchor:
             source_label = self._get_anchor_source_label(product_name)
             return {
@@ -169,7 +165,7 @@ class QuotePoolManager:
                 'last_updated': None,
                 'is_cold_start': True,
                 'note': '参考价格（非实时报价）',
-                'history': _generate_historical_trend(anchor),
+                'history': history,
             }
 
         return {
@@ -179,7 +175,7 @@ class QuotePoolManager:
             'data_source': '数据不足',
             'is_cold_start': True,
             'message': '数据不足，暂无价格指数',
-            'history': _generate_historical_trend(None),
+            'history': history,
         }
 
     def apply_anti_fraud_filter(self, quotes: list[Quote]) -> list[Quote]:

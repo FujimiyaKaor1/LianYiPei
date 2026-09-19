@@ -4,6 +4,7 @@
 import hashlib
 import hmac
 from datetime import datetime
+from xml.etree import ElementTree as ET
 
 from flask import Blueprint, current_app, make_response, render_template, request, jsonify, redirect, url_for, flash
 from flask_login import login_required, current_user
@@ -24,8 +25,8 @@ def _wechat_callback_token() -> str:
 def _verify_wechat_signature() -> bool:
     token = _wechat_callback_token()
     if not token:
-        logger.warning('WECHAT_CALLBACK_TOKEN 未配置，跳过微信回调签名校验')
-        return True
+        logger.error('WECHAT_CALLBACK_TOKEN 未配置，拒绝微信回调')
+        return False
 
     signature = (request.args.get('signature') or '').strip()
     timestamp = (request.args.get('timestamp') or '').strip()
@@ -42,6 +43,20 @@ def _xml_response(body: str, status: int = 200):
     resp = make_response(body, status)
     resp.headers['Content-Type'] = 'application/xml; charset=utf-8'
     return resp
+
+
+def _encrypted_work_wechat_response(crypto, plaintext: str):
+    """Encrypt a plaintext reply for a Work WeChat callback response."""
+    envelope = crypto.encrypt(plaintext)
+    response_xml = (
+        '<xml>'
+        f'<Encrypt><![CDATA[{envelope["encrypted"]}]]></Encrypt>'
+        f'<MsgSignature><![CDATA[{envelope["signature"]}]]></MsgSignature>'
+        f'<TimeStamp>{envelope["timestamp"]}</TimeStamp>'
+        f'<Nonce><![CDATA[{envelope["nonce"]}]]></Nonce>'
+        '</xml>'
+    )
+    return _xml_response(response_xml)
 
 
 @bp.route('/settings')
@@ -291,21 +306,79 @@ def test_email():
 @bp.route('/callback/work-wechat', methods=['GET', 'POST'])
 def work_wechat_callback():
     """企业微信回调接口（用于验证和接收消息）"""
-    if request.method == 'GET':
-        # 验证URL
-        msg_signature = request.args.get('msg_signature', '')
-        timestamp = request.args.get('timestamp', '')
-        nonce = request.args.get('nonce', '')
-        echostr = request.args.get('echostr', '')
-        
-        # TODO: 实现签名验证逻辑
-        # 这里简化处理，实际应该验证签名
-        return echostr
-    
-    elif request.method == 'POST':
-        # 接收企业微信推送的消息
-        # TODO: 实现消息处理逻辑
-        return 'success'
+    required = (
+        current_app.config.get('WORK_WECHAT_CALLBACK_TOKEN'),
+        current_app.config.get('WORK_WECHAT_ENCODING_AES_KEY'),
+        current_app.config.get('WORK_WECHAT_CORPID'),
+    )
+    if not all(str(value or '').strip() for value in required):
+        logger.error('企业微信回调凭据未完整配置，拒绝回调')
+        return 'work wechat callback unavailable', 503
+
+    from app.services.work_wechat_crypto import WorkWeChatCrypto, WorkWeChatCryptoError
+
+    crypto = WorkWeChatCrypto(
+        token=required[0],
+        encoding_aes_key=required[1],
+        corp_id=required[2],
+    )
+    msg_signature = request.args.get('msg_signature', '')
+    timestamp = request.args.get('timestamp', '')
+    nonce = request.args.get('nonce', '')
+
+    receipt = None
+    try:
+        if request.method == 'GET':
+            echostr = request.args.get('echostr', '')
+            return crypto.decrypt(echostr, msg_signature, timestamp, nonce)
+
+        raw = request.get_data() or b''
+        if len(raw) > 64 * 1024:
+            return 'payload too large', 413
+        text = raw.decode('utf-8', errors='replace')
+        if '<!doctype' in text.lower() or '<!entity' in text.lower():
+            return 'invalid xml', 400
+        root = ET.fromstring(text)
+        encrypted = (root.findtext('Encrypt') or '').strip()
+        plaintext = crypto.decrypt(encrypted, msg_signature, timestamp, nonce)
+
+        from app.services.wechat_inbound_service import (
+            build_text_reply,
+            handle_wechat_message,
+            parse_wechat_xml,
+        )
+        from app.services.callback_receipts import (
+            callback_event_key,
+            claim_callback,
+            complete_callback,
+        )
+
+        incoming = parse_wechat_xml(plaintext.encode('utf-8'))
+        incoming['channel'] = 'work_wechat'
+        event_key = callback_event_key(incoming, plaintext.encode('utf-8'))
+        receipt, claimed = claim_callback('work_wechat', event_key)
+        if not claimed:
+            if receipt.status == 'completed' and receipt.response_body:
+                return _encrypted_work_wechat_response(crypto, receipt.response_body)
+            return 'success'
+
+        reply = build_text_reply(
+            to_user=incoming.get('from_user', ''),
+            from_user=incoming.get('to_user', ''),
+            content=handle_wechat_message(incoming),
+        )
+        complete_callback(receipt, reply)
+        return _encrypted_work_wechat_response(crypto, reply)
+    except (WorkWeChatCryptoError, ET.ParseError):
+        logger.warning('企业微信回调验签或解密失败 remote=%s', request.remote_addr)
+        return 'invalid signature', 403
+    except Exception:
+        if receipt is not None:
+            from app.services.callback_receipts import release_callback
+
+            release_callback(receipt)
+        logger.error('企业微信入站处理失败', exc_info=True)
+        return 'callback failed', 500
 
 
 @bp.route('/callback/service-account', methods=['GET', 'POST'])
@@ -314,15 +387,20 @@ def service_account_callback():
     if request.method == 'GET':
         echostr = request.args.get('echostr', '')
 
+        if not _wechat_callback_token():
+            return 'wechat callback unavailable', 503
         if not _verify_wechat_signature():
             return 'invalid signature', 403
         return echostr
     
     elif request.method == 'POST':
+        if not _wechat_callback_token():
+            return 'wechat callback unavailable', 503
         if not _verify_wechat_signature():
             logger.warning('微信服务号回调签名校验失败 remote=%s', request.remote_addr)
             return 'invalid signature', 403
 
+        receipt = None
         try:
             from app.services.wechat_inbound_service import (
                 WeChatInboundError,
@@ -330,19 +408,36 @@ def service_account_callback():
                 handle_wechat_message,
                 parse_wechat_xml,
             )
-
-            incoming = parse_wechat_xml(request.get_data() or b'')
-            reply = handle_wechat_message(incoming)
-            return _xml_response(
-                build_text_reply(
-                    to_user=incoming.get('from_user', ''),
-                    from_user=incoming.get('to_user', ''),
-                    content=reply,
-                )
+            from app.services.callback_receipts import (
+                callback_event_key,
+                claim_callback,
+                complete_callback,
             )
+
+            raw = request.get_data() or b''
+            incoming = parse_wechat_xml(raw)
+            event_key = callback_event_key(incoming, raw)
+            receipt, claimed = claim_callback('wechat_service_account', event_key)
+            if not claimed:
+                if receipt.status == 'completed' and receipt.response_body:
+                    return _xml_response(receipt.response_body)
+                return 'success'
+
+            reply = handle_wechat_message(incoming)
+            response_xml = build_text_reply(
+                to_user=incoming.get('from_user', ''),
+                from_user=incoming.get('to_user', ''),
+                content=reply,
+            )
+            complete_callback(receipt, response_xml)
+            return _xml_response(response_xml)
         except WeChatInboundError as e:
             logger.warning('微信服务号回调 XML 无效: %s', e)
             return 'success'
         except Exception as e:
+            if receipt is not None:
+                from app.services.callback_receipts import release_callback
+
+                release_callback(receipt)
             logger.error('微信服务号入站处理失败: %s', e, exc_info=True)
             return 'success'

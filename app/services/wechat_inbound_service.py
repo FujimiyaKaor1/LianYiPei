@@ -55,6 +55,8 @@ def parse_wechat_xml(raw: bytes) -> dict[str, str]:
         "content": field("Content"),
         "event": field("Event").lower(),
         "event_key": field("EventKey"),
+        "msg_id": field("MsgId"),
+        "create_time": field("CreateTime"),
     }
 
 
@@ -72,6 +74,7 @@ def build_text_reply(*, to_user: str, from_user: str, content: str) -> str:
 
 
 def handle_wechat_message(message: dict[str, str]) -> str:
+    channel = "work_wechat" if message.get("channel") == "work_wechat" else "service_account"
     msg_type = (message.get("msg_type") or "").lower()
     if msg_type == "event":
         event = (message.get("event") or "").lower()
@@ -90,24 +93,29 @@ def handle_wechat_message(message: dict[str, str]) -> str:
     if _is_help(content):
         return _help_text()
 
+    from app.services.supplier_quote_intake import is_supplier_quote_command
+
+    if is_supplier_quote_command(content):
+        return _handle_supplier_quote(openid, content, channel)
+
     if content == CONFIRMATION_PHRASE:
-        return _execute_latest_pending(openid)
+        return _execute_latest_pending(openid, channel)
 
     if _is_status_command(content):
         return _status_text()
 
     assign_match = re.search(r"(?:准备派发|派发)\s*#?(\d+)\s*(?:给|到|至)?\s*#?(\d+)", content)
     if assign_match:
-        return _preview_assign_alert(openid, int(assign_match.group(1)), int(assign_match.group(2)))
+        return _preview_assign_alert(openid, int(assign_match.group(1)), int(assign_match.group(2)), channel)
 
     close_match = re.search(r"(?:准备关闭|关闭预警|关闭)\s*#?(\d+)(?:\s+(.+))?$", content)
     if close_match:
         reason = (close_match.group(2) or "微信确认关闭预警").strip()
-        return _preview_close_alert(openid, int(close_match.group(1)), reason)
+        return _preview_close_alert(openid, int(close_match.group(1)), reason, channel)
 
     read_match = re.search(r"(?:准备标记已读|标记已读|已读)\s*#?(\d+)", content)
     if read_match:
-        return _preview_mark_alert_read(openid, int(read_match.group(1)))
+        return _preview_mark_alert_read(openid, int(read_match.group(1)), channel)
 
     detail_match = re.search(r"(?:查看|详情|预警)\s*#?(\d+)", content)
     if detail_match:
@@ -149,10 +157,55 @@ def _help_text(prefix: str = "") -> str:
             "5. 派发 763812 给 3060",
             "6. 确认执行",
             "7. 服务状态",
+            "8. 报价 询价ID 单价12.8元 含税13% 交期25天",
             "写操作会先生成预览，必须再回复“确认执行”才会生效。",
         ]
     )
     return "\n".join(lines)
+
+
+def _handle_supplier_quote(openid: str, content: str, channel: str) -> str:
+    supplier_id = _operator_id_for_openid(openid, channel)
+    if not supplier_id:
+        return "当前微信账号未绑定到链易配供应商账号，无法提交报价。"
+
+    from app.models import IntentQuote
+    from app.services.intent_quote_service import intent_quote_service
+    from app.services.supplier_quote_intake import (
+        SupplierQuoteParseError,
+        format_quote_preview,
+        parse_supplier_quote,
+    )
+
+    try:
+        parsed = parse_supplier_quote(content)
+    except SupplierQuoteParseError as exc:
+        return f"报价格式有误：{exc}"
+
+    quote = IntentQuote.query.get(parsed["quote_id"])
+    if not quote or quote.seller_id != supplier_id:
+        return "未找到可报价的询价或当前账号无权操作。"
+    if quote.status != "pending":
+        return f"询价 #{quote.id} 当前状态为 {quote.status}，不能重复报价。"
+    if not parsed["confirmed"]:
+        return format_quote_preview(parsed, quote.product_name)
+
+    accepted, error = intent_quote_service.accept_intent_quote(
+        quote_id=quote.id,
+        seller_id=supplier_id,
+        reply_price=parsed["reply_price"],
+        reply_notes=f"通过{channel}确认提交",
+        reply_details=parsed["reply_details"],
+        reply_channel=channel,
+    )
+    if error or not accepted:
+        return f"报价提交失败：{error or '未知错误'}"
+    return (
+        f"报价已提交 #{accepted.id}：{accepted.product_name}\n"
+        f"单价：{accepted.seller_reply_price:g} "
+        f"{(accepted.seller_reply_details or {}).get('currency', 'CNY')}\n"
+        "采购方现在可以在链小易中汇总比较该报价。"
+    )
 
 
 def _status_text() -> str:
@@ -206,36 +259,38 @@ def _alert_detail_text(alert_id: int) -> str:
     return "\n".join(lines)
 
 
-def _preview_close_alert(openid: str, alert_id: int, reason: str) -> str:
-    operator_id = _operator_id_for_openid(openid)
+def _preview_close_alert(openid: str, alert_id: int, reason: str, channel: str) -> str:
+    operator_id = _operator_id_for_openid(openid, channel)
     if not operator_id:
         return "当前 OpenID 未绑定到链易配账号，无法准备关闭动作。"
     return _preview_action_text(
         action="close_alert",
         alert_id=alert_id,
-        requested_by=f"wechat:{openid}",
+        requested_by=f"{channel}:{openid}",
         parameters={"operator_id": operator_id, "reason": reason},
     )
 
 
-def _preview_mark_alert_read(openid: str, alert_id: int) -> str:
-    operator_id = _operator_id_for_openid(openid)
+def _preview_mark_alert_read(openid: str, alert_id: int, channel: str) -> str:
+    operator_id = _operator_id_for_openid(openid, channel)
+    if not operator_id:
+        return "当前微信账号未绑定到链易配账号，无法准备写操作。"
     return _preview_action_text(
         action="mark_alert_read",
         alert_id=alert_id,
-        requested_by=f"wechat:{openid}",
+        requested_by=f"{channel}:{openid}",
         parameters={"operator_id": operator_id, "note": "微信标记已读"},
     )
 
 
-def _preview_assign_alert(openid: str, alert_id: int, assigned_to: int) -> str:
-    assigned_by = _operator_id_for_openid(openid)
+def _preview_assign_alert(openid: str, alert_id: int, assigned_to: int, channel: str) -> str:
+    assigned_by = _operator_id_for_openid(openid, channel)
     if not assigned_by:
         return "当前 OpenID 未绑定到链易配账号，无法准备派发动作。"
     return _preview_action_text(
         action="assign_alert",
         alert_id=alert_id,
-        requested_by=f"wechat:{openid}",
+        requested_by=f"{channel}:{openid}",
         parameters={"assigned_to": assigned_to, "assigned_by": assigned_by},
     )
 
@@ -264,8 +319,8 @@ def _preview_action_text(
     )
 
 
-def _execute_latest_pending(openid: str) -> str:
-    requested_by = f"wechat:{normalize_wechat_openid(openid)}"
+def _execute_latest_pending(openid: str, channel: str) -> str:
+    requested_by = f"{channel}:{normalize_wechat_openid(openid)}"
     pending = (
         HermesPendingAction.query.filter_by(requested_by=requested_by, status="pending")
         .order_by(HermesPendingAction.created_at.desc())
@@ -286,14 +341,14 @@ def _execute_latest_pending(openid: str) -> str:
     return f"已执行：{_action_label(action)}，预警 #{alert_id}。"
 
 
-def _operator_id_for_openid(openid: str) -> Optional[int]:
+def _operator_id_for_openid(openid: str, channel: str = "service_account") -> Optional[int]:
     clean = normalize_wechat_openid(openid)
     if clean:
-        bound = Enterprise.query.filter_by(wechat_service_openid=clean).first()
+        field = "wechat_work_userid" if channel == "work_wechat" else "wechat_service_openid"
+        bound = Enterprise.query.filter(getattr(Enterprise, field) == clean).first()
         if bound:
             return bound.id
-    admin = Enterprise.query.filter_by(role="admin").order_by(Enterprise.id.asc()).first()
-    return admin.id if admin else None
+    return None
 
 
 def _level_label(level: str) -> str:

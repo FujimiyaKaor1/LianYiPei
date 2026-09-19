@@ -319,8 +319,10 @@ def ensure_schema(db) -> None:
     from app.models import (
         Alert,
         Enterprise,
+        ExternalCallbackReceipt,
         HermesPendingAction,
         Inquiry,
+        IntentQuote,
         MatchFeedback,
         Message,
         PriceIndex,
@@ -334,10 +336,12 @@ def ensure_schema(db) -> None:
     )
     from app.models_chain_xiaoyi import (
         ChainXiaoYiApproval,
+        ChainXiaoYiCandidateSnapshot,
         ChainXiaoYiEvent,
         ChainXiaoYiFileImport,
         ChainXiaoYiGuestTrial,
         ChainXiaoYiMessage,
+        ChainXiaoYiOutboundRecord,
         ChainXiaoYiRun,
         ChainXiaoYiSession,
         ChainXiaoYiTask,
@@ -345,8 +349,10 @@ def ensure_schema(db) -> None:
 
     core_models: Iterable = (
         Enterprise,
+        ExternalCallbackReceipt,
         Product,
         Inquiry,
+        IntentQuote,
         Quote,
         Transaction,
         MatchFeedback,
@@ -366,6 +372,8 @@ def ensure_schema(db) -> None:
         ChainXiaoYiFileImport,
         ChainXiaoYiEvent,
         ChainXiaoYiGuestTrial,
+        ChainXiaoYiCandidateSnapshot,
+        ChainXiaoYiOutboundRecord,
     )
 
     with db.engine.connect() as conn:

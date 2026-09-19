@@ -145,7 +145,7 @@ def validate_invoice(invoice_data: Dict) -> Dict:
         return {
             'valid': False,
             'error': f'税务API调用失败: {str(e)}',
-            'manual_review_required': False
+            'manual_review_required': True
         }
     except Exception as e:
         logger.error(f"发票验证异常: {str(e)}", exc_info=True)
@@ -186,10 +186,13 @@ def call_tax_api(invoice_no: str, invoice_code: str = '',
     tax_api_url = current_app.config.get('TAX_API_URL', '')
     tax_api_key = current_app.config.get('TAX_API_KEY', '')
     
-    # 如果未配置税务API，使用模拟验证（开发/演示模式）
+    # Mock verification is test-only and must be explicitly enabled. Missing
+    # production credentials fail closed instead of manufacturing a valid tax
+    # result with fake buyer/seller identities.
     if not tax_api_url or not tax_api_key:
-        logger.warning("税务API未配置，使用模拟验证模式")
-        return _mock_tax_api_validation(invoice_no, invoice_code, invoice_date, invoice_amount)
+        if current_app.testing and current_app.config.get('ALLOW_MOCK_TAX_API') is True:
+            return _mock_tax_api_validation(invoice_no, invoice_code, invoice_date, invoice_amount)
+        raise TaxAPIError("税务验票接口未配置，已转人工审核，禁止使用模拟验真结果")
     
     try:
         # 构建请求参数

@@ -6,6 +6,8 @@ Revises: 8d7b7b9d2c31
 from alembic import op
 import sqlalchemy as sa
 
+from migrations._compat import column_exists, index_exists, table_exists
+
 revision = "5e4d2a1b9c80"
 down_revision = "8d7b7b9d2c31"
 branch_labels = None
@@ -13,23 +15,27 @@ depends_on = None
 
 
 def upgrade():
-    with op.batch_alter_table("chain_xiaoyi_sessions") as batch:
-        batch.add_column(sa.Column("anonymous_expires_at", sa.DateTime(), nullable=True))
-    op.create_table(
-        "chain_xiaoyi_guest_trials",
-        sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column("browser_token_hash", sa.String(length=64), nullable=False),
-        sa.Column("ip_hmac_hash", sa.String(length=64), nullable=False),
-        sa.Column("match_count", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("minute_count", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("minute_started_at", sa.DateTime(), nullable=False),
-        sa.Column("used_at", sa.DateTime(), nullable=True),
-        sa.Column("expires_at", sa.DateTime(), nullable=False),
-        sa.Column("created_at", sa.DateTime(), nullable=False),
-        sa.UniqueConstraint("browser_token_hash"),
-    )
-    op.create_index("ix_chain_xiaoyi_guest_trials_browser_token_hash", "chain_xiaoyi_guest_trials", ["browser_token_hash"])
-    op.create_index("ix_chain_xiaoyi_guest_trials_ip_hmac_hash", "chain_xiaoyi_guest_trials", ["ip_hmac_hash"])
+    if table_exists("chain_xiaoyi_sessions") and not column_exists("chain_xiaoyi_sessions", "anonymous_expires_at"):
+        with op.batch_alter_table("chain_xiaoyi_sessions") as batch:
+            batch.add_column(sa.Column("anonymous_expires_at", sa.DateTime(), nullable=True))
+    if not table_exists("chain_xiaoyi_guest_trials"):
+        op.create_table(
+            "chain_xiaoyi_guest_trials",
+            sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
+            sa.Column("browser_token_hash", sa.String(length=64), nullable=False),
+            sa.Column("ip_hmac_hash", sa.String(length=64), nullable=False),
+            sa.Column("match_count", sa.Integer(), nullable=False, server_default="0"),
+            sa.Column("minute_count", sa.Integer(), nullable=False, server_default="0"),
+            sa.Column("minute_started_at", sa.DateTime(), nullable=False),
+            sa.Column("used_at", sa.DateTime(), nullable=True),
+            sa.Column("expires_at", sa.DateTime(), nullable=False),
+            sa.Column("created_at", sa.DateTime(), nullable=False),
+            sa.UniqueConstraint("browser_token_hash"),
+        )
+    if not index_exists("chain_xiaoyi_guest_trials", "ix_chain_xiaoyi_guest_trials_browser_token_hash"):
+        op.create_index("ix_chain_xiaoyi_guest_trials_browser_token_hash", "chain_xiaoyi_guest_trials", ["browser_token_hash"])
+    if not index_exists("chain_xiaoyi_guest_trials", "ix_chain_xiaoyi_guest_trials_ip_hmac_hash"):
+        op.create_index("ix_chain_xiaoyi_guest_trials_ip_hmac_hash", "chain_xiaoyi_guest_trials", ["ip_hmac_hash"])
 
 
 def downgrade():

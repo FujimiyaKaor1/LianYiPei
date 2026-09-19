@@ -232,7 +232,7 @@ const PROVINCE_COORDS: Record<string, [number, number]> = {
   新疆: [87.62, 43.83],
 };
 
-type EChartsWindow = Window & typeof globalThis & {
+type EChartsWindow = {
   echarts?: typeof echarts;
   __chainyipeiChinaMapReady?: boolean;
 };
@@ -418,12 +418,12 @@ function screenAssetPath(fileName: string) {
 function useChinaMapReady() {
   const [ready, setReady] = useState(() => (
     typeof window !== 'undefined'
-    && Boolean((window as EChartsWindow).__chainyipeiChinaMapReady)
+    && Boolean((window as unknown as EChartsWindow).__chainyipeiChinaMapReady)
     && Boolean(echarts.getMap?.('china'))
   ));
 
   useEffect(() => {
-    const win = window as EChartsWindow;
+    const win = window as unknown as EChartsWindow;
     win.echarts = echarts;
 
     if (echarts.getMap?.('china')) {

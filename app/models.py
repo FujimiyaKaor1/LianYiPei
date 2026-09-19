@@ -49,6 +49,9 @@ class Enterprise(db.Model, UserMixin):
     business_scope = db.Column(db.Text)
     province = db.Column(db.String(20))
     city = db.Column(db.String(200))
+    # 企业统一社会信用代码：入驻主键事实，独立列用于唯一约束和高效核验。
+    # 历史演示数据可能没有证照，因此允许 NULL；非空值必须唯一。
+    unified_social_credit_code = db.Column(db.String(18), unique=True, nullable=True, index=True)
 
     patent_category = db.Column(db.String(100))
     patent_count = db.Column(db.Integer)
@@ -274,6 +277,15 @@ class Transaction(db.Model):
 
     def __repr__(self):
         return f"<Transaction {self.product_name}>"
+
+    @classmethod
+    def find_by_contract_id(cls, contract_id: str):
+        """Resolve the local authorization record for a provider contract."""
+        if not contract_id:
+            return None
+        return cls.query.filter(
+            cls.invoice_info["contract_id"].as_string() == str(contract_id)
+        ).first()
 
     @staticmethod
     def generate_match_code(buyer_id: int, seller_id: int, contract_id: str = "") -> str:
@@ -785,6 +797,15 @@ class IntentQuote(db.Model):
         db.ForeignKey("match_records.id", ondelete="SET NULL"),
         nullable=True,
     )
+    # Durable idempotency scope for Agent-created RFQs. The same supplier may
+    # receive separate rows for identical product names when specifications or
+    # source line items differ, while retries of one RFQ reuse its row.
+    source_rfq_task_id = db.Column(
+        db.Integer,
+        db.ForeignKey("chain_xiaoyi_tasks.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # 报价产品信息
     product_name = db.Column(db.String(100), nullable=False)
@@ -812,6 +833,8 @@ class IntentQuote(db.Model):
     # 供应商回复
     seller_reply_price = db.Column(db.Float)  # 供应商回复的报价
     seller_reply_notes = db.Column(db.Text)  # 供应商回复的备注
+    # 可核验结构化报价：税率/MOQ/交期/费用/付款条件/有效期等。
+    seller_reply_details = db.Column(db.JSON)
 
     # 时间戳
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -829,10 +852,31 @@ class IntentQuote(db.Model):
         backref=db.backref("intent_quotes_as_seller", lazy="dynamic"),
     )
     chat = db.relationship("InquiryChat", foreign_keys=[chat_id])
+
+
     match_record = db.relationship("MatchRecord", foreign_keys=[match_record_id])
+
+    __table_args__ = (
+        db.UniqueConstraint("source_rfq_task_id", "seller_id", name="uq_intent_quote_source_task_seller"),
+    )
 
     def __repr__(self):
         return f"<IntentQuote {self.id} buyer={self.buyer_id} seller={self.seller_id} status={self.status}>"
+
+
+class ExternalCallbackReceipt(db.Model):
+    """Durable idempotency receipt for signed third-party callbacks."""
+    __tablename__ = "external_callback_receipts"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    provider = db.Column(db.String(40), nullable=False)
+    event_key = db.Column(db.String(160), nullable=False)
+    status = db.Column(db.String(24), nullable=False, default="processing")
+    response_body = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    completed_at = db.Column(db.DateTime, nullable=True)
+
+    __table_args__ = (db.UniqueConstraint("provider", "event_key", name="uq_external_callback_provider_event"),)
 
 
 # =============================================================================
@@ -926,7 +970,10 @@ class IndustryNewsArticle(db.Model):
     tags = db.Column(db.JSON, default=list)
     source_name = db.Column(db.String(120), nullable=False)
     source_url = db.Column(db.String(1000), nullable=False)
-    canonical_url = db.Column(db.String(1000), nullable=False, unique=True)
+    # Keep the indexed URL below MySQL's utf8mb4 3072-byte key limit.
+    # A 700-character canonical URL still covers normal article URLs while
+    # allowing fresh production databases to create the unique constraint.
+    canonical_url = db.Column(db.String(700), nullable=False, unique=True)
     published_at = db.Column(db.DateTime)
     fetched_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     cover_image_url = db.Column(db.String(1000))

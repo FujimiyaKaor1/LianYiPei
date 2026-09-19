@@ -394,7 +394,7 @@ curl -X POST http://localhost:5000/api/intent-quote/ai-suggestion \
 
 ## 十一、后续优化建议
 
-1. **DeepSeek真实API集成**：当前为模拟实现，后续可接入真实DeepSeek API
+1. **DeepSeek真实API集成**：链小易已支持通过 `DEEPSEEK_API_KEY` 和 `CHAINXIAOYI_CLOUD_ENABLED` 调用 DeepSeek；未配置时明确降级到规则解析，不伪造模型结果。上线前仍需在部署环境完成 TLS、额度、超时和监控验收。
 2. **WebSocket实时推送**：名片交换、报价状态变更可推送通知
 3. **消息推送集成**：与企业微信消息服务集成
 4. **前端页面开发**：根据UI设计开发完整的交互页面

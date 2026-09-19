@@ -8,6 +8,8 @@ Create Date: 2026-06-11 01:10:00.000000
 from alembic import op
 import sqlalchemy as sa
 
+from migrations._compat import table_exists
+
 
 revision = "8d7b7b9d2c31"
 down_revision = "0e5ab26f3a6b"
@@ -16,6 +18,8 @@ depends_on = None
 
 
 def upgrade():
+    if table_exists("hermes_pending_actions"):
+        return
     op.create_table(
         "hermes_pending_actions",
         sa.Column("id", sa.String(length=64), nullable=False),

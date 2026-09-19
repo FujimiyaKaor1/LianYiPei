@@ -10,6 +10,55 @@ import threading
 
 import app.services.map_service as map_service
 
+
+_MOCK_SOURCE_MARKERS = ("demo", "mock", "faker", "演示", "模拟")
+
+
+def _supplier_is_demo_or_mock(supplier) -> bool:
+    """Identify records that must never enter a production recommendation.
+
+    Seed scripts and legacy imports use several historical flags, so the
+    production gate deliberately checks all of them.  This is an exclusion
+    guard only; development/demo mode keeps the old behavior for local
+    walkthroughs.
+    """
+    extras = supplier.extras if isinstance(getattr(supplier, "extras", None), dict) else {}
+    if extras.get("is_demo") is True or extras.get("is_mock") is True:
+        return True
+    data_source = str(extras.get("data_source") or "").strip().lower()
+    if any(marker in data_source for marker in _MOCK_SOURCE_MARKERS):
+        return True
+    trust = extras.get("trust_profile") if isinstance(extras.get("trust_profile"), dict) else {}
+    sources = trust.get("sources") if isinstance(trust.get("sources"), list) else []
+    source_flags = [item.get("is_mock") is True for item in sources if isinstance(item, dict)]
+    if source_flags and all(source_flags):
+        return True
+    return False
+
+
+def _supplier_contact_authorized(supplier) -> bool:
+    """Return the explicit enterprise-claimed contact authorization flag."""
+    extras = supplier.extras if isinstance(getattr(supplier, "extras", None), dict) else {}
+    trust = extras.get("trust_profile") if isinstance(extras.get("trust_profile"), dict) else {}
+    return trust.get("claim_status") == "claimed" and trust.get("contact_authorized") is True
+
+
+def _production_data_mode() -> bool:
+    try:
+        from flask import current_app
+
+        return (
+            str(current_app.config.get("APP_ENV") or "development").lower() == "production"
+            or str(current_app.config.get("PUBLIC_DATA_MODE") or "demo").lower() == "production"
+        )
+    except RuntimeError:
+        import os
+
+        return (
+            str(os.getenv("APP_ENV") or "development").lower() == "production"
+            or str(os.getenv("PUBLIC_DATA_MODE") or "demo").lower() == "production"
+        )
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -701,6 +750,13 @@ def match_suppliers(demand_product, demand_location=None, demand_quantity=100, d
 
     supplier_ids = list(set([p.enterprise_id for p in products]))
     suppliers = Enterprise.query.filter(Enterprise.id.in_(supplier_ids)).all()
+    if _production_data_mode():
+        # Apply the trust boundary before scoring, not after ranking.  This
+        # prevents mock rows from affecting score distributions, tie-breaks,
+        # or any downstream top-K truncation.
+        suppliers = [supplier for supplier in suppliers if not _supplier_is_demo_or_mock(supplier)]
+        if not suppliers:
+            return []
 
     # 质量标签筛选：需求 18.5
     if label_types:
@@ -828,6 +884,7 @@ def match_suppliers(demand_product, demand_location=None, demand_quantity=100, d
 
         credit_score = float(supplier.credit_score or 0.0)
         credit_score = max(0.0, min(100.0, credit_score))
+        contact_authorized = _supplier_contact_authorized(supplier)
 
         green_score, green_desc = _calc_green_score(supplier)
         carbon = estimate_carbon(supplier, demand_location, demand_quantity)
@@ -899,13 +956,18 @@ def match_suppliers(demand_product, demand_location=None, demand_quantity=100, d
             'name': supplier.name,
             'enterprise_id': supplier.id,
             'enterprise_name': supplier.name,
-            'address': supplier.address,
+            # Exact address and direct contacts are private fields.  Public
+            # matching endpoints may still return province/city, while a
+            # supplier must explicitly claim the profile and authorize
+            # contact before these values are exposed or used for outreach.
+            'address': supplier.address if contact_authorized else '',
             'province': supplier.province,
             'city': supplier.city,
             'business_scope': supplier.business_scope,
             'data_updated_at': (supplier.biz_data_updated_at or supplier.last_data_update or supplier.created_at).isoformat() if (supplier.biz_data_updated_at or supplier.last_data_update or supplier.created_at) else None,
-            'contact': supplier.contact,
-            'phone': supplier.phone,
+            'contact': supplier.contact if contact_authorized else '',
+            'phone': supplier.phone if contact_authorized else '',
+            'contact_authorized': contact_authorized,
             'credit_score': supplier.credit_score,
             'capacity': supplier.capacity,
             'current_orders': supplier.current_orders,

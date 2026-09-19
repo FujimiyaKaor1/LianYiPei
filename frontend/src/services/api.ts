@@ -288,9 +288,24 @@ export interface ChainXiaoYiModelStatus {
   local_model: string;
   cloud_provider: string;
   cloud_model: string;
+  cloud_required?: boolean;
   active_provider: 'rules' | 'local' | 'deepseek' | string;
   is_configured: boolean;
   message: string;
+}
+
+export interface ProductionReadinessCheck {
+  configured: boolean;
+  required: boolean;
+  status: 'ok' | 'required_missing' | 'optional_missing' | string;
+  provider?: string;
+}
+
+export interface ProductionReadinessReport {
+  ready: boolean;
+  environment: string;
+  required_failures: string[];
+  checks: Record<string, ProductionReadinessCheck>;
 }
 
 export interface ChainXiaoYiSession {
@@ -307,11 +322,44 @@ export interface ChainXiaoYiMatchItem {
   id: number; name: string; province: string; city: string; business_scope: string;
   score: number; confidence_index: number;
   dimensions: Record<string, { score?: number; desc?: string }>;
+  data_freshness?: { status?: 'fresh' | 'stale' | 'unknown' | string; is_latest?: boolean; updated_at?: string | null; age_days?: number | null; max_age_days?: number };
   trusted_labels: string[]; reason: string; data_updated_at?: string | null; degraded: boolean;
+  contact_eligible?: boolean;
+  trust_profile?: { claim_status?: string; contact_authorized?: boolean; sources?: Array<Record<string, unknown>> };
 }
 
 export interface ChainXiaoYiMatchResult {
   total: number; results: ChainXiaoYiMatchItem[]; degraded: boolean; explanation_provider: string;
+}
+
+export interface ChainXiaoYiItemMatch {
+  item_index: number;
+  intent: Record<string, unknown>;
+  evidence: Record<string, Record<string, unknown>>;
+  match_result: ChainXiaoYiMatchResult;
+}
+
+export interface ChainXiaoYiBatchRfqPreview {
+  status: string;
+  item_count: number;
+  supplier_count: number;
+  channels: string[];
+  quote_deadline_at?: string | null;
+  task_ids: number[];
+  disclosures: Array<{ item_index: number; product: string; supplier_ids: number[]; supplier_count: number; channels: string[]; message: string; rfq_task_id: number }>;
+}
+
+export interface ChainXiaoYiRfqPreview {
+  task_id: number;
+  status: string;
+  supplier_count: number;
+  suppliers: Array<{ id: number; name: string; province?: string | null; city?: string | null; data_updated_at?: string | null; claim_status: string; contact_authorized: boolean; authorization_scope: string; trusted_labels?: string[] }>;
+  content: string;
+  disclosed_fields: Record<string, unknown>;
+  channels: string[];
+  quote_deadline_at?: string | null;
+  requires_approval: boolean;
+  external_send: boolean;
 }
 
 export interface ChainXiaoYiTask {
@@ -319,6 +367,78 @@ export interface ChainXiaoYiTask {
   type: string;
   status: string;
   requires_approval: boolean;
+  quote_deadline_at?: string | null;
+}
+
+export interface ChainXiaoYiProcurementDraft {
+  fields: Record<string, { value: unknown; confidence: number; evidence: Record<string, unknown> }>;
+  items?: Array<{ index: number; fields: Record<string, { value: unknown; confidence: number; evidence: Record<string, unknown> }>; missing_required: string[] }>;
+  file_ids?: number[];
+  conflicts?: Array<{ field: string; values: unknown[]; sources: Array<Record<string, unknown>> }>;
+  missing_required: string[];
+  clarifying_questions: string[];
+  schema_version: string;
+}
+
+export interface ChainXiaoYiQuote {
+  quote_id: number; supplier_id: number; supplier_name: string; price: number;
+  unit: string; quantity?: number; delivery_days?: number | null; notes: string; status: string; tax_included?: boolean;
+}
+
+export interface ChainXiaoYiQuoteSummary {
+  task_id: number; product: string; quotes: ChainXiaoYiQuote[];
+  recommendation: (ChainXiaoYiQuote & { reason: string }) | null;
+}
+
+export interface ChainXiaoYiBatchQuoteItem extends ChainXiaoYiQuoteSummary {
+  item_index: number;
+  rfq_task_id: number;
+  criteria?: Record<string, unknown>;
+  explanation?: string;
+}
+
+export interface ChainXiaoYiBatchQuoteSummary {
+  task_id: number;
+  item_count: number;
+  quoted_item_count: number;
+  quote_count: number;
+  complete: boolean;
+  items: ChainXiaoYiBatchQuoteItem[];
+  order_drafts?: Array<Record<string, unknown>>;
+  formal_orders?: Array<Record<string, unknown>>;
+}
+
+export interface ChainXiaoYiBatchQuoteQuery {
+  task_id: number;
+  query: string;
+  item_count: number;
+  complete: boolean;
+  missing_items: Array<{ item_index: number; rfq_task_id: number; product: string }>;
+  items: ChainXiaoYiBatchQuoteItem[];
+  selections: Array<{ item_index: number; rfq_task_id: number; product: string; supplier_id: number; supplier_name: string; quote_id: number; price: number; delivery_days?: number | null }>;
+  explanation: string;
+  evidence_only: boolean;
+}
+
+export interface ChainXiaoYiTaskProgress {
+  task: ChainXiaoYiTask;
+  deadline?: { at?: string | null; expired: boolean; seconds_remaining?: number | null };
+  counts: Record<string, number>;
+  total: number;
+  records: Array<{ id: number; supplier_id: number; status: string; channel?: string; channel_status?: Record<string, unknown>; quote_id?: number | null; quote_status?: string | null; quote_price?: number | null; error?: string | null; sent_at?: string | null; delivered_at?: string | null; read_at?: string | null; replied_at?: string | null; rejected_at?: string | null; timed_out_at?: string | null }>;
+}
+
+export interface ChainXiaoYiTaskAudit {
+  task: ChainXiaoYiTask & { input: Record<string, unknown>; output: Record<string, unknown>; error?: string | null; created_at: string; updated_at: string };
+  runs: Array<{ provider: string; skill: string; status: string; latency_ms?: number | null; metadata: Record<string, unknown>; created_at: string }>;
+  approvals: Array<{ decision: string; decided_by?: number | null; comment?: string | null; created_at: string; decided_at?: string | null }>;
+  candidates: Array<{ supplier_id: number; name?: string; province?: string; city?: string; data_updated_at?: string | null; trust_profile: { claim_status?: string; contact_authorized: boolean; sources: Array<Record<string, unknown>> }; captured_at: string }>;
+  outbound: Array<{ supplier_id: number; intent_quote_id?: number | null; status: string; channel: string; channel_status: Record<string, unknown>; error?: string | null; created_at: string; sent_at?: string | null; delivered_at?: string | null; read_at?: string | null; replied_at?: string | null; rejected_at?: string | null; timed_out_at?: string | null }>;
+  events: Array<{ type: string; actor_id?: number | null; payload: Record<string, unknown>; created_at: string }>;
+}
+
+export interface ChainXiaoYiTaskInboxItem extends ChainXiaoYiTask {
+  session_id: number; product?: string | null; next_action?: string | null; created_at: string; updated_at: string;
 }
 
 export interface ChainXiaoYiMessageResponse {
@@ -330,6 +450,18 @@ export interface ChainXiaoYiMessageResponse {
   match_result: ChainXiaoYiMatchResult;
   model_status: ChainXiaoYiModelStatus;
   task: ChainXiaoYiTask;
+  workflow?: {
+    action: string;
+    source_task_id?: number;
+    status?: string;
+    sent?: number;
+    failed?: number;
+    orders?: Array<Record<string, unknown>>;
+    selection?: Record<string, unknown>;
+    requires_formal_order_confirmation?: boolean;
+    needs_clarification?: boolean;
+    error?: string;
+  };
 }
 
 export interface SalesMessageItem {
@@ -592,6 +724,7 @@ export interface IntentQuoteItem {
   seller_confirmed: boolean;
   seller_reply_price: number | null;
   seller_reply_notes: string | null;
+  seller_reply_details?: { tax_included?: boolean; tax_rate?: number; moq?: number; delivery_days?: number; mold_fee?: number; freight?: number; payment_terms?: string; valid_until?: string; currency?: string };
   is_buyer: boolean;
   created_at: string | null;
   expires_at: string | null;
@@ -924,6 +1057,10 @@ async function request<T>(
 }
 
 export const api = {
+  getProductionReadiness() {
+    return request<ProductionReadinessReport>('/api/admin/production-readiness');
+  },
+
   createChainXiaoYiSession(surface = 'public') {
     return request<{ success: boolean; session: ChainXiaoYiSession; model_status: ChainXiaoYiModelStatus }>(
       '/api/chain-xiaoyi/sessions',
@@ -941,6 +1078,10 @@ export const api = {
 
   listChainXiaoYiSessions() {
     return request<{ success: boolean; sessions: ChainXiaoYiSession[] }>('/api/chain-xiaoyi/sessions');
+  },
+
+  listChainXiaoYiTasks(filter = 'needs_action') {
+    return request<{ success: boolean; tasks: ChainXiaoYiTaskInboxItem[]; total: number }>(`/api/chain-xiaoyi/tasks?filter=${encodeURIComponent(filter)}`);
   },
 
   getChainXiaoYiSession(sessionId: number) {
@@ -976,7 +1117,141 @@ export const api = {
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new ApiError(messageFromErrorBody(payload) || NETWORK_ERROR_MESSAGE);
-    return payload as { success: boolean; file: { id: number; filename: string; status: string; detected_kind: string; preview: Record<string, unknown>; errors: string[] } };
+    return payload as { success: boolean; file: { id: number; filename: string; status: string; detected_kind: string; preview: Record<string, unknown>; errors: string[] }; draft?: ChainXiaoYiProcurementDraft; task?: ChainXiaoYiTask };
+  },
+
+  /** Canonical resource endpoints used by non-browser procurement workspaces. */
+  getChainXiaoYiMaterial(materialId: number) {
+    return request<{ success: boolean; material: Record<string, unknown>; draft: ChainXiaoYiProcurementDraft; task?: ChainXiaoYiTask | null }>(`/api/chain-xiaoyi/materials/${materialId}`);
+  },
+
+  createChainXiaoYiProcurementTask(sessionId: number, materialIds: number[] = [], fields?: Record<string, unknown>) {
+    return request<{ success: boolean; idempotent?: boolean; task: ChainXiaoYiTask; draft: ChainXiaoYiProcurementDraft }>(
+      '/api/chain-xiaoyi/procurement-tasks',
+      { method: 'POST', body: JSON.stringify({ session_id: sessionId, material_ids: materialIds, ...(fields ? { fields } : {}) }) },
+    );
+  },
+
+  getChainXiaoYiProcurementTask(taskId: number) {
+    return request<{ success: boolean; task: ChainXiaoYiTask & { input: Record<string, unknown>; output: Record<string, unknown> } }>(`/api/chain-xiaoyi/procurement-tasks/${taskId}`);
+  },
+
+  createChainXiaoYiRfqDraft(sessionId: number, intent: Record<string, unknown>, supplierIds: number[], message: string, channels: string[] = ['site'], quoteDeadlineAt?: string) {
+    return request<{ success: boolean; task: ChainXiaoYiTask; preview: ChainXiaoYiRfqPreview }>(`/api/chain-xiaoyi/sessions/${sessionId}/rfq-draft`, { method: 'POST', body: JSON.stringify({ intent, supplier_ids: supplierIds, message, channels, ...(quoteDeadlineAt ? { quote_deadline_at: quoteDeadlineAt } : {}) }) });
+  },
+
+  getChainXiaoYiRfqPreview(taskId: number) {
+    return request<{ success: boolean; preview: ChainXiaoYiRfqPreview }>(`/api/chain-xiaoyi/tasks/${taskId}/rfq-preview`);
+  },
+
+  sendChainXiaoYiTask(taskId: number) {
+    return request<{ success: boolean; sent: number; failed: number; idempotent: boolean }>(`/api/chain-xiaoyi/tasks/${taskId}/send`, { method: 'POST', body: JSON.stringify({}) });
+  },
+
+  sendChainXiaoYiTaskAsync(taskId: number) {
+    return request<{ success: boolean; status: string; idempotent: boolean }>(`/api/chain-xiaoyi/tasks/${taskId}/send-async`, { method: 'POST', body: JSON.stringify({}) });
+  },
+
+  approveChainXiaoYiTask(taskId: number) {
+    return request<{ success: boolean; status: string }>(`/api/chain-xiaoyi/tasks/${taskId}/approve`, { method: 'POST', body: JSON.stringify({ confirm: true }) });
+  },
+
+  getChainXiaoYiQuoteSummary(taskId: number) {
+    return request<{ success: boolean } & ChainXiaoYiQuoteSummary>(`/api/chain-xiaoyi/tasks/${taskId}/quote-summary`);
+  },
+
+  queryChainXiaoYiQuotes(taskId: number, query: string) {
+    return request<{ success: boolean; task_id: number; query: string; criteria: Record<string, unknown>; quotes: ChainXiaoYiQuote[]; explanation: string; evidence_only: boolean }>(`/api/chain-xiaoyi/tasks/${taskId}/quote-query`, { method: 'POST', body: JSON.stringify({ query }) });
+  },
+
+  getChainXiaoYiBatchQuoteSummary(taskId: number) {
+    return request<{ success: boolean } & ChainXiaoYiBatchQuoteSummary>(`/api/chain-xiaoyi/tasks/${taskId}/batch-quote-summary`);
+  },
+
+  queryChainXiaoYiBatchQuotes(taskId: number, query: string) {
+    return request<{ success: boolean } & ChainXiaoYiBatchQuoteQuery>(`/api/chain-xiaoyi/tasks/${taskId}/batch-quote-query`, { method: 'POST', body: JSON.stringify({ query }) });
+  },
+
+  createChainXiaoYiBatchOrderDrafts(taskId: number, query: string) {
+    return request<{ success: boolean; idempotent: boolean; orders: Array<Record<string, unknown>>; selection: ChainXiaoYiBatchQuoteQuery; requires_formal_order_confirmation: boolean }>(`/api/chain-xiaoyi/tasks/${taskId}/batch-order-drafts`, { method: 'POST', body: JSON.stringify({ query }) });
+  },
+
+  confirmChainXiaoYiBatchOrderDrafts(taskId: number, query: string) {
+    return request<{ success: boolean; idempotent: boolean; orders: Array<Record<string, unknown>>; requires_contract_confirmation: boolean; requires_payment_confirmation: boolean }>(`/api/chain-xiaoyi/tasks/${taskId}/batch-order-drafts/confirm`, { method: 'POST', body: JSON.stringify({ query, confirm: true }) });
+  },
+
+  createChainXiaoYiOrderDraft(taskId: number, supplierId: number) {
+    return request<{ success: boolean; order: Record<string, unknown>; idempotent: boolean }>(`/api/chain-xiaoyi/tasks/${taskId}/order-draft`, { method: 'POST', body: JSON.stringify({ supplier_id: supplierId }) });
+  },
+
+  confirmChainXiaoYiOrderDraft(taskId: number, supplierId: number) {
+    return request<{ success: boolean; order: Record<string, unknown>; idempotent: boolean }>(`/api/chain-xiaoyi/tasks/${taskId}/order-draft/confirm`, { method: 'POST', body: JSON.stringify({ supplier_id: supplierId, confirm: true }) });
+  },
+
+  confirmOrderContract(orderId: number) {
+    return request<{ success: boolean; order: Record<string, unknown>; idempotent: boolean }>(`/orders/${orderId}/confirm-contract`, { method: 'POST', body: JSON.stringify({ confirm: true }) });
+  },
+
+  confirmOrderPayment(orderId: number) {
+    return request<{ success: boolean; order: Record<string, unknown>; idempotent: boolean }>(`/orders/${orderId}/confirm-payment`, { method: 'POST', body: JSON.stringify({ confirm: true }) });
+  },
+
+  getChainXiaoYiTaskProgress(taskId: number) {
+    return request<{ success: boolean } & ChainXiaoYiTaskProgress>(`/api/chain-xiaoyi/tasks/${taskId}/progress`);
+  },
+
+  getChainXiaoYiTaskAudit(taskId: number) {
+    return request<{ success: boolean } & ChainXiaoYiTaskAudit>(`/api/chain-xiaoyi/tasks/${taskId}/audit`);
+  },
+
+  getEnterpriseDataEvidence(enterpriseId: number) {
+    return request<{ success: boolean; entity: { type: string; id: number; name: string }; claim_status: string; contact_authorized: boolean; is_demo: boolean; updated_at?: string | null; sources: Array<Record<string, unknown>>; fields: Record<string, unknown>; uncertain_fields: string[] }>(`/api/data-evidence/enterprise/${enterpriseId}`);
+  },
+
+  claimEnterpriseDirectory(enterpriseId?: number) {
+    return request<{ success: boolean; idempotent?: boolean; enterprise: { id: number; name: string }; claim_status: string; contact_authorized: boolean; channels: string[]; authorization: string }>(
+      '/api/enterprises/claim',
+      { method: 'POST', body: JSON.stringify(enterpriseId ? { enterprise_id: enterpriseId } : {}) },
+    );
+  },
+
+  updateEnterpriseContactAuthorization(enterpriseId: number, authorized: boolean, channels?: string[]) {
+    return request<{ success: boolean; enterprise: { id: number; name: string }; claim_status: string; contact_authorized: boolean; channels: string[]; authorization: string }>(
+      `/api/enterprises/${enterpriseId}/contact-authorization`,
+      { method: 'POST', body: JSON.stringify({ authorized, ...(channels ? { channels } : {}) }) },
+    );
+  },
+
+  retryChainXiaoYiTask(taskId: number) {
+    return request<{ success: boolean; sent: number; failed: number; progress: ChainXiaoYiTaskProgress }>(`/api/chain-xiaoyi/tasks/${taskId}/retry`, { method: 'POST', body: JSON.stringify({}) });
+  },
+
+  cancelChainXiaoYiTask(taskId: number, reason = '') {
+    return request<{ success: boolean; status: string }>(`/api/chain-xiaoyi/tasks/${taskId}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) });
+  },
+
+  resumeChainXiaoYiTask(taskId: number) {
+    return request<{ success: boolean; status: string }>(`/api/chain-xiaoyi/tasks/${taskId}/resume`, { method: 'POST', body: JSON.stringify({}) });
+  },
+
+  updateChainXiaoYiTaskFields(taskId: number, fields: Record<string, unknown>) {
+    return request<{ success: boolean; draft: ChainXiaoYiProcurementDraft; task: ChainXiaoYiTask }>(`/api/chain-xiaoyi/tasks/${taskId}/fields`, { method: 'PATCH', body: JSON.stringify({ fields }) });
+  },
+
+  recomputeChainXiaoYiTask(taskId: number) {
+    return request<{ success: boolean; task: ChainXiaoYiTask; item_matches: ChainXiaoYiItemMatch[] }>(`/api/chain-xiaoyi/tasks/${taskId}/recompute`, { method: 'POST', body: JSON.stringify({}) });
+  },
+
+  autoPlanChainXiaoYiProcurement(taskId: number, message = '请按采购项提供含税报价、最早交期和有效期。', channels: string[] = ['site'], quoteDeadlineAt?: string) {
+    return request<{ success: boolean; idempotent: boolean; task: ChainXiaoYiTask; item_matches: ChainXiaoYiItemMatch[]; rfq_tasks: ChainXiaoYiTask[]; preview: ChainXiaoYiBatchRfqPreview }>(`/api/chain-xiaoyi/procurement-tasks/${taskId}/auto-plan`, { method: 'POST', body: JSON.stringify({ message, channels, ...(quoteDeadlineAt ? { quote_deadline_at: quoteDeadlineAt } : {}) }) });
+  },
+
+  createChainXiaoYiBatchRfqPreview(taskId: number, selections: Array<{ item_index: number; supplier_ids: number[] }>, message: string, channels: string[], quoteDeadlineAt?: string) {
+    return request<{ success: boolean; idempotent: boolean; task: ChainXiaoYiTask; rfq_tasks: ChainXiaoYiTask[]; preview: ChainXiaoYiBatchRfqPreview }>(`/api/chain-xiaoyi/tasks/${taskId}/rfq-batch-preview`, { method: 'POST', body: JSON.stringify({ selections, message, channels, ...(quoteDeadlineAt ? { quote_deadline_at: quoteDeadlineAt } : {}) }) });
+  },
+
+  approveChainXiaoYiBatchRfq(taskId: number, comment = '') {
+    return request<{ success: boolean; queued: number; idempotent: boolean; task: ChainXiaoYiTask }>(`/api/chain-xiaoyi/tasks/${taskId}/rfq-batch-approve`, { method: 'POST', body: JSON.stringify({ confirm: true, comment }) });
   },
 
   fetchCreditScore(enterpriseId: number | string) {
@@ -1525,10 +1800,10 @@ export const api = {
   },
 
   /** POST /api/intent-quote/:id/accept — 供应商接受意向报价 */
-  acceptIntentQuote(quoteId: number, replyPrice?: number, replyNotes?: string) {
+  acceptIntentQuote(quoteId: number, replyPrice?: number, replyNotes?: string, replyDetails?: { tax_included?: boolean; tax_rate?: number; moq?: number; delivery_days?: number; mold_fee?: number; freight?: number; payment_terms?: string; valid_until?: string; currency?: string }) {
     return request<IntentQuoteResponse>(`/api/intent-quote/${quoteId}/accept`, {
       method: 'POST',
-      body: JSON.stringify({ reply_price: replyPrice, reply_notes: replyNotes }),
+      body: JSON.stringify({ reply_price: replyPrice, reply_notes: replyNotes, reply_details: replyDetails }),
     });
   },
 

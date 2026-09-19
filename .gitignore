@@ -34,6 +34,8 @@ eggs/
 htmlcov/
 .tox/
 frontend/test-artifacts/
+frontend/test-results/
+frontend/playwright-report/
 
 # ========== 日志 ==========
 *.log
@@ -71,6 +73,9 @@ ehthumbs.db
 Desktop.ini
 
 # ========== 杂项 ==========
+.build/
+backups/
+tmp/
 *.tmp
 *.temp
 *.bak

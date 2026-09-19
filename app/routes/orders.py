@@ -3,6 +3,7 @@ SaaS订单管理工具路由
 提供订单创建、查看、更新、删除和导出功能
 """
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for, send_file
+from werkzeug.exceptions import HTTPException
 from flask_login import login_required, current_user
 from datetime import datetime, date
 from app.services.order_service import OrderService
@@ -181,8 +182,9 @@ def update_status(order_id):
         return jsonify({'success': False, 'message': '无权操作此订单'}), 403
     
     try:
-        status = request.json.get('status')
-        actual_delivery_date_str = request.json.get('actual_delivery_date')
+        payload = request.get_json(silent=True) or {}
+        status = payload.get('status')
+        actual_delivery_date_str = payload.get('actual_delivery_date')
         
         actual_delivery_date = None
         if actual_delivery_date_str:
@@ -195,10 +197,42 @@ def update_status(order_id):
             enterprise_id=current_user.id,
         )
         
-        return jsonify({'success': True, 'message': '状态更新成功'})
+        updated = OrderService.get_order_by_id(order_id, enterprise_id=current_user.id)
+        return jsonify({'success': True, 'message': '状态更新成功', 'order': updated._d})
         
+    except HTTPException as e:
+        return jsonify({'success': False, 'message': e.description}), e.code
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
+
+
+def _confirm_requirement(order_id: int, requirement: str):
+    payload = request.get_json(silent=True) or {}
+    try:
+        order, idempotent = OrderService.confirm_order_requirement(
+            order_id=order_id,
+            requirement=requirement,
+            enterprise_id=current_user.id,
+            confirmed=payload.get("confirm") is True,
+        )
+        return jsonify({"success": True, "idempotent": idempotent, "order": order._d})
+    except Exception as exc:
+        status = getattr(exc, "code", None) or 500
+        if status in {400, 404, 409}:
+            return jsonify({"success": False, "message": getattr(exc, "description", str(exc))}), status
+        return jsonify({"success": False, "message": str(exc)}), 500
+
+
+@bp.route('/<int:order_id>/confirm-contract', methods=['POST'])
+@login_required
+def confirm_contract(order_id):
+    return _confirm_requirement(order_id, "contract")
+
+
+@bp.route('/<int:order_id>/confirm-payment', methods=['POST'])
+@login_required
+def confirm_payment(order_id):
+    return _confirm_requirement(order_id, "payment")
 
 
 @bp.route('/<int:order_id>/delete', methods=['POST'])
@@ -295,6 +329,7 @@ def api_get_orders():
             'actual_delivery_date': actual_delivery_date,
             'status': order.status,
             'notes': order.notes,
+            'metadata': order._d.get('metadata') or {},
             'progress': _estimate_progress(order_date, delivery_date, order.status),
         })
     

@@ -16,6 +16,7 @@ class ModelStatus:
     local_model: str
     cloud_provider: str
     cloud_model: str
+    cloud_required: bool
     configured_provider: str
     active_provider: str
 
@@ -28,8 +29,17 @@ class ModelStatus:
             "cloud_model": self.cloud_model,
             "configured_provider": self.configured_provider,
             "active_provider": self.active_provider,
-            "is_configured": self.active_provider != "rules",
-            "message": "智能模型尚未配置，当前使用基础规则" if self.configured_provider == "rules" else "已检测到模型配置，但模型 Provider 尚未启用，当前使用基础规则",
+            "cloud_required": self.cloud_required,
+            "is_configured": self.active_provider in {"deepseek", "local"},
+            "message": (
+                "生产环境要求 DeepSeek，但当前未配置或不可用"
+                if self.active_provider == "unavailable"
+                else "智能模型尚未配置，当前使用基础规则"
+                if self.active_provider == "rules"
+                else "当前使用 DeepSeek 模型，失败将停止本轮执行，不会降级为规则结果"
+                if self.active_provider == "deepseek" and self.cloud_required
+                else f"当前使用 {self.active_provider} 模型，失败时自动降级为基础规则"
+            ),
         }
 
 
@@ -37,23 +47,89 @@ def _enabled(name: str) -> bool:
     return os.getenv(name, "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _credential_present(value: str | None) -> bool:
+    """Reject template prompts so a copied deployment sample cannot route to a fake model."""
+    candidate = str(value or "").strip().lower()
+    if not candidate:
+        return False
+    return not any(
+        marker in candidate
+        for marker in (
+            "placeholder",
+            "change-me",
+            "changeme",
+            "replace-me",
+            "your-",
+            "your_",
+            "请填写",
+            "请使用",
+            "请从",
+            "密钥管理系统",
+        )
+    )
+
+
+def cloud_model_required() -> bool:
+    """Whether production must fail closed instead of using rule fallback.
+
+    Prefer the Flask config when an application context exists so tests and
+    deployment overlays can set the policy without mutating process globals;
+    the environment remains the standalone-worker fallback.
+    """
+    try:
+        from flask import current_app
+
+        configured = current_app.config.get("CHAINXIAOYI_CLOUD_REQUIRED")
+        if configured is not None:
+            return bool(configured)
+    except (ImportError, RuntimeError):
+        pass
+    return _enabled("CHAINXIAOYI_CLOUD_REQUIRED")
+
+
+def cloud_model_enabled() -> bool:
+    """Return whether the DeepSeek adapter may be used.
+
+    A key injected by a secret manager is an explicit opt-in in production.
+    ``CHAINXIAOYI_CLOUD_ENABLED=false`` remains an emergency kill switch, but
+    operators no longer need to maintain a second flag merely because a key
+    was mounted into the process environment.  This also keeps a missing key
+    truthful: the model is never reported as configured without credentials.
+    """
+    if not _credential_present(os.getenv("DEEPSEEK_API_KEY")):
+        return False
+    raw_flag = os.getenv("CHAINXIAOYI_CLOUD_ENABLED")
+    if raw_flag is None or not raw_flag.strip():
+        return True
+    return _enabled("CHAINXIAOYI_CLOUD_ENABLED")
+
+
 def get_model_status() -> ModelStatus:
     local_model = (os.getenv("CHAINXIAOYI_LOCAL_MODEL") or os.getenv("BIZMIND_OLLAMA_MODEL") or "").strip()
     local_enabled = _enabled("CHAINXIAOYI_LOCAL_ENABLED") and bool(local_model)
-    cloud_key = (os.getenv("DEEPSEEK_API_KEY") or "").strip()
-    cloud_enabled = _enabled("CHAINXIAOYI_CLOUD_ENABLED") and bool(cloud_key)
+    cloud_enabled = cloud_model_enabled()
+    cloud_required = cloud_model_required()
     routing_mode = os.getenv("CHAINXIAOYI_ROUTING_MODE", "local_first").strip().lower()
-    # Provider calls remain deliberately disabled until their adapters are
-    # implemented and reviewed. Environment variables alone must not make the
-    # UI claim that an LLM has processed a request.
-    configured_provider = "deepseek" if routing_mode == "cloud_first" and cloud_enabled else "local" if local_enabled else "deepseek" if cloud_enabled else "rules"
-    active_provider = "rules"
+    configured_provider = (
+        "unavailable"
+        if cloud_required and not cloud_enabled
+        else "deepseek" if routing_mode == "cloud_first" and cloud_enabled
+        else "local" if local_enabled
+        else "deepseek" if cloud_enabled
+        else "rules"
+    )
+    # Adapters are implemented in the orchestrator; expose the selected
+    # provider so requests can use it instead of silently claiming rule-only
+    # execution. Development may fall back to deterministic parsing; a
+    # production cloud-required policy is enforced at the execution boundary.
+    active_provider = configured_provider
     return ModelStatus(
         local_enabled=local_enabled,
         cloud_enabled=cloud_enabled,
         local_model=local_model,
         cloud_provider="deepseek",
         cloud_model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat").strip() or "deepseek-chat",
+        cloud_required=cloud_required,
         configured_provider=configured_provider,
         active_provider=active_provider,
     )

@@ -707,6 +707,19 @@ DEMO_PRODUCT_NAMES = [
     for product in items
 ]
 
+# Keep the demo dataset useful for exercising the public/export shortcuts.
+DEMO_EXPORT_ENTERPRISE_KEYS = {
+    "buyer_ev",
+    "buyer_storage",
+    "supplier_battery",
+    "supplier_motor",
+    "supplier_pcb",
+    "supplier_material",
+    "supplier_cable",
+    "supplier_connector",
+    "supplier_ems",
+}
+
 
 def _dt(days_ago: int = 0, hours_ago: int = 0) -> datetime:
     return datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days_ago, hours=hours_ago)
@@ -874,7 +887,21 @@ def _make_enterprises() -> dict[str, Enterprise]:
                     "apply_date": "2025-09-18",
                 }
             ],
-            extras={"demo_dataset": DEMO_MARK, "enterprise_key": row["key"]},
+            extras={
+                "demo_dataset": DEMO_MARK,
+                "enterprise_key": row["key"],
+                "is_export": row["key"] in DEMO_EXPORT_ENTERPRISE_KEYS,
+                "trust_profile": {
+                    "claim_status": "claimed" if row["role"] == "enterprise" else "platform_managed",
+                    "contact_authorized": row["role"] == "enterprise",
+                    "sources": [{
+                        "name": "完整流程演示数据",
+                        "source_type": "demo_seed",
+                        "collected_at": _dt(0).isoformat(),
+                        "is_mock": True,
+                    }],
+                },
+            },
             credit_score_events=[
                 {
                     "id": f"demo-credit-{idx}-1",

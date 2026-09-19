@@ -14,25 +14,25 @@ import { useAuth } from './context/AuthContext';
 import { loginHomePathForRole } from './lib/rbac';
 
 // Enterprise pages
-import Dashboard from './pages/Dashboard';
-import SalesConsole from './pages/SalesConsole';
-import Matching from './pages/Matching';
-import OrderPipeline from './pages/OrderPipeline';
-import Alerts from './pages/Alerts';
-import Assets from './pages/Assets';
-import GroupPurchase from './pages/GroupPurchase';
-import Settings from './pages/Settings';
-import FulfillmentDashboard from './pages/FulfillmentDashboard';
-import CapacityCalendar from './pages/CapacityCalendar';
-import EnterpriseDirectory from './pages/EnterpriseDirectory';
-import AlertWorkflow from './pages/AlertWorkflow';
-import PublicHome from './pages/PublicHome';
-import IndustryNews from './pages/IndustryNews';
-import PublicSearch from './pages/PublicSearch';
-import PublicAia from './pages/PublicAia';
-import FactoryDetail from './pages/FactoryDetail';
-import AgentMarket from './pages/AgentMarket';
-import IndustryNewsDetail from './pages/IndustryNewsDetail';
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const SalesConsole = lazy(() => import('./pages/SalesConsole'));
+const Matching = lazy(() => import('./pages/Matching'));
+const OrderPipeline = lazy(() => import('./pages/OrderPipeline'));
+const Alerts = lazy(() => import('./pages/Alerts'));
+const Assets = lazy(() => import('./pages/Assets'));
+const GroupPurchase = lazy(() => import('./pages/GroupPurchase'));
+const Settings = lazy(() => import('./pages/Settings'));
+const FulfillmentDashboard = lazy(() => import('./pages/FulfillmentDashboard'));
+const CapacityCalendar = lazy(() => import('./pages/CapacityCalendar'));
+const EnterpriseDirectory = lazy(() => import('./pages/EnterpriseDirectory'));
+const AlertWorkflow = lazy(() => import('./pages/AlertWorkflow'));
+const PublicHome = lazy(() => import('./pages/PublicHome'));
+const IndustryNews = lazy(() => import('./pages/IndustryNews'));
+const PublicSearch = lazy(() => import('./pages/PublicSearch'));
+const PublicAia = lazy(() => import('./pages/PublicAia'));
+const FactoryDetail = lazy(() => import('./pages/FactoryDetail'));
+const AgentMarket = lazy(() => import('./pages/AgentMarket'));
+const IndustryNewsDetail = lazy(() => import('./pages/IndustryNewsDetail'));
 import NewsManagementPage from './pages/admin/NewsManagementPage';
 
 // Government pages
@@ -93,6 +93,7 @@ function PublicOrRoleHome() {
 
 export default function App() {
   return (
+    <Suspense fallback={<AuthLoadingShell />}>
     <Routes>
       <Route path="/" element={<PublicOrRoleHome />} />
       <Route path="/login" element={<Navigate to="/" replace />} />
@@ -178,5 +179,6 @@ export default function App() {
         </div>
       } />
     </Routes>
+    </Suspense>
   );
 }

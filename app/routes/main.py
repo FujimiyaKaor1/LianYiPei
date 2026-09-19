@@ -11,6 +11,8 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
+from sqlalchemy import text
+from app import db
 from app.models import Enterprise, Inquiry, Product, Alert
 from app.authz import role_required, user_effective_role, user_session_role
 
@@ -106,6 +108,29 @@ def _render_spa(title='链易配'):
 @main.route('/')
 def index():
     return _render_spa('首页 - 链易配')
+
+
+@main.route('/healthz')
+def healthz():
+    """Cheap liveness probe; never reads or returns deployment secrets."""
+    return jsonify({"status": "ok"}), 200
+
+
+@main.route('/readyz')
+def readyz():
+    """Readiness probe for the web process and minimum Agent schema."""
+    checks = {"database": "failed", "agent_schema": "missing"}
+    try:
+        db.session.execute(text("SELECT 1"))
+        db.session.rollback()
+        checks["database"] = "ok"
+        from app.services.production_readiness import _agent_schema_ready
+
+        checks["agent_schema"] = "ok" if _agent_schema_ready() else "missing"
+    except Exception:
+        db.session.rollback()
+    ready = all(value == "ok" for value in checks.values())
+    return jsonify({"status": "ready" if ready else "not_ready", "checks": checks}), 200 if ready else 503
 
 
 @main.route('/china.js')

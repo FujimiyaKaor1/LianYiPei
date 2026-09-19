@@ -25,9 +25,11 @@ export function AnalysisReportModal({ open, onClose }: AnalysisReportModalProps)
   const [stats, setStats] = useState<EnterpriseStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
 
   const fetchStats = useCallback(async () => {
     setRefreshing(true);
+    setError('');
     try {
       // 获取企业列表数据
       const data = await api.fetchEnterpriseDirectory({ limit: 10000, include_self: true });
@@ -45,14 +47,9 @@ export function AnalysisReportModal({ open, onClose }: AnalysisReportModalProps)
         abnormal: Math.max(0, abnormal),
         dormant: Math.max(0, dormant),
       });
-    } catch {
-      // 如果获取失败，显示模拟数据
-      setStats({
-        total: 48,
-        active: 42,
-        abnormal: 3,
-        dormant: 3,
-      });
+    } catch (err) {
+      setStats(null);
+      setError(err instanceof Error ? err.message : '企业分析数据暂时不可用');
     } finally {
       setRefreshing(false);
     }
@@ -108,6 +105,13 @@ export function AnalysisReportModal({ open, onClose }: AnalysisReportModalProps)
             <div className="flex items-center justify-center py-20">
               <RefreshCw className="w-6 h-6 animate-spin text-neutral-400" />
               <span className="ml-2 text-sm text-neutral-400">加载分析数据中...</span>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
+              <XCircle className="h-8 w-8 text-red-500" />
+              <p className="text-sm text-neutral-600">{error}</p>
+              <p className="text-xs text-neutral-400">未取得真实数据时不会展示模拟统计。</p>
+              <button type="button" onClick={() => void fetchAll()} className="rounded-lg border border-neutral-200 px-4 py-2 text-xs font-bold text-neutral-700 hover:bg-neutral-50">重试</button>
             </div>
           ) : (
             <>

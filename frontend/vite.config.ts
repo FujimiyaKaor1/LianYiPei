@@ -46,6 +46,15 @@ export default defineConfig(({mode}) => {
           entryFileNames: 'assets/[name].js',
           chunkFileNames: 'assets/[name].js',
           assetFileNames: 'assets/[name].[ext]',
+          // Keep the Agent entry and route chunks small enough for first load;
+          // charting/icons are only needed by selected dashboards.
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined;
+            if (id.includes('echarts')) return 'charts';
+            if (id.includes('recharts')) return 'recharts';
+            if (id.includes('lucide-react')) return 'icons';
+            return 'vendor';
+          },
         },
       },
     },

@@ -1,0 +1,171 @@
+name: lianyipei-production
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    command: ["mysqld", "--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-lianyipei}
+      MYSQL_USER: ${MYSQL_USER:?set MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks: [private]
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [private]
+
+  minio:
+    # MinIO's maintained images are published on Quay; Docker Hub's old
+    # minio/minio name is no longer a reliable production source.
+    image: quay.io/minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?set S3_SECRET_KEY}
+    volumes:
+      - minio-data:/data
+    expose: ["9000", "9001"]
+    networks: [private]
+
+  minio-init:
+    image: quay.io/minio/mc:latest
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: ["/bin/sh", "-c"]
+    command: >-
+      "until mc alias set local http://minio:9000 $$S3_ACCESS_KEY $$S3_SECRET_KEY; do
+      sleep 2; done
+      && mc mb --ignore-existing local/$$MATERIAL_S3_BUCKET
+      && mc anonymous set none local/$$MATERIAL_S3_BUCKET"
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?set S3_SECRET_KEY}
+      MATERIAL_S3_BUCKET: ${MATERIAL_S3_BUCKET:-lianyipei-private-materials}
+    networks: [private]
+
+  clamav:
+    image: clamav/clamav:1.4
+    # clamav/clamav:1.4 currently publishes an amd64 manifest only. Docker
+    # Desktop on Apple Silicon can run it through its amd64 emulation; x86
+    # production hosts use the native platform without any change.
+    platform: linux/amd64
+    restart: unless-stopped
+    expose: ["3310"]
+    volumes:
+      - clamav-data:/var/lib/clamav
+    networks: [private]
+
+  migrate:
+    build: .
+    restart: "no"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment: &app-environment
+      APP_ENV: production
+      FLASK_ENV: production
+      AUTO_CREATE_SCHEMA: "0"
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
+      # Supply a URL-encoded password through DATABASE_URL; constructing a
+      # SQLAlchemy URL from raw YAML credentials would break on @, :, or #.
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      REDIS_URL: redis://redis:6379/0
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:?set DEEPSEEK_API_KEY}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      CHAINXIAOYI_CLOUD_ENABLED: "true"
+      CHAINXIAOYI_CLOUD_REQUIRED: "true"
+      CHAINXIAOYI_REQUIRE_EXPLICIT_APPROVAL: "true"
+      DISABLE_API_AUTH: "0"
+      ENABLE_MOCK_API: "false"
+      MATERIAL_AV_MODE: clamav
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: "3310"
+      MATERIAL_STORAGE_BACKEND: s3
+      MATERIAL_ENCRYPTION_KEY: ${MATERIAL_ENCRYPTION_KEY:?set MATERIAL_ENCRYPTION_KEY}
+      MATERIAL_S3_BUCKET: ${MATERIAL_S3_BUCKET:-lianyipei-private-materials}
+      MATERIAL_S3_REGION: ${MATERIAL_S3_REGION:-us-east-1}
+      MATERIAL_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?set S3_SECRET_KEY}
+      LIANYIPEI_WORKER_ENABLED: "1"
+      LIANYIPEI_SCHEDULER_ENABLED: "0"
+    command: ["flask", "--app", "wsgi:app", "db", "upgrade"]
+    networks: [private]
+
+  web:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      clamav:
+        condition: service_started
+    environment:
+      <<: *app-environment
+      LIANYIPEI_WORKER_ENABLED: "0"
+      LIANYIPEI_SCHEDULER_ENABLED: "0"
+    ports:
+      - "${LIANYIPEI_BIND:-127.0.0.1}:8000:8000"
+    networks: [private]
+
+  worker:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      clamav:
+        condition: service_started
+    environment:
+      <<: *app-environment
+      LIANYIPEI_WORKER_ENABLED: "1"
+      LIANYIPEI_SCHEDULER_ENABLED: "1"
+    # Module execution keeps /app (the image workdir) on sys.path.  Running
+    # the file path directly would set sys.path[0] to /app/scripts and make
+    # ``from app import ...`` fail in the split worker container.
+    command: ["python", "-m", "scripts.run_scheduler"]
+    # The image healthcheck targets the HTTP web process.  This worker is a
+    # scheduler-only process, so inheriting that probe would report it
+    # unhealthy despite a live scheduler and trigger false alarms.
+    healthcheck:
+      disable: true
+    networks: [private]
+
+networks:
+  private:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  redis-data:
+  minio-data:
+  clamav-data:

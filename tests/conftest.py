@@ -33,6 +33,7 @@ class TestConfig(Config):
     # 强制走 invoice_validator 的模拟税务校验，避免 Hypothesis 大量用例触发真实 HTTP
     TAX_API_URL = ""
     TAX_API_KEY = ""
+    ALLOW_MOCK_TAX_API = True
     
     # 禁用调度器（测试时不需要后台任务）
     SCHEDULER_ENABLED = False

@@ -7,12 +7,15 @@ import copy
 import hashlib
 import json
 import logging
+import os
 import time
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlsplit
 
 import requests
+from flask import current_app
 
 from app import db
 from app.models import Alert, Enterprise
@@ -22,6 +25,23 @@ logger = logging.getLogger(__name__)
 # query_key -> (expires_at, result_data)
 _industrial_memory_cache: Dict[str, Tuple[datetime, List[Dict]]] = {}
 _interface_runtime_state: Optional[Dict[str, Dict[str, Any]]] = None
+
+
+class ExternalDataUnavailable(RuntimeError):
+    """A configured real source is unavailable; callers must not invent facts."""
+
+
+def _evidence(source: str, source_url: str = "") -> Dict[str, Any]:
+    now = datetime.utcnow().isoformat() + "Z"
+    return {
+        "source": source,
+        "source_url": source_url,
+        "collected_at": now,
+        "updated_at": now,
+        "is_mock": False,
+        "confidence": 1.0,
+        "authorization": "configured_external_interface",
+    }
 
 
 def _state() -> Dict[str, Dict[str, Any]]:
@@ -54,8 +74,30 @@ class ExternalAPIClient:
 
     def __init__(self, config: SimpleNamespace):
         self.config = config
+        self._validate_base_url()
         self._oauth_token: Optional[str] = None
         self._token_expires_at: Optional[datetime] = None
+
+    def _validate_base_url(self) -> None:
+        """Reject malformed or unsafe credential destinations.
+
+        Configured registry/tax/power providers are trusted only after their
+        origin is validated. Production requires HTTPS; URL userinfo,
+        queries and fragments are rejected so secrets cannot be redirected or
+        accidentally exposed to an unapproved endpoint.
+        """
+        raw = str(getattr(self.config, "base_url", "") or "").strip()
+        parsed = urlsplit(raw)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ExternalDataUnavailable("外部数据接口 URL 配置无效")
+        if parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ExternalDataUnavailable("外部数据接口 URL 不得包含凭据或查询参数")
+        try:
+            environment = str(current_app.config.get("APP_ENV") or os.getenv("APP_ENV") or "development").lower()
+        except RuntimeError:
+            environment = str(os.getenv("APP_ENV") or "development").lower()
+        if environment == "production" and parsed.scheme != "https":
+            raise ExternalDataUnavailable("生产环境外部数据接口 URL 必须使用 HTTPS")
 
     def _get_headers(self) -> Dict[str, str]:
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
@@ -162,7 +204,7 @@ class PowerAPIService:
     def fetch_power_consumption(self, enterprise_id: int) -> Dict:
         config = self.get_config()
         if not config or not config.is_enabled:
-            return self._mock_power_data(enterprise_id)
+            raise ExternalDataUnavailable("电力数据接口未配置，禁止使用模拟用电数据")
 
         enterprise = Enterprise.query.get(enterprise_id)
         if not enterprise:
@@ -175,7 +217,9 @@ class PowerAPIService:
         )
 
         mapping = getattr(config, "field_mapping", None)
-        return self._map_power_data(raw, mapping, enterprise_id)
+        result = self._map_power_data(raw, mapping, enterprise_id)
+        result.update(_evidence(self.INTERFACE_TYPE, config.base_url))
+        return result
 
     def _map_power_data(
         self, raw: Dict, mapping: Optional[Dict], enterprise_id: int
@@ -198,28 +242,6 @@ class PowerAPIService:
             "total_consumption": raw.get(total_key, 0),
         }
 
-    def _mock_power_data(self, enterprise_id: int) -> Dict:
-        import random
-
-        months = []
-        for i in range(12, 0, -1):
-            months.append(
-                {
-                    "month": f"{datetime.utcnow().year}-{i:02d}",
-                    "consumption": random.randint(5000, 15000),
-                    "unit": "kWh",
-                }
-            )
-        return {
-            "enterprise_id": enterprise_id,
-            "data_type": "power_consumption",
-            "period": "last_12_months",
-            "data": months,
-            "total_consumption": sum(m["consumption"] for m in months),
-            "is_mock": True,
-        }
-
-
 class TaxAPIService:
     INTERFACE_TYPE = "tax_api"
 
@@ -229,7 +251,7 @@ class TaxAPIService:
     def fetch_invoice_data(self, enterprise_id: int) -> Dict:
         config = self.get_config()
         if not config or not config.is_enabled:
-            return self._mock_invoice_data(enterprise_id)
+            raise ExternalDataUnavailable("税务数据接口未配置，禁止使用模拟开票数据")
 
         enterprise = Enterprise.query.get(enterprise_id)
         if not enterprise:
@@ -242,7 +264,9 @@ class TaxAPIService:
         )
 
         mapping = getattr(config, "field_mapping", None)
-        return self._map_invoice_data(raw, mapping, enterprise_id)
+        result = self._map_invoice_data(raw, mapping, enterprise_id)
+        result.update(_evidence(self.INTERFACE_TYPE, config.base_url))
+        return result
 
     def _map_invoice_data(
         self, raw: Dict, mapping: Optional[Dict], enterprise_id: int
@@ -268,30 +292,6 @@ class TaxAPIService:
             "total_invoices": raw.get(count_key, 0),
         }
 
-    def _mock_invoice_data(self, enterprise_id: int) -> Dict:
-        import random
-
-        months = []
-        for i in range(12, 0, -1):
-            months.append(
-                {
-                    "month": f"{datetime.utcnow().year}-{i:02d}",
-                    "invoice_count": random.randint(10, 50),
-                    "total_amount": random.randint(100000, 500000),
-                    "unit": "CNY",
-                }
-            )
-        return {
-            "enterprise_id": enterprise_id,
-            "data_type": "invoice_data",
-            "period": "last_12_months",
-            "data": months,
-            "total_amount": sum(m["total_amount"] for m in months),
-            "total_invoices": sum(m["invoice_count"] for m in months),
-            "is_mock": True,
-        }
-
-
 class IndustrialCommerceService:
     INTERFACE_TYPE = "industrial_commerce_api"
     CACHE_TTL_HOURS = 24
@@ -302,6 +302,10 @@ class IndustrialCommerceService:
     def query_enterprises(
         self, keyword: str, filters: Optional[Dict] = None
     ) -> List[Dict]:
+        config = self.get_config()
+        if not config or not config.is_enabled or not getattr(config, "base_url", ""):
+            raise ExternalDataUnavailable("工商数据接口未配置，禁止生成模拟候选企业")
+
         cache_key = self._build_cache_key(keyword, filters)
 
         hit = _industrial_memory_cache.get(cache_key)
@@ -311,21 +315,19 @@ class IndustrialCommerceService:
                 logger.debug(f"[工商API] 命中内存缓存: {cache_key}")
                 return data
 
-        config = self.get_config()
-        if not config or not config.is_enabled:
-            result = self._mock_enterprise_data(keyword, filters)
-        else:
-            try:
-                client = ExternalAPIClient(config)
-                params = {"keyword": keyword, "page_size": 20}
-                if filters:
-                    params.update(filters)
-                raw = client.get("/enterprise/search", params=params)
-                mapping = getattr(config, "field_mapping", None)
-                result = self._map_enterprise_data(raw, mapping)
-            except Exception as e:
-                logger.error(f"[工商API] 查询失败: {e}")
-                result = self._mock_enterprise_data(keyword, filters)
+        try:
+            client = ExternalAPIClient(config)
+            params = {"keyword": keyword, "page_size": 20}
+            if filters:
+                params.update(filters)
+            raw = client.get("/enterprise/search", params=params)
+            mapping = getattr(config, "field_mapping", None)
+            result = self._map_enterprise_data(raw, mapping, config.base_url)
+        except ExternalDataUnavailable:
+            raise
+        except Exception as e:
+            logger.error(f"[工商API] 查询失败: {e}")
+            raise ExternalDataUnavailable("工商数据接口查询失败，未返回候选企业") from e
 
         expires = datetime.utcnow() + timedelta(hours=self.CACHE_TTL_HOURS)
         _industrial_memory_cache[cache_key] = (expires, result)
@@ -335,7 +337,9 @@ class IndustrialCommerceService:
         raw = f"{keyword}:{json.dumps(filters or {}, sort_keys=True)}"
         return hashlib.md5(raw.encode()).hexdigest()
 
-    def _map_enterprise_data(self, raw: Dict, mapping: Optional[Dict]) -> List[Dict]:
+    def _map_enterprise_data(
+        self, raw: Dict, mapping: Optional[Dict], source_url: str = ""
+    ) -> List[Dict]:
         if not mapping:
             items = raw.get("data", raw.get("list", []))
         else:
@@ -343,34 +347,21 @@ class IndustrialCommerceService:
 
         result = []
         for item in items:
-            result.append(
-                {
+            mapped = {
                     "name": item.get("name", ""),
                     "location": item.get("address", item.get("location", "")),
                     "business_scope": item.get("business_scope", ""),
                     "registered_capital": item.get("registered_capital", ""),
                     "patent_count": item.get("patent_count", 0),
                     "credit_rating": item.get("credit_rating", ""),
-                    "contact": item.get("contact", ""),
-                    "source": "industrial_commerce_api",
-                }
-            )
-        return result
-
-    def _mock_enterprise_data(self, keyword: str, filters: Optional[Dict]) -> List[Dict]:
-        return [
-            {
-                "name": f"{keyword}相关企业（示例{i}）",
-                "location": "广东省深圳市",
-                "business_scope": f"主营{keyword}的生产与销售",
-                "registered_capital": f"{(i+1)*1000}万元",
-                "patent_count": i * 3,
-                "credit_rating": "AA",
-                "contact": "",
-                "source": "mock",
+                    # Public registry results are candidate facts only. Private
+                    # contacts require a separate enterprise claim/authorization.
+                    "contact": "",
+                    "contact_authorized": False,
             }
-            for i in range(1, 4)
-        ]
+            mapped.update(_evidence(self.INTERFACE_TYPE, source_url))
+            result.append(mapped)
+        return result
 
     def check_enterprise_status(self, enterprise_name: str) -> Dict:
         """
@@ -387,32 +378,9 @@ class IndustrialCommerceService:
                 - check_date: 检查时间
                 - is_mock: 是否为模拟数据
         """
-        import random
-        
         config = self.get_config()
-        if not config or not config.is_enabled:
-            # 模拟数据：90%概率存续，10%概率其他状态
-            rand = random.random()
-            if rand < 0.9:
-                status = "存续"
-                is_active = True
-            elif rand < 0.95:
-                status = "注销"
-                is_active = False
-            elif rand < 0.98:
-                status = "吊销"
-                is_active = False
-            else:
-                status = "清算"
-                is_active = False
-            
-            return {
-                "name": enterprise_name,
-                "status": status,
-                "is_active": is_active,
-                "check_date": datetime.utcnow().isoformat(),
-                "is_mock": True,
-            }
+        if not config or not config.is_enabled or not getattr(config, "base_url", ""):
+            raise ExternalDataUnavailable("工商状态接口未配置，禁止随机生成企业经营状态")
         
         try:
             client = ExternalAPIClient(config)
@@ -426,22 +394,14 @@ class IndustrialCommerceService:
             
         except Exception as e:
             logger.error(f"[工商API] 企业状态查询失败: {e}")
-            # 失败时返回未知状态
-            return {
-                "name": enterprise_name,
-                "status": "未知",
-                "is_active": True,  # 默认保持活跃，避免误判
-                "check_date": datetime.utcnow().isoformat(),
-                "is_mock": False,
-                "error": str(e),
-            }
+            raise ExternalDataUnavailable("工商状态查询失败，企业状态保持不变") from e
 
     def _map_enterprise_status(self, raw: Dict, mapping: Optional[Dict], enterprise_name: str) -> Dict:
         """映射企业状态数据"""
-        if not mapping:
-            status_field = raw.get("status", "存续")
-        else:
-            status_field = raw.get(mapping.get("status", "status"), "存续")
+        status_key = "status" if not mapping else mapping.get("status", "status")
+        status_field = raw.get(status_key)
+        if status_field in (None, ""):
+            raise ExternalDataUnavailable("工商状态接口响应缺少状态字段")
         
         # 状态映射：有些API返回英文或数字
         status_map = {
@@ -461,10 +421,12 @@ class IndustrialCommerceService:
             "4": "清算",
         }
         
-        mapped_status = status_map.get(str(status_field), str(status_field))
+        mapped_status = status_map.get(str(status_field))
+        if mapped_status is None:
+            raise ExternalDataUnavailable("工商状态接口返回了未知状态")
         is_active = mapped_status == "存续"
         
-        return {
+        result = {
             "name": enterprise_name,
             "status": mapped_status,
             "is_active": is_active,
@@ -472,6 +434,9 @@ class IndustrialCommerceService:
             "is_mock": False,
             "raw_data": raw,
         }
+        config = self.get_config()
+        result.update(_evidence(self.INTERFACE_TYPE, getattr(config, "base_url", "")))
+        return result
 
 
 def _config_to_dict(cfg: Dict[str, Any]) -> Dict[str, Any]:

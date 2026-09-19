@@ -2,10 +2,14 @@
 测试配置验证
 验证测试环境是否正确配置
 """
+import os
+
 import pytest
+from cryptography.fernet import Fernet
 from flask import current_app
-from app import db
+from app import create_app, db
 from app.models import Enterprise
+from config import Config, _load_project_env
 
 
 @pytest.mark.unit
@@ -13,6 +17,17 @@ def test_app_exists(app):
     """测试应用实例是否存在"""
     assert app is not None
     assert current_app is not None
+
+
+@pytest.mark.unit
+def test_process_environment_wins_over_project_dotenv(tmp_path, monkeypatch):
+    env_file = tmp_path / ".env"
+    env_file.write_text("CHAIN_XIAOYI_TEST_PRECEDENCE=from-file\n", encoding="utf-8")
+    monkeypatch.setenv("CHAIN_XIAOYI_TEST_PRECEDENCE", "from-process")
+
+    _load_project_env(env_file)
+
+    assert os.environ["CHAIN_XIAOYI_TEST_PRECEDENCE"] == "from-process"
 
 
 @pytest.mark.unit
@@ -83,3 +98,163 @@ def test_fixtures_work(test_enterprise, test_supplier):
     assert test_supplier.name == '测试供应商B'
     assert test_enterprise.credit_score == 75.0
     assert test_supplier.credit_score == 85.0
+
+
+@pytest.mark.unit
+def test_mock_api_is_not_registered_without_explicit_enablement():
+    class ProductionLikeConfig(Config):
+        TESTING = False
+        ENABLE_MOCK_API = False
+        SCHEDULER_ENABLED = False
+        SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+
+    production_app = create_app(ProductionLikeConfig)
+    rules = {rule.rule for rule in production_app.url_map.iter_rules()}
+    assert not any(rule.startswith("/mock/") for rule in rules)
+
+
+def test_production_requires_explicit_chain_xiaoyi_approval(monkeypatch):
+    monkeypatch.delenv("CHAINXIAOYI_REQUIRE_EXPLICIT_APPROVAL", raising=False)
+    class ProductionApprovalConfig(Config):
+        APP_ENV = "production"
+        CHAINXIAOYI_REQUIRE_EXPLICIT_APPROVAL = True
+
+    assert ProductionApprovalConfig.CHAINXIAOYI_REQUIRE_EXPLICIT_APPROVAL is True
+
+
+@pytest.mark.unit
+def test_production_refuses_unsafe_defaults():
+    class UnsafeProductionConfig(Config):
+        APP_ENV = "production"
+        SECRET_KEY_IS_DEFAULT = True
+        DATABASE_URL_CONFIGURED = False
+        DISABLE_API_AUTH = False
+        ENABLE_MOCK_API = False
+
+    with pytest.raises(RuntimeError, match="SECRET_KEY.*DATABASE_URL"):
+        create_app(UnsafeProductionConfig)
+
+
+@pytest.mark.unit
+def test_production_requires_clamav_material_scanning():
+    class UnsafeMaterialConfig(Config):
+        APP_ENV = "production"
+        SECRET_KEY_IS_DEFAULT = False
+        DATABASE_URL_CONFIGURED = True
+        DISABLE_API_AUTH = False
+        ENABLE_MOCK_API = False
+        MATERIAL_AV_MODE = "basic"
+        SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+        SCHEDULER_ENABLED = False
+
+    with pytest.raises(RuntimeError, match="MATERIAL_AV_MODE"):
+        create_app(UnsafeMaterialConfig)
+
+
+@pytest.mark.unit
+def test_production_requires_encrypted_object_storage():
+    class UnsafeStorageConfig(Config):
+        APP_ENV = "production"
+        SECRET_KEY_IS_DEFAULT = False
+        DATABASE_URL_CONFIGURED = True
+        DISABLE_API_AUTH = False
+        ENABLE_MOCK_API = False
+        MATERIAL_AV_MODE = "clamav"
+        MATERIAL_STORAGE_BACKEND = "none"
+        MATERIAL_ENCRYPTION_KEY = ""
+        MATERIAL_S3_BUCKET = ""
+        SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+        SCHEDULER_ENABLED = False
+
+    with pytest.raises(RuntimeError, match="MATERIAL_STORAGE_BACKEND"):
+        create_app(UnsafeStorageConfig)
+
+
+@pytest.mark.unit
+def test_production_accepts_complete_material_security_configuration():
+    class SafeProductionConfig(Config):
+        APP_ENV = "production"
+        SECRET_KEY_IS_DEFAULT = False
+        SECRET_KEY = "test-only-production-secret"
+        DATABASE_URL_CONFIGURED = True
+        DISABLE_API_AUTH = False
+        ENABLE_MOCK_API = False
+        MATERIAL_AV_MODE = "clamav"
+        MATERIAL_STORAGE_BACKEND = "s3"
+        MATERIAL_ENCRYPTION_KEY = Fernet.generate_key().decode("ascii")
+        MATERIAL_S3_BUCKET = "private-materials"
+        SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+        SCHEDULER_ENABLED = False
+
+    production_app = create_app(SafeProductionConfig)
+
+    assert production_app.config["MATERIAL_STORAGE_BACKEND"] == "s3"
+
+
+@pytest.mark.unit
+def test_production_does_not_create_schema_at_app_startup(monkeypatch):
+    """Production schema must come from Alembic, not implicit create_all()."""
+    class SafeProductionConfig(Config):
+        APP_ENV = "production"
+        SECRET_KEY_IS_DEFAULT = False
+        SECRET_KEY = "test-only-production-secret"
+        DATABASE_URL_CONFIGURED = True
+        DISABLE_API_AUTH = False
+        ENABLE_MOCK_API = False
+        MATERIAL_AV_MODE = "clamav"
+        MATERIAL_STORAGE_BACKEND = "s3"
+        MATERIAL_ENCRYPTION_KEY = Fernet.generate_key().decode("ascii")
+        MATERIAL_S3_BUCKET = "private-materials"
+        SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+        SCHEDULER_ENABLED = False
+
+    def fail_create_all(*_args, **_kwargs):
+        raise AssertionError("production must apply migrations explicitly")
+
+    monkeypatch.setattr(db, "create_all", fail_create_all)
+    production_app = create_app(SafeProductionConfig)
+
+    assert production_app.config["AUTO_CREATE_SCHEMA"] is False
+
+
+@pytest.mark.unit
+def test_production_rejects_explicit_auto_schema_creation():
+    class UnsafeSchemaConfig(Config):
+        APP_ENV = "production"
+        SECRET_KEY_IS_DEFAULT = False
+        DATABASE_URL_CONFIGURED = True
+        DISABLE_API_AUTH = False
+        ENABLE_MOCK_API = False
+        AUTO_CREATE_SCHEMA = True
+        MATERIAL_AV_MODE = "clamav"
+        MATERIAL_STORAGE_BACKEND = "s3"
+        MATERIAL_ENCRYPTION_KEY = Fernet.generate_key().decode("ascii")
+        MATERIAL_S3_BUCKET = "private-materials"
+        SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+        SCHEDULER_ENABLED = False
+
+    with pytest.raises(RuntimeError, match="AUTO_CREATE_SCHEMA"):
+        create_app(UnsafeSchemaConfig)
+
+
+@pytest.mark.unit
+def test_production_requires_cloud_model_by_default(monkeypatch):
+    """A production process must fail closed when the cloud flag is omitted."""
+    monkeypatch.delenv("CHAINXIAOYI_CLOUD_REQUIRED", raising=False)
+
+    class ProductionCloudDefaultConfig(Config):
+        APP_ENV = "production"
+        SECRET_KEY_IS_DEFAULT = False
+        SECRET_KEY = "test-only-production-secret"
+        DATABASE_URL_CONFIGURED = True
+        DISABLE_API_AUTH = False
+        ENABLE_MOCK_API = False
+        MATERIAL_AV_MODE = "clamav"
+        MATERIAL_STORAGE_BACKEND = "s3"
+        MATERIAL_ENCRYPTION_KEY = Fernet.generate_key().decode("ascii")
+        MATERIAL_S3_BUCKET = "private-materials"
+        SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+        SCHEDULER_ENABLED = False
+
+    production_app = create_app(ProductionCloudDefaultConfig)
+    assert production_app.config["CHAINXIAOYI_CLOUD_REQUIRED"] is True

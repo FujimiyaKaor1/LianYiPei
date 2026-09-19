@@ -8,6 +8,19 @@ from app.services.industry_news_service import (
     parse_feed,
     validate_feed_url,
 )
+from app.services.schema_migrator import ensure_schema
+
+
+def test_schema_migrator_adds_news_columns_to_legacy_table(app, _db):
+    """旧本地库升级后，资讯查询不能因新增字段缺失而失败。"""
+    from sqlalchemy import text
+
+    db.session.execute(text("DROP TABLE IF EXISTS industry_news_articles"))
+    db.session.execute(text("CREATE TABLE industry_news_articles (id INTEGER PRIMARY KEY, slug VARCHAR(220), title VARCHAR(500), summary TEXT, content_excerpt TEXT, category VARCHAR(40), tags JSON, source_name VARCHAR(120), source_url VARCHAR(1000), canonical_url VARCHAR(1000), published_at DATETIME, fetched_at DATETIME, cover_image_url VARCHAR(1000), content_hash VARCHAR(64), is_featured BOOLEAN, is_published BOOLEAN, is_demo BOOLEAN, created_at DATETIME, updated_at DATETIME)"))
+    db.session.commit()
+    ensure_schema(db)
+    columns = {row[1] for row in db.session.execute(text('PRAGMA table_info(industry_news_articles)'))}
+    assert {'provider_article_id', 'industry_tags', 'chain_stage', 'relevance_score', 'relevance_status'} <= columns
 
 
 def test_public_news_hides_unpublished_and_paginates(client, _db):

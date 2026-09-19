@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import smtplib
 from email.header import Header
 from email.mime.multipart import MIMEMultipart
@@ -33,7 +34,16 @@ def _load_dotenv_values() -> dict[str, str]:
 
 
 def _smtp_config() -> dict[str, object]:
-    values = _load_dotenv_values()
+    values = {**_load_dotenv_values(), **{key: value for key, value in os.environ.items() if key.startswith("SMTP_")}}
+    try:
+        from flask import current_app
+        if current_app:
+            for key in ("SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM_NAME", "SMTP_FROM_EMAIL", "SMTP_USE_TLS"):
+                configured = current_app.config.get(key)
+                if configured is not None:
+                    values[key] = str(configured)
+    except RuntimeError:
+        pass
     return {
         "host": values.get("SMTP_HOST", "").strip(),
         "port": int(values.get("SMTP_PORT", "587").strip() or 587),
@@ -89,7 +99,8 @@ def send_email(
         finally:
             server.quit()
 
-        logger.info("[Email] email sent to %s, subject=%s", to_email, subject)
+        domain = to_email.rsplit("@", 1)[-1] if "@" in to_email else "invalid"
+        logger.info("[Email] email sent to recipient domain=%s", domain)
         return True, "ok"
     except smtplib.SMTPAuthenticationError:
         logger.error("[Email] SMTP authentication failed")

@@ -7,7 +7,6 @@ import {
   Clock, 
   Users,
   Award,
-  ArrowUp,
   ArrowDown
 } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -20,7 +19,7 @@ interface PriceIndexData {
   product_name: string;
   median_price: number;
   mean_price: number;
-  price_range: [number, number];
+  price_range?: [number, number];
   sample_count: number;
   last_updated: string;
   data_source?: string;
@@ -45,12 +44,6 @@ const POPULAR_PRODUCTS = [
   '液压油缸',
 ];
 
-const mockPriceHistory = {
-  '精密轴承': [1180, 1195, 1210, 1205, 1220, 1235, 1218],
-  '不锈钢板材': [4850, 4920, 4780, 4950, 4880, 5020, 4985],
-  '电子元器件': [125, 132, 128, 135, 142, 138, 145],
-};
-
 export function QuotePoolDashboard() {
   const { user } = useAuth();
   const [selectedProduct, setSelectedProduct] = useState(POPULAR_PRODUCTS[0]);
@@ -58,11 +51,13 @@ export function QuotePoolDashboard() {
   const [loading, setLoading] = useState(false);
   const [myQuotes, setMyQuotes] = useState<QuoteItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   // 报价表单
   const [formData, setFormData] = useState({
-    price: 1250,
-    quantity: 500,
+    inquiry_id: 0,
+    price: 0,
+    quantity: 0,
     unit: '件',
     delivery_days: 15,
     remarks: '',
@@ -73,24 +68,13 @@ export function QuotePoolDashboard() {
   // 获取价格指数
   const fetchPriceIndex = async (product: string) => {
     setLoading(true);
+    setError('');
     try {
       const data = await api.fetchPriceIndex(product);
-      setPriceIndex({
-        ...data,
-        prices: mockPriceHistory[product as keyof typeof mockPriceHistory] || [1200, 1220, 1190, 1250, 1215],
-      });
+      setPriceIndex({ ...data, prices: (data.history || []).map(item => Number(item.price)).filter(Number.isFinite) });
     } catch (err) {
-      console.error('获取价格指数失败', err);
-      // 使用模拟数据
-      setPriceIndex({
-        product_name: product,
-        median_price: 1220,
-        mean_price: 1235,
-        price_range: [1150, 1320],
-        sample_count: 28,
-        last_updated: new Date().toISOString(),
-        prices: mockPriceHistory[product as keyof typeof mockPriceHistory] || [1200, 1220, 1190, 1250, 1215],
-      });
+      setPriceIndex(null);
+      setError(err instanceof Error ? err.message : '真实价格数据暂时不可用');
     } finally {
       setLoading(false);
     }
@@ -101,8 +85,7 @@ export function QuotePoolDashboard() {
     try {
       const resp = await api.getQuotesList({ page: 1 });
       setMyQuotes(resp.quotes || []);
-    } catch (e) {
-      console.error(e);
+    } catch {
       setMyQuotes([]);
     }
   };
@@ -113,6 +96,10 @@ export function QuotePoolDashboard() {
   }, [selectedProduct]);
 
   const handleSubmitQuote = async () => {
+    if (!Number.isInteger(formData.inquiry_id) || formData.inquiry_id <= 0) {
+      alert('请输入真实询价单 ID，不能使用演示询盘');
+      return;
+    }
     if (!formData.price || formData.price <= 0) {
       alert('请输入有效报价');
       return;
@@ -121,7 +108,7 @@ export function QuotePoolDashboard() {
     setSubmitting(true);
     try {
       const payload: QuoteSubmitPayload = {
-        inquiry_id: 999, // 模拟询盘ID
+        inquiry_id: formData.inquiry_id,
         price: formData.price,
         product_name: selectedProduct,
         quantity: formData.quantity,
@@ -136,7 +123,7 @@ export function QuotePoolDashboard() {
       
       // 重置表单并刷新列表
       setFormData({
-        price: Math.round(formData.price * 0.98), // 模拟略微调整
+        ...formData,
         quantity: formData.quantity,
         unit: formData.unit,
         delivery_days: formData.delivery_days,
@@ -246,6 +233,11 @@ export function QuotePoolDashboard() {
 
           <div className="p-6">
             <div className="flex justify-between items-center mb-6">
+              {error && <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">{error}。未使用模拟价格。</div>}
+              <div>
+                <label className="text-xs font-medium text-neutral-500 block mb-1">真实询价单 ID</label>
+                <input type="number" min="1" value={formData.inquiry_id || ''} onChange={(e) => setFormData({...formData, inquiry_id: parseInt(e.target.value, 10) || 0})} className="w-full px-4 py-3 border border-neutral-200 rounded-2xl focus:outline-none focus:border-blue-500" required />
+              </div>
               <div>
                 <div className="text-sm text-neutral-500">当前产品</div>
                 <div className="text-2xl font-semibold">{selectedProduct}</div>
@@ -254,11 +246,9 @@ export function QuotePoolDashboard() {
               <div className="text-right">
                 <div className="text-sm text-neutral-500">市场中位价</div>
                 <div className="text-4xl font-black text-blue-600">
-                  ¥{priceIndex?.median_price?.toLocaleString() || '1,220'}
+                  ¥{priceIndex?.median_price?.toLocaleString() || '暂无真实报价'}
                 </div>
-                <div className="text-xs text-blue-600 flex items-center gap-1 justify-end">
-                  <ArrowUp className="w-3 h-3" /> 较上周 +2.1%
-                </div>
+                {priceIndex?.is_cold_start && <div className="text-xs text-amber-600">参考锚点，非实时报价</div>}
               </div>
             </div>
 
@@ -337,12 +327,12 @@ export function QuotePoolDashboard() {
             <div className="grid grid-cols-2 gap-4 text-center">
               <div className="bg-neutral-50 rounded-2xl p-4">
                 <div className="text-xs text-neutral-500">样本量</div>
-                <div className="text-3xl font-black mt-1">{priceIndex?.sample_count || 28}</div>
+                <div className="text-3xl font-black mt-1">{priceIndex?.sample_count ?? '—'}</div>
               </div>
               <div className="bg-neutral-50 rounded-2xl p-4">
                 <div className="text-xs text-neutral-500">价格区间</div>
                 <div className="text-xl font-semibold mt-1">
-                  ¥{(priceIndex?.price_range?.[0] || 1150)} - ¥{(priceIndex?.price_range?.[1] || 1320)}
+                  {priceIndex?.price_range ? `¥${priceIndex.price_range[0]} - ¥${priceIndex.price_range[1]}` : '暂无真实区间'}
                 </div>
               </div>
             </div>

@@ -5,14 +5,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from datetime import datetime, timedelta
 from typing import Dict, Optional
+from urllib.parse import urlsplit
 
 import requests
+from flask import current_app
 
 from app import db
-from app.models import Enterprise
+from app.models import Enterprise, Transaction
 from app.services.collaboration_service import generate_collaboration_code
+
+
+class EContractConfigurationError(RuntimeError):
+    pass
 
 
 class EContractService:
@@ -21,7 +28,7 @@ class EContractService:
     集成第三方电子合同平台（e签宝/法大大）
     """
     
-    def __init__(self, provider: str = 'esign', api_key: str = '', api_secret: str = ''):
+    def __init__(self, provider: str = 'disabled', api_key: str = '', api_secret: str = '', base_url: str = '', allow_mock: bool = False):
         """
         初始化电子合同服务
         
@@ -33,15 +40,49 @@ class EContractService:
         self.provider = provider
         self.api_key = api_key
         self.api_secret = api_secret
+        self.allow_mock = allow_mock
         
         # 配置API端点
-        if provider == 'esign':
+        if base_url:
+            self.base_url = base_url.rstrip('/')
+        elif provider == 'esign':
             self.base_url = 'https://openapi.esign.cn'
         elif provider == 'fadada':
             self.base_url = 'https://api.fadada.com'
+        elif provider == 'mock' and allow_mock:
+            self.base_url = 'http://127.0.0.1:5050/mock/api/econtract'
         else:
-            # 默认使用模拟端点（开发/测试环境）
-            self.base_url = 'http://localhost:5000/api/mock/econtract'
+            self.base_url = ''
+
+    def _require_configured(self) -> None:
+        if self.provider == 'mock' and self.allow_mock and self.base_url:
+            return
+        if self.provider not in {'esign', 'fadada', 'custom'} or not self.base_url or not self.api_key:
+            raise EContractConfigurationError('电子合同供应商未配置，禁止使用模拟合同或模拟签署结果')
+        self._validate_base_url()
+
+    def _validate_base_url(self) -> None:
+        """Validate the provider origin before any credentialed request.
+
+        Provider URLs are deployment configuration, but treating them as
+        trusted input would allow an accidental HTTP endpoint or URL userinfo
+        to exfiltrate the API key.  Production requires HTTPS; development
+        may use an internal HTTP test endpoint, but malformed URLs and
+        embedded credentials are never accepted.
+        """
+        parsed = urlsplit(str(self.base_url or "").strip())
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise EContractConfigurationError("电子合同供应商 URL 配置无效")
+        if parsed.username or parsed.password:
+            raise EContractConfigurationError("电子合同供应商 URL 不得包含凭据")
+        if parsed.query or parsed.fragment:
+            raise EContractConfigurationError("电子合同供应商 URL 不得包含查询参数或片段")
+        try:
+            environment = str(current_app.config.get("APP_ENV") or os.getenv("APP_ENV") or "development").lower()
+        except RuntimeError:
+            environment = str(os.getenv("APP_ENV") or "development").lower()
+        if environment == "production" and parsed.scheme != "https":
+            raise EContractConfigurationError("生产环境电子合同供应商 URL 必须使用 HTTPS")
     
     def generate_contract(
         self,
@@ -74,9 +115,25 @@ class EContractService:
         
         if not buyer or not seller:
             raise ValueError('买方或卖方企业不存在')
+        self._require_configured()
         
         # 构建合同内容
+        request_id = hashlib.sha256(
+            json.dumps(
+                {
+                    'operation': 'contract_create',
+                    'buyer_id': buyer_id,
+                    'seller_id': seller_id,
+                    'product_name': product_name,
+                    'terms': terms,
+                },
+                sort_keys=True,
+                ensure_ascii=False,
+                default=str,
+            ).encode('utf-8')
+        ).hexdigest()
         contract_data = {
+            'request_id': request_id,
             'buyer': {
                 'id': buyer_id,
                 'name': buyer.name,
@@ -95,19 +152,11 @@ class EContractService:
         }
         
         # 调用第三方API生成合同
-        try:
-            response = self._call_api('/contract/create', contract_data)
-            contract_id = response.get('contract_id')
-            
-            if not contract_id:
-                raise ValueError('合同生成失败：未返回合同ID')
-            
-            return contract_id
-            
-        except Exception as e:
-            # 如果第三方API失败，生成本地合同ID
-            contract_id = self._generate_local_contract_id(buyer_id, seller_id)
-            return contract_id
+        response = self._call_api('/contract/create', contract_data)
+        contract_id = response.get('contract_id')
+        if not contract_id:
+            raise ValueError('合同生成失败：未返回合同ID')
+        return str(contract_id)
     
     def sign_contract(
         self,
@@ -132,9 +181,24 @@ class EContractService:
         enterprise = Enterprise.query.get(enterprise_id)
         if not enterprise:
             raise ValueError('企业不存在')
+        self._require_configured()
         
         # 构建签署请求
+        request_id = hashlib.sha256(
+            json.dumps(
+                {
+                    'operation': 'contract_sign',
+                    'contract_id': contract_id,
+                    'enterprise_id': enterprise_id,
+                    'signature': signature_data,
+                },
+                sort_keys=True,
+                ensure_ascii=False,
+                default=str,
+            ).encode('utf-8')
+        ).hexdigest()
         sign_data = {
+            'request_id': request_id,
             'contract_id': contract_id,
             'signer': {
                 'id': enterprise_id,
@@ -144,13 +208,8 @@ class EContractService:
             'signed_at': datetime.utcnow().isoformat(),
         }
         
-        try:
-            response = self._call_api('/contract/sign', sign_data)
-            return response.get('success', False)
-            
-        except Exception as e:
-            # 如果第三方API失败，返回模拟成功
-            return True
+        response = self._call_api('/contract/sign', sign_data)
+        return response.get('success') is True
     
     def check_contract_status(self, contract_id: str) -> str:
         """
@@ -162,13 +221,12 @@ class EContractService:
         Returns:
             status: 合同状态 ('pending', 'signed', 'fulfilled', 'expired')
         """
-        try:
-            response = self._call_api('/contract/status', {'contract_id': contract_id})
-            return response.get('status', 'pending')
-            
-        except Exception as e:
-            # 如果第三方API失败，返回默认状态
-            return 'pending'
+        self._require_configured()
+        response = self._call_api('/contract/status', {'contract_id': contract_id})
+        status = response.get('status')
+        if status not in {'pending', 'signed', 'fulfilled', 'expired', 'failed'}:
+            raise ValueError('电子合同供应商返回了未知状态')
+        return status
     
     def generate_collaboration_code(self, contract_id: str) -> str:
         """
@@ -182,32 +240,39 @@ class EContractService:
         """
         # 从合同ID中提取买卖方信息
         # 注意：实际应用中应从数据库查询合同详情
-        try:
-            response = self._call_api('/contract/details', {'contract_id': contract_id})
-            buyer_id = response.get('buyer_id')
-            seller_id = response.get('seller_id')
-            product_name = response.get('product_name', '')
-            amount_range = response.get('amount_range', '')
-            
-        except Exception:
-            # 如果API失败，从本地合同ID解析
-            parts = contract_id.split('-')
-            if len(parts) >= 3:
-                buyer_id = int(parts[1])
-                seller_id = int(parts[2])
-            else:
-                raise ValueError('无法从合同ID解析买卖方信息')
-            product_name = ''
-            amount_range = ''
+        self._require_configured()
+        response = self._call_api('/contract/details', {'contract_id': contract_id})
+        buyer_id = response.get('buyer_id')
+        seller_id = response.get('seller_id')
+        product_name = response.get('product_name', '')
+        amount_range = response.get('amount_range', '')
+        if not buyer_id or not seller_id:
+            raise ValueError('合同详情缺少买卖方信息')
         
         # 生成撮合码
-        collab_code = generate_collaboration_code(
-            buyer_id=buyer_id,
-            seller_id=seller_id,
-            product_name=product_name,
-            contract_id=contract_id,
-            amount_range=amount_range,
-        )
+        collab_code = Transaction.find_by_contract_id(contract_id)
+        if collab_code is None:
+            collab_code = generate_collaboration_code(
+                buyer_id=buyer_id,
+                seller_id=seller_id,
+                product_name=product_name,
+                contract_id=contract_id,
+                amount_range=amount_range,
+            )
+        else:
+            if collab_code.buyer_id != int(buyer_id) or collab_code.seller_id != int(seller_id):
+                raise ValueError('电子合同供应商返回的签约方与本地授权记录不一致')
+            if not collab_code.match_code:
+                collab_code.match_code = Transaction.generate_match_code(
+                    collab_code.buyer_id,
+                    collab_code.seller_id,
+                    contract_id,
+                )
+            info = dict(collab_code.invoice_info or {})
+            info['amount_range'] = amount_range or info.get('amount_range')
+            collab_code.invoice_info = info
+            collab_code.fulfillment_status = 'pending'
+            db.session.commit()
         
         return collab_code.match_code
     
@@ -221,24 +286,19 @@ class EContractService:
         Returns:
             pdf_content: PDF文件内容（字节）
         """
-        try:
-            response = self._call_api('/contract/download', {'contract_id': contract_id})
-            
-            # 如果返回的是URL，下载文件
-            if 'download_url' in response:
-                pdf_response = requests.get(response['download_url'])
-                return pdf_response.content
-            
-            # 如果返回的是base64编码的内容
-            if 'content' in response:
-                import base64
-                return base64.b64decode(response['content'])
-            
-            raise ValueError('合同下载失败：未返回有效内容')
-            
-        except Exception as e:
-            # 如果第三方API失败，返回模拟PDF内容
-            return self._generate_mock_pdf(contract_id)
+        self._require_configured()
+        response = self._call_api('/contract/download', {'contract_id': contract_id})
+        if 'download_url' in response:
+            download_url = str(response['download_url'])
+            if urlsplit(download_url).scheme != 'https' or urlsplit(download_url).netloc != urlsplit(self.base_url).netloc:
+                raise ValueError('合同下载地址不在已配置供应商域名内')
+            pdf_response = requests.get(download_url, timeout=15)
+            pdf_response.raise_for_status()
+            return pdf_response.content
+        if 'content' in response:
+            import base64
+            return base64.b64decode(response['content'], validate=True)
+        raise ValueError('合同下载失败：未返回有效内容')
     
     def _call_api(self, endpoint: str, data: Dict) -> Dict:
         """
@@ -251,24 +311,29 @@ class EContractService:
         Returns:
             response: API响应
         """
+        self._require_configured()
         url = f"{self.base_url}{endpoint}"
+        payload = dict(data or {})
+        request_id = str(payload.pop('request_id', '') or '').strip()
         
         # 构建请求头
         headers = {
             'Content-Type': 'application/json',
             'X-API-Key': self.api_key,
         }
+        if request_id:
+            headers['Idempotency-Key'] = request_id[:128]
         
         # 添加签名（如果需要）
         if self.api_secret:
             timestamp = str(int(datetime.utcnow().timestamp()))
-            sign_string = f"{endpoint}{timestamp}{json.dumps(data, sort_keys=True)}{self.api_secret}"
+            sign_string = f"{endpoint}{timestamp}{json.dumps(payload, sort_keys=True)}{self.api_secret}"
             signature = hashlib.sha256(sign_string.encode()).hexdigest()
             headers['X-Timestamp'] = timestamp
             headers['X-Signature'] = signature
         
         # 发送请求
-        response = requests.post(url, json=data, headers=headers, timeout=10)
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
         response.raise_for_status()
         
         return response.json()
@@ -356,11 +421,14 @@ _econtract_service: Optional[EContractService] = None
 def get_econtract_service() -> EContractService:
     """获取电子合同服务实例"""
     global _econtract_service
-    if _econtract_service is None:
-        # 从配置读取（这里使用默认值）
-        _econtract_service = EContractService(
-            provider='mock',  # 默认使用模拟服务
-            api_key='',
-            api_secret='',
-        )
+    from flask import current_app
+    provider = str(current_app.config.get('ECONTRACT_PROVIDER') or os.getenv('ECONTRACT_PROVIDER') or 'disabled').strip().lower()
+    api_key = str(current_app.config.get('ECONTRACT_API_KEY') or os.getenv('ECONTRACT_API_KEY') or '')
+    api_secret = str(current_app.config.get('ECONTRACT_API_SECRET') or os.getenv('ECONTRACT_API_SECRET') or '')
+    base_url = str(current_app.config.get('ECONTRACT_BASE_URL') or os.getenv('ECONTRACT_BASE_URL') or '')
+    allow_mock = bool(current_app.testing and current_app.config.get('ENABLE_MOCK_API'))
+    signature = (provider, api_key, api_secret, base_url, allow_mock)
+    if _econtract_service is None or getattr(_econtract_service, '_config_signature', None) != signature:
+        _econtract_service = EContractService(provider=provider, api_key=api_key, api_secret=api_secret, base_url=base_url, allow_mock=allow_mock)
+        _econtract_service._config_signature = signature
     return _econtract_service

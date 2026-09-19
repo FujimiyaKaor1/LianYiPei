@@ -1,26 +1,24 @@
 """
 广东企业 CSV 导入 MySQL `enterprises` 表（与 app.models.Enterprise 一致）。
 
-读取 data/real_enterprises_test.csv（UTF-8 BOM），制造业关键词过滤，Faker 补全联系人与资本等字段，
-按城市补全经纬度，bulk_insert_mappings 每 1000 条提交。
+读取公开 CSV，制造业关键词过滤，只导入来源中实际存在的字段。
+企业默认是“未认领、不可触达”的候选目录，不生成联系人、电话、地址、资本或信用分。
 
 用法（项目根目录）：
-    python scripts/import_guangdong_data.py
+    python scripts/seed/import_guangdong_data.py
 """
 from __future__ import annotations
 
 import argparse
 import logging
-import random
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
 from os import environ
 
 import pandas as pd
-from faker import Faker
 from sqlalchemy import text
-from werkzeug.security import generate_password_hash
 
 _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
@@ -31,13 +29,12 @@ from dotenv import load_dotenv
 load_dotenv(_ROOT / ".env")
 
 from app import create_app, db
-from app.models import Enterprise
+from app.models import Enterprise, Product
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 DEFAULT_CSV = _ROOT / "data" / "real_enterprises_test.csv"
-DEFAULT_PASSWORD = "admin"
 BATCH_SIZE = 1000
 
 # 与 CSV 列对应：支持英文列名与广东公开数据常见中文表头
@@ -45,6 +42,8 @@ _COL_NAME = ("enterprise_name", "企业名称", "公司名称")
 _COL_PROVINCE = ("province", "所在省份", "省份")
 _COL_CITY = ("city", "地区", "城市", "地市")
 _COL_INDUSTRY = ("industry", "经营范围", "业务范围")
+_COL_SOURCE_URL = ("source_url", "source", "来源链接", "来源网址", "数据来源")
+_COL_PRODUCTS = ("product", "products", "产品", "主营产品", "产品能力", "制造能力", "product_name")
 
 # 制造业关键词：企业名称或经营范围任含其一即导入
 MFG_KEYWORDS = ("制造", "工业", "装备", "机械", "电子", "精密")
@@ -131,11 +130,12 @@ def _truncate(s: str, max_len: int) -> str:
     return s[:max_len]
 
 
-def import_guangdong_data(csv_path: Path, default_password: str) -> tuple[int, int, int]:
+def import_guangdong_data(csv_path: Path, replace_all: bool = False) -> tuple[int, int, int]:
     """
     返回 (成功插入条数, 跳过非制造条数, 跳过无效/重复条数)。
     """
-    _clear_enterprises_fresh_start()
+    if replace_all:
+        _clear_enterprises_fresh_start()
 
     df = pd.read_csv(csv_path, encoding="utf-8-sig", on_bad_lines="skip")
     df.columns = [str(c).strip() for c in df.columns]
@@ -145,6 +145,8 @@ def import_guangdong_data(csv_path: Path, default_password: str) -> tuple[int, i
     col_province = _pick_column(cols, _COL_PROVINCE)
     col_city = _pick_column(cols, _COL_CITY)
     col_industry = _pick_column(cols, _COL_INDUSTRY)
+    col_source_url = _pick_column(cols, _COL_SOURCE_URL)
+    col_products = _pick_column(cols, _COL_PRODUCTS)
 
     if not col_name:
         raise ValueError(f"未找到企业名称列，当前表头: {cols}")
@@ -157,25 +159,34 @@ def import_guangdong_data(csv_path: Path, default_password: str) -> tuple[int, i
         col_industry,
     )
 
-    fake = Faker("zh_CN")
-    rng = random.Random()
-    pw_hash = generate_password_hash(default_password)
-
     inserted = 0
     skipped_non_mfg = 0
     skipped_bad = 0
-    seen_names: set[str] = set()
+    seen_names: set[str] = {name for (name,) in db.session.query(Enterprise.name).all() if name}
     batch: list[dict] = []
+    batch_product_specs: list[tuple[str, list[str]]] = []
 
     def flush() -> None:
-        nonlocal inserted, batch
+        nonlocal inserted, batch, batch_product_specs
         if not batch:
             return
         db.session.bulk_insert_mappings(Enterprise, batch)
         db.session.commit()
+        for enterprise_name, product_names in batch_product_specs:
+            enterprise = Enterprise.query.filter_by(name=enterprise_name).first()
+            if not enterprise:
+                continue
+            existing = {str(item.name).strip().lower() for item in Product.query.filter_by(enterprise_id=enterprise.id).all() if item.name}
+            for product_name in product_names:
+                if product_name.lower() in existing:
+                    continue
+                db.session.add(Product(enterprise_id=enterprise.id, name=product_name))
+                existing.add(product_name.lower())
+        db.session.commit()
         inserted += len(batch)
         logger.info("已批量提交 %s 条，累计 %s", len(batch), inserted)
         batch.clear()
+        batch_product_specs.clear()
 
     for _, row in df.iterrows():
         r = row.to_dict()
@@ -192,6 +203,12 @@ def import_guangdong_data(csv_path: Path, default_password: str) -> tuple[int, i
         province = _cell(r, col_province) or None
         city_val = _cell(r, col_city) or None
         industry = _cell(r, col_industry)
+        source_url = _cell(r, col_source_url) or None
+        product_names = [
+            _truncate(value, 200)
+            for value in re.split(r"[,，、;/；|]+", _cell(r, col_products))
+            if value.strip()
+        ][:20]
 
         if not _is_manufacturing(name, industry):
             skipped_non_mfg += 1
@@ -201,10 +218,27 @@ def import_guangdong_data(csv_path: Path, default_password: str) -> tuple[int, i
 
         lng, lat = _lng_lat_for_city(city_val or "")
 
-        street = fake.street_address()
-        base = (city_val or "") + street
-        address = _truncate(base, 200)
-
+        collected_at = datetime.utcnow()
+        evidence_base = {
+            "source_type": "public_directory",
+            "source": csv_path.name,
+            "source_url": source_url,
+            "collected_at": collected_at.isoformat(),
+            "updated_at": collected_at.isoformat(),
+            "is_mock": False,
+            "confidence": 0.6,
+            "authorization": "public_directory_only",
+        }
+        data_evidence = {
+            field: {**evidence_base, "value_present": bool(value)}
+            for field, value in {
+                "name": name,
+                "province": province,
+                "city": city_val,
+                "business_scope": industry,
+                "products": product_names,
+            }.items()
+        }
         mapping = {
             "name": name,
             "province": _truncate(province, 20) if province else None,
@@ -212,19 +246,37 @@ def import_guangdong_data(csv_path: Path, default_password: str) -> tuple[int, i
             "business_scope": industry if industry else None,
             "longitude": lng,
             "latitude": lat,
-            "address": address if address else None,
-            "contact": _truncate(fake.name(), 50),
-            "phone": _truncate(fake.phone_number(), 20),
-            "registered_capital": round(rng.uniform(500, 8000), 2),
-            "credit_score": round(rng.uniform(80, 95), 2),
-            "password_hash": pw_hash,
+            "address": None,
+            "contact": None,
+            "phone": None,
+            "registered_capital": None,
+            # Enterprise.credit_score has a legacy ORM default of 70. Use a
+            # neutral zero sentinel and explicitly mark it unverified so the
+            # matcher never treats a generated default as a sourced fact.
+            "credit_score": 0,
+            "password_hash": None,
             "role": "enterprise",
             "is_admin": False,
-            "capacity": 50,
+            "capacity": 0,
             "current_orders": 0,
-            "created_at": datetime.utcnow(),
+            "verification_status": "pending",
+            "is_verified": False,
+            "last_data_update": collected_at,
+            "extras": {
+                "trust_profile": {
+                    "claim_status": "unclaimed",
+                    "contact_authorized": False,
+                    "sources": [{**evidence_base, "name": csv_path.name}],
+                },
+                "directory_record": True,
+                "data_evidence": data_evidence,
+                "unverified_fields": ["address", "contact", "phone", "registered_capital", "credit_score", "capacity"],
+            },
+            "created_at": collected_at,
         }
         batch.append(mapping)
+        if product_names:
+            batch_product_specs.append((name, product_names))
 
         if len(batch) >= BATCH_SIZE:
             flush()
@@ -242,7 +294,7 @@ def main() -> int:
         default=DEFAULT_CSV,
         help=f"CSV 路径（默认 {DEFAULT_CSV}）",
     )
-    parser.add_argument("-p", "--password", default=DEFAULT_PASSWORD, help="默认登录密码哈希用")
+    parser.add_argument("--replace-all", action="store_true", help="危险：清空企业及关联业务表后重建；默认只做增量导入")
     args = parser.parse_args()
 
     if not args.input.is_file():
@@ -255,7 +307,7 @@ def main() -> int:
     app = create_app()
     with app.app_context():
         try:
-            n, skip_mfg, skip_bad = import_guangdong_data(args.input, args.password)
+            n, skip_mfg, skip_bad = import_guangdong_data(args.input, replace_all=args.replace_all)
         except Exception:
             db.session.rollback()
             logger.exception("导入失败")

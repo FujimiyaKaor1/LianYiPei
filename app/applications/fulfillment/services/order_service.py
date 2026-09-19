@@ -51,6 +51,7 @@ def _next_order_id(orders: List[Dict[str, Any]]) -> int:
 
 
 class OrderService:
+    _VALID_STATUSES = {"pending", "in_progress", "completed", "cancelled", "failed"}
     @staticmethod
     def generate_order_no() -> str:
         date_str = datetime.now().strftime("%Y%m%d")
@@ -67,6 +68,9 @@ class OrderService:
         order_date: date,
         delivery_date: Optional[date] = None,
         notes: str = "",
+        metadata: Optional[Dict[str, Any]] = None,
+        *,
+        commit: bool = True,
     ) -> _OrderView:
         ent = Enterprise.query.get_or_404(enterprise_id)
         orders = _saas_orders(ent)
@@ -83,13 +87,15 @@ class OrderService:
             "actual_delivery_date": None,
             "status": "pending",
             "notes": notes,
+            "metadata": dict(metadata or {}),
             "created_at": datetime.utcnow().isoformat(),
         }
         orders.append(row)
         _save_saas_orders(ent, orders)
         ent.current_orders = (ent.current_orders or 0) + 1
         ent.last_order_update = datetime.utcnow()
-        db.session.commit()
+        if commit:
+            db.session.commit()
         return _OrderView(enterprise_id, row)
 
     @staticmethod
@@ -127,6 +133,19 @@ class OrderService:
 
             abort(404)
         old_status = target.get("status")
+        if status not in OrderService._VALID_STATUSES:
+            from flask import abort
+            abort(400, description="无效的订单状态")
+        metadata = dict(target.get("metadata") or {})
+        if status in {"in_progress", "completed"}:
+            missing = []
+            if metadata.get("requires_contract_confirmation") and not metadata.get("contract_confirmed_at"):
+                missing.append("合同")
+            if metadata.get("requires_payment_confirmation") and not metadata.get("payment_confirmed_at"):
+                missing.append("付款")
+            if missing:
+                from flask import abort
+                abort(409, description=f"订单仍需确认：{'、'.join(missing)}")
         target["status"] = status
         if status == "completed" and actual_delivery_date:
             target["actual_delivery_date"] = actual_delivery_date.isoformat()
@@ -137,6 +156,111 @@ class OrderService:
             ent.last_order_update = datetime.utcnow()
         db.session.commit()
         return _OrderView(ent.id, target)
+
+    @staticmethod
+    def record_external_event(
+        order_id: int,
+        enterprise_id: int,
+        event_type: str,
+        event_data: Dict[str, Any],
+        *,
+        metadata_updates: Optional[Dict[str, Any]] = None,
+        desired_status: Optional[str] = None,
+    ) -> tuple[_OrderView, bool, Optional[str]]:
+        """Persist a whitelisted external lifecycle event atomically.
+
+        ``desired_status`` is best-effort: contract/payment confirmations stay
+        independent and therefore can block a shipment/completion transition.
+        The event and its reason are still recorded so an operator can recover
+        without losing the provider callback.
+        """
+        ent, row = OrderService._find_order(order_id, enterprise_id=enterprise_id)
+        metadata = dict(row.get("metadata") or {})
+        external_events = dict(metadata.get("external_events") or {})
+        key = str(event_type or "").strip()[:60]
+        if not key:
+            from flask import abort
+
+            abort(400, description="外部事件类型不能为空")
+        event_id = str((event_data or {}).get("event_id") or "").strip()[:160]
+        if event_id and event_id in external_events:
+            return _OrderView(ent.id, row), True, None
+
+        safe_data = dict(event_data or {})
+        # Keep every provider event by its immutable event ID.  A separate
+        # latest-by-type view makes the current state easy to render without
+        # collapsing two legitimate corrections into one idempotency key.
+        external_events[event_id or f"{key}:{datetime.utcnow().isoformat()}"] = safe_data
+        if len(external_events) > 100:
+            external_events = dict(list(external_events.items())[-100:])
+        metadata["external_events"] = external_events
+        latest_events = dict(metadata.get("external_event_latest") or {})
+        latest_events[key] = safe_data
+        metadata["external_event_latest"] = latest_events
+        if metadata_updates:
+            metadata.update(dict(metadata_updates))
+
+        blocked_reason = None
+        old_status = str(row.get("status") or "pending")
+        if desired_status and desired_status != old_status:
+            if desired_status not in OrderService._VALID_STATUSES:
+                from flask import abort
+
+                abort(400, description="无效的外部订单状态")
+            rank = {"pending": 0, "in_progress": 1, "completed": 2, "cancelled": 3, "failed": 3}
+            if rank.get(desired_status, 0) > rank.get(old_status, 0):
+                if desired_status in {"in_progress", "completed"}:
+                    missing = []
+                    if metadata.get("requires_contract_confirmation") and not metadata.get("contract_confirmed_at"):
+                        missing.append("合同")
+                    if metadata.get("requires_payment_confirmation") and not metadata.get("payment_confirmed_at"):
+                        missing.append("付款")
+                    if missing:
+                        blocked_reason = f"订单仍需确认：{'、'.join(missing)}"
+                    else:
+                        row["status"] = desired_status
+                else:
+                    row["status"] = desired_status
+        if blocked_reason:
+            metadata["last_external_transition_blocked"] = blocked_reason
+        row["metadata"] = metadata
+        if row.get("status") in {"completed", "cancelled"} and old_status not in {"completed", "cancelled"}:
+            if ent.current_orders and ent.current_orders > 0:
+                ent.current_orders -= 1
+            ent.last_order_update = datetime.utcnow()
+        _save_saas_orders(ent, _saas_orders(ent))
+        db.session.commit()
+        return _OrderView(ent.id, row), False, blocked_reason
+
+    @staticmethod
+    def confirm_order_requirement(
+        order_id: int,
+        requirement: str,
+        enterprise_id: int,
+        confirmed: bool,
+    ) -> tuple[_OrderView, bool]:
+        if requirement not in {"contract", "payment"}:
+            from flask import abort
+            abort(400, description="不支持的订单确认类型")
+        if not confirmed:
+            from flask import abort
+            abort(400, description="必须明确确认后才能继续")
+        ent, row = OrderService._find_order(order_id, enterprise_id=enterprise_id)
+        metadata = dict(row.get("metadata") or {})
+        key = f"{requirement}_confirmed_at"
+        if metadata.get(key):
+            return _OrderView(ent.id, row), True
+        required_key = f"requires_{requirement}_confirmation"
+        if not metadata.get(required_key):
+            from flask import abort
+            abort(409, description=f"该订单不需要{requirement}确认")
+        metadata[key] = datetime.utcnow().isoformat() + "Z"
+        metadata[f"{requirement}_confirmed_by"] = int(enterprise_id)
+        row["metadata"] = metadata
+        orders = _saas_orders(ent)
+        _save_saas_orders(ent, orders)
+        db.session.commit()
+        return _OrderView(ent.id, row), False
 
     @staticmethod
     def get_orders(

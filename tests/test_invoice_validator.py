@@ -91,6 +91,27 @@ class TestValidateInvoice:
                 assert 'error' in result
                 assert 'API' in result['error']
 
+    def test_missing_tax_api_config_fails_closed_without_fake_facts(self, app, monkeypatch):
+        """生产配置缺失时不得用模拟企业信息伪装验票成功。"""
+        with app.app_context():
+            monkeypatch.setitem(app.config, 'TAX_API_URL', '')
+            monkeypatch.setitem(app.config, 'TAX_API_KEY', '')
+            monkeypatch.setitem(app.config, 'ALLOW_MOCK_TAX_API', False)
+
+            result = validate_invoice({
+                'invoice_no': '12345678',
+                'invoice_code': '1234567890',
+                'invoice_date': '2024-01-15',
+                'invoice_amount': 10000.00,
+            })
+
+            assert result['valid'] is False
+            assert result['manual_review_required'] is True
+            assert '未配置' in result['error']
+            assert '人工审核' in result['error']
+            assert 'buyer' not in result
+            assert 'seller' not in result
+
 
 class TestCallTaxAPI:
     """测试 call_tax_api 函数"""

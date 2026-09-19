@@ -147,6 +147,12 @@ VALUES ('某产品', 0.75, '日本,德国', '8486', '海关总署');
 
 可参考 `scripts/seed/seed_all_data.py` 中的 `ENTERPRISES` 结构，按需扩展后重新运行种子脚本（或在清空后使用 `scripts/seed/fresh_init.py`）。
 
+### 4. 广东公开企业目录（采购 Agent 候选库）
+
+生产导入使用 `python scripts/seed/import_guangdong_data.py --input <公开CSV>`。脚本只写入 CSV 中实际存在的企业名称、省份、城市、经营范围和可选来源链接；联系人、电话、地址、注册资本、信用与产能保持未核验，不会生成 Faker 值。CSV 若包含 `主营产品`、`产品能力` 或 `product_name` 列，脚本才会把明确列出的产品写入 `products`，不会从经营范围臆造产品能力。
+
+每条目录记录都会保存 `source / source_url / collected_at / updated_at / is_mock / confidence / authorization` 和字段级 `data_evidence`。企业默认 `claim_status=unclaimed`、`contact_authorized=false`，企业认领并授权前只能作为公开候选展示，不能进入外发询价。
+
 ---
 
 ## 六、常见问题

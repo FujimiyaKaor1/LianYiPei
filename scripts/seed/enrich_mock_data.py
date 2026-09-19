@@ -359,6 +359,11 @@ def main() -> None:
 
     try:
         app = create_app()
+        if str(app.config.get("APP_ENV") or os.getenv("APP_ENV") or "development").lower() == "production":
+            raise RuntimeError(
+                "Faker 模拟数据脚本仅用于本地演示，生产环境禁止写入企业、联系人或产能字段；"
+                "请使用带来源和授权信息的真实企业导入流程"
+            )
         with app.app_context():
             enrich_enterprises(fake, args.verbose)
             seed_products(fake, args.force, args.verbose)

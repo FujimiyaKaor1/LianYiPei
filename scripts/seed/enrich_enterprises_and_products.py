@@ -396,6 +396,11 @@ def main() -> None:
 
     try:
         app = create_app()
+        if str(app.config.get("APP_ENV") or os.getenv("APP_ENV") or "development").lower() == "production":
+            raise RuntimeError(
+                "Faker 补数脚本仅用于本地演示，生产环境禁止写入企业、联系人或产能字段；"
+                "请使用 scripts/seed/import_guangdong_data.py 导入带来源的真实数据"
+            )
         with app.app_context():
             enrich_enterprises(fake, args.verbose)
             seed_products(fake, args.force, args.verbose)

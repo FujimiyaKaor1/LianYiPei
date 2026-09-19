@@ -6,13 +6,18 @@ Flask-Migrate>=4.0.0
 SQLAlchemy>=2.0.36
 pymysql==1.1.1
 cryptography==50.0.0
+boto3>=1.35,<2
 neo4j==5.14.0
 APScheduler==3.10.4
+# Production cache/coordination probe and optional recommender persistence.
+redis>=5.0,<7
 # 地理编码 / 球面距离（高德地图 Web 服务配合 requests 使用）
 geopy==2.4.1
 python-dotenv==1.2.2
 pandas>=2.0
 openpyxl>=3.1.0
+pypdf>=5.0.0
+Pillow>=10.0,<13
 pyecharts==2.0.4
 werkzeug==3.1.6
 email-validator==2.0.0

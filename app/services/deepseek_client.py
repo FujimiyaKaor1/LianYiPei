@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from typing import Any, Iterator
 
 import requests
@@ -12,6 +13,7 @@ from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResu
 
 DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 DEFAULT_DEEPSEEK_MODEL = "deepseek-chat"
+_RETRYABLE_STATUS_CODES = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
 
 
 def _role(message: BaseMessage) -> str:
@@ -52,6 +54,11 @@ class DeepSeekChatModel(BaseChatModel):
     timeout: float = 120.0
     max_completion_tokens: int = 2048
     top_p: float | None = None
+    # Chat completions are safe to retry because the request has no external
+    # side effect.  Keep this bounded so a provider outage fails closed in a
+    # predictable amount of time instead of multiplying API latency/cost.
+    max_retries: int = 2
+    retry_backoff_seconds: float = 0.5
 
     @property
     def _llm_type(self) -> str:
@@ -78,14 +85,52 @@ class DeepSeekChatModel(BaseChatModel):
     def _url(self) -> str:
         return f"{self.base_url.rstrip('/')}/chat/completions"
 
+    def _post_with_retry(self, messages: list[BaseMessage], stop: list[str] | None, stream: bool):
+        """POST with bounded retries for transient transport/provider errors."""
+        attempts = max(0, min(int(self.max_retries), 5)) + 1
+        backoff = max(0.0, min(float(self.retry_backoff_seconds), 10.0))
+        payload = self._payload(messages, stop, stream)
+        last_error: Exception | None = None
+        for attempt in range(attempts):
+            try:
+                response = requests.post(
+                    self._url(),
+                    headers=self._headers(),
+                    json=payload,
+                    timeout=self.timeout,
+                    **({"stream": True} if stream else {}),
+                )
+                status_code = getattr(response, "status_code", None)
+                if status_code in _RETRYABLE_STATUS_CODES and attempt < attempts - 1:
+                    try:
+                        response.close()
+                    except Exception:
+                        pass
+                    time.sleep(backoff * (2 ** attempt))
+                    continue
+                response.raise_for_status()
+                return response
+            except (requests.Timeout, requests.ConnectionError) as exc:
+                last_error = exc
+                if attempt >= attempts - 1:
+                    raise
+                time.sleep(backoff * (2 ** attempt))
+            except requests.HTTPError as exc:
+                last_error = exc
+                status_code = getattr(getattr(exc, "response", None), "status_code", None)
+                if status_code not in _RETRYABLE_STATUS_CODES or attempt >= attempts - 1:
+                    raise
+                time.sleep(backoff * (2 ** attempt))
+        if last_error is not None:  # defensive; loop either returns or raises
+            raise last_error
+        raise RuntimeError("DeepSeek request failed without a response")
+
     def _generate(self, messages: list[BaseMessage], stop: list[str] | None = None, run_manager=None, **kwargs: Any) -> ChatResult:
-        response = requests.post(self._url(), headers=self._headers(), json=self._payload(messages, stop, False), timeout=self.timeout)
-        response.raise_for_status()
+        response = self._post_with_retry(messages, stop, False)
         return ChatResult(generations=[ChatGeneration(message=AIMessage(content=_choice_content(response.json())))], llm_output={"model": self.model})
 
     def _stream(self, messages: list[BaseMessage], stop: list[str] | None = None, run_manager=None, **kwargs: Any) -> Iterator[ChatGenerationChunk]:
-        response = requests.post(self._url(), headers=self._headers(), json=self._payload(messages, stop, True), timeout=self.timeout, stream=True)
-        response.raise_for_status()
+        response = self._post_with_retry(messages, stop, True)
         response.encoding = "utf-8"
         try:
             for raw in response.iter_lines(decode_unicode=True):
@@ -119,4 +164,6 @@ def create_deepseek_chat_model_from_env() -> DeepSeekChatModel:
         temperature=float(os.getenv("LLM_TEMPERATURE", "0.3")),
         timeout=float(os.getenv("LLM_TIMEOUT_SECONDS", "120")),
         max_completion_tokens=int(os.getenv("LLM_MAX_TOKENS", "2048")),
+        max_retries=int(os.getenv("DEEPSEEK_MAX_RETRIES", "2")),
+        retry_backoff_seconds=float(os.getenv("DEEPSEEK_RETRY_BACKOFF_SECONDS", "0.5")),
     )

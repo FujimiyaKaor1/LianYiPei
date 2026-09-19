@@ -83,7 +83,18 @@ export function ChainXiaoYiPanel() {
       const response = await api.sendChainXiaoYiMessage(currentSession.id, content);
       setModelStatus(response.model_status);
       setLastIntent(response.intent);
-      setMessages(current => [...current, { id: `a-${Date.now()}`, role: 'assistant', content: response.reply, intent: response.intent }]);
+      const workflowSuffix = response.workflow?.action === 'order_draft'
+        ? `\n已生成 ${response.workflow.orders?.length || 0} 个订单草稿，正式订单仍需确认。`
+        : response.workflow?.action === 'quote_query'
+          ? `\n已完成报价筛选，结果来自已回收供应商报价。`
+          : response.workflow?.action === 'task_cancelled'
+            ? '\n当前询价已暂停，不会继续对外发送；你可以说“恢复当前询价”。'
+            : response.workflow?.action === 'task_resumed'
+              ? '\n当前询价已恢复，发送前仍需确认触达范围。'
+              : response.workflow?.action === 'task_retry'
+                ? `\n已重试询价发送：成功 ${response.workflow.sent || 0} 条，失败 ${response.workflow.failed || 0} 条。`
+          : '';
+      setMessages(current => [...current, { id: `a-${Date.now()}`, role: 'assistant', content: `${response.reply}${workflowSuffix}`, intent: response.intent }]);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '链小易暂时无法响应，请稍后重试');
     } finally { setBusy(false); }
@@ -110,8 +121,14 @@ export function ChainXiaoYiPanel() {
       const response = await api.previewChainXiaoYiFile(currentSession.id, file);
       const preview = response.file.preview;
       const sheetCount = Array.isArray(preview.sheets) ? preview.sheets.length : 0;
-      setMessages(current => [...current, { id: `f-${Date.now()}`, role: 'assistant', content: `文件已安全接收：${response.file.filename}。识别为${response.file.detected_kind === 'table' ? '表格' : '文档'}，${sheetCount ? `发现 ${sheetCount} 个工作表` : '等待人工确认导入类型'}。当前只生成预览，不会自动写入业务数据。` }]);
-      setNotice(response.file.errors.length ? response.file.errors.join('；') : '预览已生成，请确认字段后再导入');
+      const draft = response.draft;
+      if (draft) {
+        const nextIntent: Record<string, unknown> = { raw_text: file.name };
+        Object.entries(draft.fields).forEach(([key, field]) => { nextIntent[key] = field.value; });
+        setLastIntent(nextIntent);
+      }
+      setMessages(current => [...current, { id: `f-${Date.now()}`, role: 'assistant', content: `文件已安全接收：${response.file.filename}。识别为${response.file.detected_kind === 'table' ? '表格' : '文档'}，${sheetCount ? `发现 ${sheetCount} 个工作表` : '已提取正文'}。已生成带证据的采购草稿，${draft?.missing_required?.length ? `还需补充：${draft.clarifying_questions.join('、')}` : '可以直接进入找厂流程'}。` }]);
+      setNotice(response.file.errors.length ? response.file.errors.join('；') : '材料已解析，字段可在采购任务中复核');
     } catch (error) { setNotice(error instanceof Error ? error.message : '文件处理失败'); }
     finally { setBusy(false); }
   };
@@ -175,7 +192,7 @@ export function ChainXiaoYiPanel() {
       <div className="flex cursor-move items-center gap-3 bg-public-brand px-4 py-3 text-white" title="拖动链小易窗口"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15"><Bot className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="text-sm font-black">链小易</p><p className="text-[10px] text-white/75">统一处理找厂、询价和业务协同 · 可拖动窗口</p></div><button data-no-drag type="button" onClick={() => setOpen(false)} aria-label="收起链小易" className="cursor-pointer rounded-lg p-1.5 hover:bg-white/15"><Minus className="h-4 w-4" /></button><button data-no-drag type="button" onClick={() => setOpen(false)} aria-label="关闭链小易" className="cursor-pointer rounded-lg p-1.5 hover:bg-white/15"><X className="h-4 w-4" /></button></div>
       <div className="border-b border-public-border bg-public-bg px-4 py-2 text-[11px] text-public-muted">{modelStatus?.message || '正在检查智能模型状态…'}</div>
       <div data-scrollable className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-public-bg/60 p-4">{messages.map(message => <div key={message.id} className={message.role === 'user' ? 'ml-8 rounded-xl bg-public-brand px-3 py-2.5 text-sm leading-6 text-white' : 'mr-5 rounded-xl border border-public-border bg-white px-3 py-2.5 text-sm leading-6 text-public-text'}>{message.content}</div>)}{notice && <div className="rounded-lg border border-public-border bg-white px-3 py-2 text-xs text-public-muted">{notice}</div>}{lastIntent && <div className="rounded-xl border border-public-brand/20 bg-white p-3"><p className="text-xs font-black text-public-text">我理解的需求</p><div className="mt-2 flex flex-wrap gap-1.5">{['product', 'region', 'quantity', 'delivery_days'].filter(key => lastIntent[key] !== undefined).map(key => <span key={key} className="rounded bg-public-brand-soft px-2 py-1 text-[11px] font-semibold text-public-brand">{key}：{String(lastIntent[key])}</span>)}</div><button data-no-drag type="button" disabled={busy} onClick={() => void createDraft()} className="mt-3 inline-flex items-center gap-1 rounded-lg bg-public-brand px-3 py-2 text-xs font-bold text-white disabled:opacity-50">创建需求草稿并找厂 <ChevronDown className="h-3.5 w-3.5" /></button></div>}</div>
-      <form onSubmit={send} className="border-t border-public-border bg-white p-3"><div className="flex items-end gap-2"><button type="button" aria-label="上传文件" onClick={() => fileInputRef.current?.click()} className="rounded-lg border border-public-border p-2.5 text-public-muted hover:text-public-brand"><FileUp className="h-4 w-4" /></button><input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls,.pdf,.doc,.docx" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void upload(file); event.currentTarget.value = ''; }} /><textarea value={input} onChange={event => setInput(event.target.value)} rows={2} placeholder="告诉链小易你的需求…" className="min-h-[44px] flex-1 resize-none rounded-lg border border-public-border px-3 py-2 text-sm outline-none focus:border-public-brand" /><button type="submit" disabled={busy || !input.trim()} aria-label="发送" className="rounded-lg bg-public-brand p-2.5 text-white disabled:opacity-40"><Send className="h-4 w-4" /></button></div></form>
+      <form onSubmit={send} className="border-t border-public-border bg-white p-3"><div className="flex items-end gap-2"><button type="button" aria-label="上传文件" onClick={() => fileInputRef.current?.click()} className="rounded-lg border border-public-border p-2.5 text-public-muted hover:text-public-brand"><FileUp className="h-4 w-4" /></button><input ref={fileInputRef} type="file" accept=".csv,.xlsx,.pdf,.docx" className="hidden" onChange={event => { const file = event.target.files?.[0]; if (file) void upload(file); event.currentTarget.value = ''; }} /><textarea value={input} onChange={event => setInput(event.target.value)} rows={2} placeholder="告诉链小易你的需求…" className="min-h-[44px] flex-1 resize-none rounded-lg border border-public-border px-3 py-2 text-sm outline-none focus:border-public-brand" /><button type="submit" disabled={busy || !input.trim()} aria-label="发送" className="rounded-lg bg-public-brand p-2.5 text-white disabled:opacity-40"><Send className="h-4 w-4" /></button></div></form>
     </div>}
   </>;
 }

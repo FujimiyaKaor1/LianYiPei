@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { X } from 'lucide-react';
+import { FileUp, X } from 'lucide-react';
 import { useAuth } from '@/src/context/AuthContext';
 import { canRoleAccessPath, loginHomePathForRole } from '@/src/lib/rbac';
 import { cn } from '@/src/lib/utils';
@@ -33,6 +33,11 @@ export function LoginModal() {
   const [regLatitude, setRegLatitude] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regPassword2, setRegPassword2] = useState('');
+  const [regCreditCode, setRegCreditCode] = useState('');
+  const [regLegalRepresentative, setRegLegalRepresentative] = useState('');
+  const [materialStatus, setMaterialStatus] = useState('');
+  const [registrationMaterialFile, setRegistrationMaterialFile] = useState<File | null>(null);
+  const [registrationMaterialReady, setRegistrationMaterialReady] = useState(false);
   const [registerSuccess, setRegisterSuccess] = useState<string | null>(null);
 
   const handleClose = () => {
@@ -53,8 +58,65 @@ export function LoginModal() {
     setRegLatitude('');
     setRegPassword('');
     setRegPassword2('');
+    setRegCreditCode('');
+    setRegLegalRepresentative('');
+    setMaterialStatus('');
+    setRegistrationMaterialFile(null);
+    setRegistrationMaterialReady(false);
     setRegisterSuccess(null);
     setError(null);
+  };
+
+  const handleRegistrationMaterial = async (file: File) => {
+    setSubmitting(true); setError(null); setMaterialStatus('正在识别营业执照…');
+    try {
+      const body = new FormData(); body.set('file', file);
+      const response = await fetch('/auth/register/preview-material', { method: 'POST', body });
+      const payload = await response.json().catch(() => null) as { ok?: boolean; error?: string; draft?: { fields?: Record<string, { value?: unknown }>; clarifying_questions?: string[] } } | null;
+      if (!response.ok || !payload?.ok || !payload.draft) throw new Error(payload?.error || '营业执照识别失败');
+      const fields = payload.draft.fields || {};
+      const value = (key: string) => fields[key]?.value;
+      if (typeof value('name') === 'string') setRegName(String(value('name')));
+      if (typeof value('address') === 'string') {
+        const address = String(value('address')); setRegAddress(address);
+        const region = address.match(/^(.+?省)?(.+?市)/); if (region) { setRegProvince((region[1] || '').replace(/省$/, '')); setRegCity((region[2] || '').replace(/市$/, '')); }
+      }
+      if (typeof value('business_scope') === 'string') setRegBusinessScope(String(value('business_scope')));
+      if (typeof value('registered_capital') === 'number') setRegRegisteredCapital(String(value('registered_capital')));
+      if (typeof value('unified_social_credit_code') === 'string') setRegCreditCode(String(value('unified_social_credit_code')));
+      if (typeof value('legal_representative') === 'string') setRegLegalRepresentative(String(value('legal_representative')));
+      const ready = !payload.draft.clarifying_questions?.length;
+      setRegistrationMaterialFile(file);
+      setRegistrationMaterialReady(ready);
+      setMaterialStatus(ready ? '已从营业执照自动填报，请核对后点击“确认材料并提交申请”。' : `已自动填报；还需确认：${payload.draft.clarifying_questions?.join('、')}`);
+    } catch (err) { setError(err instanceof Error ? err.message : '营业执照识别失败'); setMaterialStatus(''); }
+    finally { setSubmitting(false); }
+  };
+
+  const handleSubmitMaterialRegistration = async () => {
+    if (!registrationMaterialFile || !registrationMaterialReady) {
+      setError('请先上传一份字段完整的营业执照材料');
+      return;
+    }
+    if (regPassword.length < 6 || regPassword !== regPassword2) {
+      setError('请设置至少 6 位密码，并确认两次输入一致');
+      return;
+    }
+    setError(null); setRegisterSuccess(null); setSubmitting(true);
+    try {
+      const body = new FormData();
+      body.set('file', registrationMaterialFile);
+      body.set('password', regPassword);
+      body.set('password2', regPassword2);
+      body.set('confirm', 'true');
+      const response = await fetch('/auth/register/submit-material', { method: 'POST', credentials: 'include', body });
+      const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string; message?: string } | null;
+      if (!response.ok || !payload?.ok) throw new Error(payload?.error || '入驻申请提交失败');
+      setRegisterSuccess(payload.message || '入驻申请已提交，等待管理员审核。');
+      setRegistrationMaterialFile(null); setRegistrationMaterialReady(false); setMaterialStatus('');
+      setRegPassword(''); setRegPassword2('');
+    } catch (err) { setError(err instanceof Error ? err.message : '入驻申请提交失败'); }
+    finally { setSubmitting(false); }
   };
 
   const handleSubmitLogin = async (e: React.FormEvent) => {
@@ -128,6 +190,8 @@ export function LoginModal() {
       body.set('latitude', regLatitude.trim());
       body.set('password', regPassword);
       body.set('password2', regPassword2);
+      body.set('unified_social_credit_code', regCreditCode.trim());
+      body.set('legal_representative', regLegalRepresentative.trim());
 
       const response = await fetch('/auth/register', {
         method: 'POST',
@@ -163,6 +227,11 @@ export function LoginModal() {
       setRegLatitude('');
       setRegPassword('');
       setRegPassword2('');
+      setRegCreditCode('');
+      setRegLegalRepresentative('');
+      setMaterialStatus('');
+      setRegistrationMaterialFile(null);
+      setRegistrationMaterialReady(false);
       setError(null);
       setRegisterSuccess(msg);
     } catch {
@@ -279,6 +348,13 @@ export function LoginModal() {
             </div>
           ) : (
             <form onSubmit={(e) => void handleSubmitRegister(e)} className="space-y-3">
+              <label className="block cursor-pointer rounded-xl border border-dashed border-primary/40 bg-primary/5 p-3 text-xs text-neutral-700 hover:border-primary">
+                <span className="flex items-center gap-2 font-bold text-primary"><FileUp className="h-4 w-4" />上传营业执照自动填报</span>
+                <span className="mt-1 block text-[11px] text-neutral-500">支持 PDF、DOCX、PNG、JPG；仅生成草稿，提交前由你核对。</span>
+                <input type="file" accept=".pdf,.docx,.png,.jpg,.jpeg" className="hidden" disabled={submitting} onChange={event => { const file = event.currentTarget.files?.[0]; if (file) void handleRegistrationMaterial(file); event.currentTarget.value = ''; }} />
+              </label>
+              {materialStatus && <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-800">{materialStatus}</p>}
+              {registrationMaterialReady && <button type="button" onClick={() => void handleSubmitMaterialRegistration()} disabled={submitting} className="w-full rounded-xl border border-primary bg-primary/5 px-3 py-2.5 text-sm font-bold text-primary hover:bg-primary/10 disabled:opacity-50">确认材料并提交入驻申请</button>}
               <div>
                 <label className="block text-xs font-medium text-neutral-600 mb-1">
                   企业名称 <span className="text-red-500">*</span>
@@ -293,6 +369,7 @@ export function LoginModal() {
                   autoComplete="organization"
                 />
               </div>
+              {(regCreditCode || regLegalRepresentative) && <div className="grid grid-cols-2 gap-3 rounded-xl bg-neutral-50 p-3"><label><span className="text-[10px] text-neutral-500">统一社会信用代码</span><input value={regCreditCode} onChange={event => setRegCreditCode(event.target.value.toUpperCase())} maxLength={18} className="mt-1 w-full rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs font-bold" /></label><label><span className="text-[10px] text-neutral-500">法定代表人</span><input value={regLegalRepresentative} onChange={event => setRegLegalRepresentative(event.target.value)} className="mt-1 w-full rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs font-bold" /></label></div>}
               <div>
                 <label className="block text-xs font-medium text-neutral-600 mb-1">企业地址</label>
                 <input

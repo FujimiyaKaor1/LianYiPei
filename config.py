@@ -6,8 +6,19 @@ from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-# 必须用 override：否则系统/IDE 里残留的 WECHAT_* 会优先于 .env，易出现「token 是 A 公众号、模板 ID 是 B 测试号」→ 40037
-load_dotenv(os.path.join(basedir, ".env"), override=True)
+
+
+def _load_project_env(path):
+    """Load local defaults without overriding injected deployment secrets.
+
+    Container/Supervisor environments are the production source of truth. A
+    checked-out ``.env`` is still useful for local development, but must only
+    fill values that are absent from the process environment.
+    """
+    load_dotenv(path, override=False)
+
+
+_load_project_env(os.path.join(basedir, ".env"))
 
 # Ollama 原生 API 根地址（无 /v1 后缀），与 app.services.ollama_client 一致
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
@@ -88,6 +99,14 @@ def _env_bool(name: str, default: bool = False) -> bool:
     if raw is None:
         return default
     return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, default: int, minimum: int, maximum: int) -> int:
+    try:
+        value = int(os.environ.get(name) or default)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(value, maximum))
 
 
 # 管理后台创建的密钥（进程内；重启后丢失，生产请写入 COLLAB_API_KEYS）
@@ -187,8 +206,15 @@ EXTERNAL_INTERFACES = build_external_interfaces()
 
 
 class Config:
+    APP_ENV = (os.environ.get("APP_ENV") or os.environ.get("FLASK_ENV") or "development").strip().lower()
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-12345'
+    SECRET_KEY_IS_DEFAULT = not bool(os.environ.get("SECRET_KEY"))
+    # Production schema changes must be applied by the checked-in Alembic
+    # migrations. Implicit ``create_all`` is retained only for local demos and
+    # tests, where it keeps the bundled SQLite fixture convenient.
+    AUTO_CREATE_SCHEMA = _env_bool("AUTO_CREATE_SCHEMA", APP_ENV != "production")
     PUBLIC_DATA_MODE = (os.environ.get('PUBLIC_DATA_MODE') or 'demo').strip().lower()
+    ENABLE_MOCK_API = _env_bool("ENABLE_MOCK_API", False)
 
     # 本地联调：顶层 /api/… 可通过 request_loader 自动登录，生产默认关闭。
     DISABLE_API_AUTH = _env_bool("DISABLE_API_AUTH", False)
@@ -196,11 +222,35 @@ class Config:
 
     # 生产部署时建议仅在一个独立进程启用调度器，避免 Gunicorn 多 worker 重复跑任务。
     # LIANYIPEI_SCHEDULER_ENABLED 是进程级覆盖项，供 Supervisor 将 Web 与调度器拆开运行。
-    # 之所以单独提供覆盖项，是因为本项目会以 override=True 读取根目录 .env，普通
-    # Supervisor environment 中的 SCHEDULER_ENABLED 会被 .env 覆盖。
+    # 之所以单独提供覆盖项，是为了让 Web 与独立调度器可以分别声明进程
+    # 行为；它优先于普通 SCHEDULER_ENABLED，但两者都不会覆盖已注入的环境变量。
     SCHEDULER_ENABLED = _env_bool(
         "LIANYIPEI_SCHEDULER_ENABLED",
         _env_bool("SCHEDULER_ENABLED", True),
+    )
+    CHAIN_XIAOYI_QUEUE_LEASE_SECONDS = _env_int("CHAIN_XIAOYI_QUEUE_LEASE_SECONDS", 900, 60, 86_400)
+    # Supplier quote windows default to three days and can be overridden per
+    # RFQ.  The worker expires unanswered records after this deadline.
+    CHAIN_XIAOYI_RFQ_DEADLINE_HOURS = _env_int("CHAIN_XIAOYI_RFQ_DEADLINE_HOURS", 72, 1, 720)
+    # A one-sentence RFQ preview may include only a bounded number of
+    # authorized candidates; the buyer can still expand the list in the
+    # review workspace before approving the send.
+    CHAIN_XIAOYI_AUTO_RFQ_SUPPLIER_LIMIT = _env_int("CHAIN_XIAOYI_AUTO_RFQ_SUPPLIER_LIMIT", 5, 1, 20)
+    # Public directory facts are shown with an explicit freshness state.  A
+    # stale record remains discoverable for recall, but is never presented as
+    # the latest verified fact.
+    CHAINXIAOYI_DATA_MAX_AGE_DAYS = _env_int("CHAINXIAOYI_DATA_MAX_AGE_DAYS", 180, 1, 3650)
+    # Production must never present deterministic rules as if a configured
+    # model had executed. Operators can explicitly set ``false`` for a
+    # controlled emergency window, but the safe default is fail-closed.
+    _cloud_required_default = APP_ENV == "production"
+    CHAINXIAOYI_CLOUD_REQUIRED = _env_bool("CHAINXIAOYI_CLOUD_REQUIRED", _cloud_required_default)
+    # Production never treats a browser POST without an explicit confirmation
+    # as approval to contact suppliers. Development keeps the legacy empty
+    # body accepted for local smoke scripts; the UI always sends ``confirm``.
+    CHAINXIAOYI_REQUIRE_EXPLICIT_APPROVAL = _env_bool(
+        "CHAINXIAOYI_REQUIRE_EXPLICIT_APPROVAL",
+        APP_ENV == "production",
     )
     SCHEDULER_LOCK_FILE = os.environ.get("SCHEDULER_LOCK_FILE") or "/tmp/lianyipei-scheduler.lock"
 
@@ -210,6 +260,7 @@ class Config:
     # 本地开发可显式启用项目自带 SQLite，避免 MySQL 凭据失效时页面完全无法启动。
     # 生产环境不允许静默回退，必须显式提供 DATABASE_URL。
     _configured_database_url = os.environ.get('DATABASE_URL')
+    DATABASE_URL_CONFIGURED = bool(_configured_database_url)
     SQLALCHEMY_DATABASE_URI = _configured_database_url or (
         f"sqlite:///{os.path.join(basedir, 'instance', 'lianyipei-dev.sqlite')}"
         if _env_bool('LIANYIPEI_DEV_SQLITE_FALLBACK', False)
@@ -225,10 +276,61 @@ class Config:
     
     UPLOAD_FOLDER = os.path.join(basedir, 'uploads')
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024
+    MATERIAL_AV_MODE = (os.environ.get('MATERIAL_AV_MODE') or 'basic').strip().lower()
+    CLAMAV_COMMAND = (os.environ.get('CLAMAV_COMMAND') or 'clamscan').strip()
+    # In containerized production ClamAV normally runs as a separate clamd
+    # service.  When set, material scans use the authenticated-free INSTREAM
+    # protocol over this private network address instead of spawning a local
+    # executable.  Keep the local command fallback for single-host installs.
+    CLAMAV_HOST = (os.environ.get('CLAMAV_HOST') or '').strip()
+    CLAMAV_PORT = _env_int('CLAMAV_PORT', 3310, 1, 65_535)
+    CLAMAV_TIMEOUT_SECONDS = _env_int('CLAMAV_TIMEOUT_SECONDS', 30, 1, 120)
+    MATERIAL_STORAGE_BACKEND = (os.environ.get('MATERIAL_STORAGE_BACKEND') or 'none').strip().lower()
+    MATERIAL_STORAGE_ROOT = os.environ.get('MATERIAL_STORAGE_ROOT') or os.path.join(basedir, 'instance', 'materials')
+    MATERIAL_ENCRYPTION_KEY = os.environ.get('MATERIAL_ENCRYPTION_KEY') or ''
+    MATERIAL_S3_BUCKET = os.environ.get('MATERIAL_S3_BUCKET') or ''
+    MATERIAL_S3_REGION = os.environ.get('MATERIAL_S3_REGION') or ''
+    MATERIAL_S3_ENDPOINT_URL = os.environ.get('MATERIAL_S3_ENDPOINT_URL') or ''
 
     # 税务API配置（发票验证）
     TAX_API_URL = os.environ.get('TAX_API_URL') or ''
     TAX_API_KEY = os.environ.get('TAX_API_KEY') or ''
+    ALLOW_MOCK_TAX_API = False
+
+    # 电子合同默认禁用；生产必须配置真实供应商，服务层会失败关闭。
+    ECONTRACT_PROVIDER = (os.environ.get('ECONTRACT_PROVIDER') or 'disabled').strip().lower()
+    ECONTRACT_API_KEY = os.environ.get('ECONTRACT_API_KEY') or ''
+    ECONTRACT_API_SECRET = os.environ.get('ECONTRACT_API_SECRET') or ''
+    ECONTRACT_BASE_URL = (os.environ.get('ECONTRACT_BASE_URL') or '').strip().rstrip('/')
+
+    SMTP_HOST = os.environ.get('SMTP_HOST') or ''
+    SMTP_PORT = int(os.environ.get('SMTP_PORT') or 587)
+    SMTP_USERNAME = os.environ.get('SMTP_USERNAME') or ''
+    SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD') or ''
+    SMTP_FROM_NAME = os.environ.get('SMTP_FROM_NAME') or '链易配'
+    SMTP_FROM_EMAIL = os.environ.get('SMTP_FROM_EMAIL') or ''
+    SMTP_USE_TLS = _env_bool('SMTP_USE_TLS', True)
+
+    # Provider delivery webhooks sign their JSON payload with this secret.
+    # Keep it separate from WeChat callback credentials so rotating one
+    # integration cannot invalidate the others.
+    RFQ_DELIVERY_CALLBACK_SECRET = os.environ.get('RFQ_DELIVERY_CALLBACK_SECRET') or ''
+    # Provider adapters use a separate secret when they submit normalized
+    # supplier quote content.  Never reuse the delivery-status secret.
+    RFQ_QUOTE_CALLBACK_SECRET = os.environ.get('RFQ_QUOTE_CALLBACK_SECRET') or ''
+    # Signed inbound email gateway events; keep separate from both RFQ
+    # delivery and normalized quote callback secrets.
+    RFQ_EMAIL_INBOUND_SECRET = os.environ.get('RFQ_EMAIL_INBOUND_SECRET') or ''
+    FULFILLMENT_CALLBACK_SECRET = os.environ.get('FULFILLMENT_CALLBACK_SECRET') or ''
+    INBOUND_EMAIL_ENABLED = _env_bool('INBOUND_EMAIL_ENABLED', False)
+    INBOUND_IMAP_HOST = os.environ.get('INBOUND_IMAP_HOST') or ''
+    INBOUND_IMAP_PORT = _env_int('INBOUND_IMAP_PORT', 993, 1, 65_535)
+    INBOUND_IMAP_USERNAME = os.environ.get('INBOUND_IMAP_USERNAME') or ''
+    INBOUND_IMAP_PASSWORD = os.environ.get('INBOUND_IMAP_PASSWORD') or ''
+    INBOUND_IMAP_FOLDER = os.environ.get('INBOUND_IMAP_FOLDER') or 'INBOX'
+    INBOUND_EMAIL_CALLBACK_URL = os.environ.get('INBOUND_EMAIL_CALLBACK_URL') or ''
+    INBOUND_EMAIL_BATCH_SIZE = _env_int('INBOUND_EMAIL_BATCH_SIZE', 20, 1, 100)
+    INBOUND_EMAIL_TIMEOUT_SECONDS = _env_int('INBOUND_EMAIL_TIMEOUT_SECONDS', 20, 5, 120)
 
     # 高德地图：三密钥拆分（.env 中配置，勿提交明文）
     # 前端 JS API 2.0
@@ -246,6 +348,9 @@ class Config:
     WORK_WECHAT_CORPID = os.environ.get('WORK_WECHAT_CORPID') or ''
     WORK_WECHAT_CORPSECRET = os.environ.get('WORK_WECHAT_CORPSECRET') or ''
     WORK_WECHAT_AGENTID = os.environ.get('WORK_WECHAT_AGENTID') or ''
+    WORK_WECHAT_CALLBACK_TOKEN = os.environ.get('WORK_WECHAT_CALLBACK_TOKEN') or ''
+    WORK_WECHAT_ENCODING_AES_KEY = os.environ.get('WORK_WECHAT_ENCODING_AES_KEY') or ''
+    WORK_WECHAT_TIMEOUT_SECONDS = _env_int('WORK_WECHAT_TIMEOUT_SECONDS', 15, 3, 60)
     
     # 微信服务号
     WECHAT_SERVICE_APPID = os.environ.get('WECHAT_SERVICE_APPID') or ''

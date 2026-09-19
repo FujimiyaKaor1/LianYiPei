@@ -2,14 +2,14 @@
 招商决策服务 (RecruitmentService)
 - 产业链缺口分析
 - 招商建议生成
-- 潜在企业推荐（工商数据API模拟）
+- 潜在企业推荐（公开目录 + 已配置工商数据接口）
 - 招商任务管理
 需求: 34.1-34.7, 36.1-36.7, 37.1-37.7
 """
 from __future__ import annotations
 
 import logging
-import random
+import re
 from datetime import datetime, date
 from typing import List, Dict, Optional
 
@@ -392,7 +392,8 @@ def _estimate_investment_scale(product_name: str, gap_type: str) -> str:
 def recommend_potential_enterprises(gap: Dict) -> List[Dict]:
     """
     推荐潜在招商企业。
-    调用工商数据API（模拟实现），根据经营范围、规模、专利数量筛选，按匹配度排序。
+    根据经营范围、规模、专利数量筛选，按匹配度排序。外部接口不可用时
+    只使用平台内可核验企业，不创建或补全企业事实。
     需求: 34.4, 34.5, 37.1-37.7
     """
     product_name = gap.get('product_name', '')
@@ -401,8 +402,8 @@ def recommend_potential_enterprises(gap: Dict) -> List[Dict]:
     # 1. 先从平台内部数据库查找相关企业
     internal_candidates = _find_internal_candidates(product_name)
 
-    # 2. 调用工商数据API（模拟）
-    external_candidates = _mock_industrial_commerce_api(product_name, enterprise_type)
+    # 2. 调用真实工商数据接口；不可用时只保留平台内候选
+    external_candidates = _query_industrial_commerce_api(product_name, enterprise_type)
 
     # 3. 合并并去重
     all_candidates = internal_candidates + external_candidates
@@ -429,9 +430,22 @@ def _find_internal_candidates(product_name: str) -> List[Dict]:
 
     candidates = []
     for ent in enterprises:
+        extras = ent.extras if isinstance(ent.extras, dict) else {}
+        trust = extras.get('trust_profile') if isinstance(extras.get('trust_profile'), dict) else {}
+        sources = trust.get('sources') if isinstance(trust.get('sources'), list) else []
+        source_flags = [item.get('is_mock') is True for item in sources if isinstance(item, dict)]
+        data_source = str(extras.get('data_source') or '').lower()
+        # 演示/Mock 企业必须与真实推荐隔离。
+        if extras.get('is_demo') is True or extras.get('is_mock') is True:
+            continue
+        if source_flags and all(source_flags):
+            continue
+        if any(token in data_source for token in ('demo', 'mock', 'faker', '演示')):
+            continue
         scope = ent.business_scope or ''
         # 简单关键词匹配
         if any(kw in scope for kw in product_name.split()):
+            contact_authorized = trust.get('claim_status') == 'claimed' and trust.get('contact_authorized') is True
             candidates.append({
                 'name': ent.name,
                 'source': 'internal',
@@ -441,15 +455,20 @@ def _find_internal_candidates(product_name: str) -> List[Dict]:
                 'patent_count': ent.patent_count or 0,
                 'credit_score': float(ent.credit_score or 70),
                 'is_green_factory': ent.is_green_factory or False,
-                'contact': ent.contact or '',
-                'phone': ent.phone or '',
+                # 未认领企业只参与公开能力检索，不暴露私人联系方式。
+                'contact': ent.contact or '' if contact_authorized else '',
+                'phone': ent.phone or '' if contact_authorized else '',
+                'contact_authorized': contact_authorized,
+                'is_mock': False,
+                'sources': [item for item in sources if isinstance(item, dict)],
+                'updated_at': (ent.last_data_update or ent.biz_data_updated_at).isoformat() if (ent.last_data_update or ent.biz_data_updated_at) else None,
             })
     return candidates
 
 
-def _mock_industrial_commerce_api(product_name: str, enterprise_type: str) -> List[Dict]:
+def _query_industrial_commerce_api(product_name: str, enterprise_type: str) -> List[Dict]:
     """
-    工商数据API查询（优先调用真实接口，降级为模拟数据）。
+    工商数据API查询；不可用时不制造企业或联系方式。
     需求: 37.1, 37.2
     """
     try:
@@ -469,51 +488,20 @@ def _mock_industrial_commerce_api(product_name: str, enterprise_type: str) -> Li
                     'patent_count': item.get('patent_count', 0),
                     'credit_score': 70.0,
                     'is_green_factory': False,
-                    'contact': item.get('contact', ''),
+                    'contact': '',
                     'phone': '',
                     'registration_no': '',
                     'established_year': None,
+                    'source_url': item.get('source_url', ''),
+                    'collected_at': item.get('collected_at'),
+                    'updated_at': item.get('updated_at'),
+                    'is_mock': False,
+                    'contact_authorized': False,
                 })
             return normalized
-    except Exception:
-        pass
-
-    # 降级：生成模拟数据
-    mock_enterprises = []
-    cities = ['深圳', '广州', '东莞', '佛山', '惠州', '珠海', '中山', '江门']
-    enterprise_suffixes = ['科技有限公司', '实业有限公司', '制造有限公司', '工业有限公司', '集团有限公司']
-
-    base_names = [
-        f'{product_name}专业{enterprise_type[:4]}',
-        f'华南{product_name}制造',
-        f'粤港澳{product_name}供应链',
-        f'智能{product_name}科技',
-        f'绿色{product_name}工业',
-    ]
-
-    random.seed(hash(product_name) % 10000)
-
-    for i, base in enumerate(base_names):
-        city = cities[i % len(cities)]
-        suffix = enterprise_suffixes[i % len(enterprise_suffixes)]
-        capital = random.choice([500, 1000, 2000, 5000, 10000])
-        patents = random.randint(0, 50)
-        mock_enterprises.append({
-            'name': f'{city}{base}{suffix}',
-            'source': 'mock',
-            'city': city,
-            'registered_capital': capital,
-            'business_scope': f'主营{product_name}相关产品的研发、生产、销售及技术服务',
-            'patent_count': patents,
-            'credit_score': round(random.uniform(65, 95), 1),
-            'is_green_factory': random.choice([True, False]),
-            'contact': f'联系人{i+1}',
-            'phone': f'0755-{random.randint(10000000, 99999999)}',
-            'registration_no': f'91440{random.randint(100000000, 999999999)}',
-            'established_year': random.randint(2005, 2020),
-        })
-
-    return mock_enterprises
+    except Exception as exc:
+        logger.warning("工商候选查询不可用，仅返回平台内可核验企业: %s", exc)
+    return []
 
 
 def _score_candidate(candidate: Dict, product_name: str) -> Dict:
@@ -533,7 +521,15 @@ def _score_candidate(candidate: Dict, product_name: str) -> Dict:
     score += scope_score
 
     # 注册资本规模（0-20分）
-    capital = candidate.get('registered_capital', 0)
+    capital_raw = candidate.get('registered_capital', 0)
+    if isinstance(capital_raw, str):
+        match = re.search(r"\d+(?:\.\d+)?", capital_raw.replace(',', ''))
+        capital = float(match.group()) if match else 0.0
+    else:
+        try:
+            capital = float(capital_raw or 0)
+        except (TypeError, ValueError):
+            capital = 0.0
     if capital >= 5000:
         score += 20
     elif capital >= 1000:

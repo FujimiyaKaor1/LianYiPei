@@ -3,8 +3,8 @@ import os
 
 from dotenv import load_dotenv
 
-# 确保在 import app / config 之前加载项目根目录 .env（避免仅依赖 config 内 load_dotenv 的导入次序问题）
-load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
+# 本地 .env 只补充缺省值；生产由 Supervisor/容器注入的环境变量优先。
+load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
 from app import create_app
 from apscheduler.schedulers.background import BackgroundScheduler
