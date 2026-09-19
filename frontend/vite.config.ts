@@ -40,6 +40,7 @@ export default defineConfig(({mode}) => {
       rollupOptions: {
         input: {
           main: path.resolve(__dirname, 'index.html'),
+          indisea: path.resolve(__dirname, 'indisea/index.html'),
         },
         output: {
           // 无哈希文件名，便于 spa.html 模板稳定引用
