@@ -33,6 +33,7 @@ const PublicAia = lazy(() => import('./pages/PublicAia'));
 const FactoryDetail = lazy(() => import('./pages/FactoryDetail'));
 const AgentMarket = lazy(() => import('./pages/AgentMarket'));
 const IndustryNewsDetail = lazy(() => import('./pages/IndustryNewsDetail'));
+const IndiseaHome = lazy(() => import('./indisea/App'));
 import NewsManagementPage from './pages/admin/NewsManagementPage';
 
 // Government pages
@@ -96,6 +97,7 @@ export default function App() {
     <Suspense fallback={<AuthLoadingShell />}>
     <Routes>
       <Route path="/" element={<PublicOrRoleHome />} />
+      <Route path="/indisea/*" element={<IndiseaHome />} />
       <Route path="/login" element={<Navigate to="/" replace />} />
       <Route path="/search" element={<PublicSearch />} />
       <Route path="/aia" element={<PublicAia />} />

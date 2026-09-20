@@ -9,7 +9,14 @@ assert.equal(homepageLinks[0].href, '/indisea/', '首页导航应回到独立首
 assert.ok(homepageLinks.every((link) => link.href.length > 0), 'Every homepage link must have a destination');
 
 const appSource = readFileSync(resolve(process.cwd(), 'src/indisea/App.tsx'), 'utf8');
+const publicHeaderSource = readFileSync(resolve(process.cwd(), 'src/components/PublicSiteHeader.tsx'), 'utf8');
+const mainRouterSource = readFileSync(resolve(process.cwd(), 'src/App.tsx'), 'utf8');
+const standaloneEntrySource = readFileSync(resolve(process.cwd(), 'src/indisea/main.tsx'), 'utf8');
 assert.ok(appSource.includes('<HomePage />'), 'Standalone entry should render the homepage');
+assert.ok(publicHeaderSource.includes('to="/indisea/"'), '公共导航首页应进入 Indisea 首页');
+assert.ok(appSource.includes('<PublicSiteHeader'), 'Indisea homepage should reuse the main public navigation');
+assert.ok(mainRouterSource.includes('path="/indisea/*"'), 'Main router should own the Indisea homepage route');
+assert.ok(standaloneEntrySource.includes('<AuthProvider>'), 'Standalone Indisea entry should provide auth context for the shared navigation');
 assert.ok(!appSource.includes('AboutPage'), 'Standalone entry should not require a separate About page');
 assert.ok(!appSource.includes("from './pages'"), 'Standalone entry must not load the legacy multi-page draft');
 
