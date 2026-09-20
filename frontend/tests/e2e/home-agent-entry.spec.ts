@@ -7,7 +7,7 @@ const homePayload = {
   data_status: { mode: 'test', message: '测试数据' },
 };
 
-test('首页搜索工厂携带关键词进入 Agent 会话页', async ({ page }) => {
+test('首页筛选入口携带关键词进入 Agent 会话页', async ({ page }) => {
   await page.route('**/api/session', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: false, user: null }) }));
   await page.route('**/api/public/home', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(homePayload) }));
   await page.route('**/api/chain-xiaoyi/sessions', route => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: '测试停止自动提交' }) }));

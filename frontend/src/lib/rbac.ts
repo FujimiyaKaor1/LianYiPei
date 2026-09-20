@@ -1,8 +1,8 @@
 export type SessionRole = 'admin' | 'government' | 'enterprise';
 
-export const GUEST_HOME_PATH = '/';
+export const GUEST_HOME_PATH = '/aisearch/';
 
-export const PUBLIC_GUEST_ROUTES = ['/', '/search', '/aia', '/industry-news', '/agent-market', '/factory', '/enterprise-directory', '/matching'] as const;
+export const PUBLIC_GUEST_ROUTES = ['/', '/aisearch', '/search', '/aia', '/industry-news', '/agent-market', '/factory', '/enterprise-directory', '/matching'] as const;
 
 export const ENTERPRISE_PRIVATE_ROUTES = [
   '/dashboard',

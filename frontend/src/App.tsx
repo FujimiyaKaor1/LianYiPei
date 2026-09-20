@@ -87,8 +87,9 @@ function GovLayoutGuard() {
 
 function PublicOrRoleHome() {
   const { user, loading } = useAuth();
+
   if (loading) return <AuthLoadingShell />;
-  if (!user) return <PublicHome />;
+  if (!user) return <Navigate to="/indisea/" replace />;
   return <Navigate to={loginHomePathForRole(user.role)} replace />;
 }
 
@@ -98,7 +99,9 @@ export default function App() {
     <Routes>
       <Route path="/" element={<PublicOrRoleHome />} />
       <Route path="/indisea/*" element={<IndiseaHome />} />
-      <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route path="/indesea/*" element={<Navigate to="/indisea/" replace />} />
+      <Route path="/aisearch/*" element={<PublicHome />} />
+      <Route path="/login" element={<Navigate to="/aisearch/" replace />} />
       <Route path="/search" element={<PublicSearch />} />
       <Route path="/aia" element={<PublicAia />} />
       <Route path="/industry-news/:slug" element={<IndustryNewsDetail />} />
@@ -177,7 +180,7 @@ export default function App() {
         <div className="min-h-screen flex flex-col items-center justify-center bg-[#F5F5F7] text-neutral-500">
           <p className="text-6xl font-bold text-neutral-200 mb-4">404</p>
           <p className="text-sm mb-6">页面未找到</p>
-          <a href="/" className="text-sm text-blue-500 hover:underline">返回首页</a>
+          <a href="/aisearch/" className="text-sm text-blue-500 hover:underline">返回首页</a>
         </div>
       } />
     </Routes>

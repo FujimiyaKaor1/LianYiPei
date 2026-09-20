@@ -31,15 +31,13 @@ async function mockPublicSearch(page: import('@playwright/test').Page) {
 }
 
 test.describe('搜索中心', () => {
-  test('可以搜索并将条件写入 URL', async ({ page }) => {
+  test('筛选条件可以携带到 AI 找工厂', async ({ page }) => {
     await mockPublicSearch(page);
     await page.goto('/search');
     await expect(page.getByTestId('public-search-result')).toHaveCount(2);
     await page.getByTestId('public-search-input').fill('工业电机');
     await page.getByTestId('public-search-submit').click();
-    await expect(page).toHaveURL(/q=%E5%B7%A5%E4%B8%9A%E7%94%B5%E6%9C%BA/);
-    await expect(page.getByTestId('public-search-count')).toContainText('2');
-    await page.screenshot({ path: 'test-results/search-desktop.png', fullPage: true });
+    await expect(page).toHaveURL(/\/aia\?q=%E5%B7%A5%E4%B8%9A%E7%94%B5%E6%9C%BA/);
   });
 
   test('快捷筛选立即生效并支持移动端抽屉', async ({ page }) => {
