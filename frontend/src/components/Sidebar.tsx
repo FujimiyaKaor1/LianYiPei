@@ -5,11 +5,7 @@ import {
   Network, 
   Settings, 
   Wallet, 
-  Users,
-  Package,
-  Activity,
   CalendarDays,
-  SlidersHorizontal,
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '@/src/context/AuthContext';
@@ -30,18 +26,9 @@ export const navGroups = [
     ],
   },
   {
-    label: '资源协同',
-    items: [
-      { icon: SlidersHorizontal, label: '名录筛选', path: '/workspace/enterprise-directory' },
-      { icon: Users, label: '集采拼单', path: '/group-purchase' },
-    ],
-  },
-  {
     label: '履约运营',
     items: [
-      { icon: Activity, label: '履约看板', path: '/fulfillment' },
       { icon: CalendarDays, label: '产能日历', path: '/capacity-calendar' },
-      { icon: Package, label: '订单工作流', path: '/orders' },
     ],
   },
   {

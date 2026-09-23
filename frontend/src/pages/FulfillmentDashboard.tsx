@@ -172,7 +172,7 @@ export default function FulfillmentDashboard() {
       {/* Top Stats */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
         {[
-          { icon: Activity, label: '当前信用分', value: String(Math.round(dashData.current_score)), sub: '/ 100' },
+          { icon: Activity, label: '当前信用分', value: dashData.current_score == null ? '未公开' : String(Math.round(dashData.current_score)), sub: dashData.current_score == null ? '暂无评级' : '/ 100' },
           { icon: TrendingUp, label: '按时交付率', value: `${dashData.delivery_stats.own_rate}%`, sub: `行业 ${dashData.delivery_stats.industry_rate}%` },
           { icon: Clock, label: '已完成订单', value: String(dashData.delivery_stats.total_count), sub: `准时 ${dashData.delivery_stats.on_time_count}` },
           { icon: Briefcase, label: '合作案例', value: String(cases.length), sub: `公开 ${cases.filter(c => c.is_public).length}` },

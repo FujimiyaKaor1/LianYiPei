@@ -1,13 +1,13 @@
-# AI意向报价功能实现说明
+# 意向报价与商机洞察功能实现说明
 
 ## 一、概述
 
-本次实现为链易配系统添加了完整的**AI意向报价**相关功能，包括：
+本次实现为链易配系统添加了完整的意向报价与商机洞察功能，包括：
 - 意向报价管理
 - 供应商收藏
 - 名片交换（基于现有逻辑增强）
-- DeepSeek企业画像生成
-- AI商机洞察消息
+- 基于数据库事实的企业公开画像
+- 可解释的规则商机洞察消息（配置真实模型后才显示模型来源）
 
 ---
 
@@ -28,8 +28,8 @@
 | 文件 | 说明 |
 |:---|:---|
 | `app/services/favorite_service.py` | 收藏服务：添加/移除/列表/批量询价 |
-| `app/applications/fulfillment/services/intent_quote_service.py` | 意向报价服务：创建/发送/确认/AI建议 |
-| `app/applications/enterprise/services/deepseek_service.py` | DeepSeek企业画像服务：生成公开画像 |
+| `app/applications/fulfillment/services/intent_quote_service.py` | 意向报价服务：创建/发送/确认/规则报价参考 |
+| `app/applications/enterprise/services/deepseek_service.py` | 企业公开画像服务：基于登记事实生成；保留历史类名兼容导入 |
 
 ### 2.3 API路由（`app/routes/`）
 
@@ -140,8 +140,8 @@ CREATE TABLE business_cards (
 | POST | `/api/intent-quote/<id>/reject` | 供应商拒绝 |
 | GET | `/api/intent-quote/buyer/list` | 采购方列表 |
 | GET | `/api/intent-quote/seller/list` | 供应方列表 |
-| POST | `/api/intent-quote/ai-suggestion` | AI报价建议 |
-| POST | `/api/intent-quote/<id>/apply-ai-suggestion` | 应用AI建议 |
+| POST | `/api/intent-quote/ai-suggestion` | 基于数据库规则的报价参考（冷启动无样本时返回无法估算） |
+| POST | `/api/intent-quote/<id>/apply-ai-suggestion` | 应用报价参考 |
 | GET | `/api/intent-quote/<id>/card-eligible` | 检查名片交换资格 |
 | GET | `/api/intent-quote/enterprise-profile/<id>` | 企业画像 |
 | POST | `/api/intent-quote/business-insight` | 商机洞察消息 |
@@ -162,8 +162,8 @@ CREATE TABLE business_cards (
    - 目标单价（可获取AI建议）
    - 预算区间（选填）
         ↓
-AI自动生成报价依据
-   （调用DeepSeek分析）
+根据已持久化报价样本生成规则报价参考
+   （无有效样本时明确返回无法估算）
         ↓
 采购方确认发送
         ↓
@@ -218,17 +218,18 @@ AI自动生成报价依据
 
 ```json
 {
-  "type": "ai_business_insight",
+  "type": "business_insight",
+  "generation_mode": "database_rules",
   "enterprise_id": 123,
   "enterprise_name": "东莞宏宇塑胶材料有限公司",
-  "insight_summary": "已为您提取商机：精密零部件。根据实时库存与产排计划分析：当前产能可评估，建议结合价格指数后快速报价。",
+  "insight_summary": "已为您提取商机：精密零部件。根据企业登记的产能字段生成规则洞察；未登记的运营数据不会被推断。",
   "enterprise_profile": {
     "name": "东莞宏宇塑胶材料有限公司",
     "industry_code": "C29",
     "province": "广东",
     "city": "东莞",
-    "capacity_status": "产能正常",
-    "capacity_usage": "72%",
+    "capacity_status": "未公开",
+    "capacity_usage": "未公开",
     "credit_score": 85.5,
     "credit_level": "AA+",
     "green_level": "B级",
@@ -245,7 +246,9 @@ AI自动生成报价依据
 }
 ```
 
-### 6.2 DeepSeek企业画像（不含敏感信息）
+### 6.2 企业公开画像（不含敏感信息）
+
+当前接口默认使用已持久化企业字段和确定性规则，返回 `generation_mode: "database_rules"`；不会把规则文本标记为 DeepSeek，也不会声称实时库存、实时排产或外部认证。只有真实模型调用链路配置并通过部署验收后，才可以展示相应模型来源。
 
 **✅ 包含的信息：**
 - 企业名称
@@ -377,7 +380,7 @@ curl -X POST http://localhost:5000/api/intent-quote/create \
   -H "Content-Type: application/json" \
   -d '{"seller_id": 2, "product_name": "电机", "quantity": 100}'
 
-# AI建议测试
+# 规则报价参考测试（仅有持久化报价样本时会返回价格）
 curl -X POST http://localhost:5000/api/intent-quote/ai-suggestion \
   -H "Content-Type: application/json" \
   -d '{"seller_id": 2, "product_name": "电机", "quantity": 100}'
@@ -394,7 +397,7 @@ curl -X POST http://localhost:5000/api/intent-quote/ai-suggestion \
 
 ## 十一、后续优化建议
 
-1. **DeepSeek真实API集成**：链小易已支持通过 `DEEPSEEK_API_KEY` 和 `CHAINXIAOYI_CLOUD_ENABLED` 调用 DeepSeek；未配置时明确降级到规则解析，不伪造模型结果。上线前仍需在部署环境完成 TLS、额度、超时和监控验收。
+1. **真实模型集成**：链小易已支持通过 `DEEPSEEK_API_KEY` 和 `CHAINXIAOYI_CLOUD_ENABLED` 调用 DeepSeek；未配置时明确使用规则解析，不伪造模型结果。上线前仍需在部署环境完成 TLS、额度、超时和监控验收。
 2. **WebSocket实时推送**：名片交换、报价状态变更可推送通知
 3. **消息推送集成**：与企业微信消息服务集成
 4. **前端页面开发**：根据UI设计开发完整的交互页面

@@ -6,7 +6,7 @@ import socket
 
 import pytest
 
-from app.services.material_security import MaterialInfected, scan_material
+from app.services.material_security import MaterialInfected, ping_clamd, scan_material
 
 
 class _FakeClamdSocket:
@@ -55,3 +55,10 @@ def test_material_scan_rejects_content_marked_infected_by_clamd(app, monkeypatch
     with app.app_context(), pytest.raises(MaterialInfected):
         scan_material("purchase.pdf", b"%PDF-1.7\nprocurement")
 
+
+def test_ping_clamd_accepts_nul_terminated_pong(monkeypatch):
+    fake = _FakeClamdSocket(b"PONG\0")
+    monkeypatch.setattr(socket, "create_connection", lambda *_args, **_kwargs: fake)
+
+    assert ping_clamd(host="clamav", port=3310) is True
+    assert fake.sent == [b"zPING\0"]

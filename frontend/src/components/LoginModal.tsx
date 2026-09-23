@@ -1,16 +1,24 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
-import { FileUp, X } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { AlertTriangle, FileUp, Sparkles, X } from 'lucide-react';
 import { useAuth } from '@/src/context/AuthContext';
 import { canRoleAccessPath, loginHomePathForRole } from '@/src/lib/rbac';
 import { cn } from '@/src/lib/utils';
 import { BrandLogo } from './BrandLogo';
 
 type ModalMode = 'login' | 'register';
+type MaterialField = { value?: unknown; confidence?: number };
+type MaterialDraft = {
+  fields?: Record<string, MaterialField>;
+  clarifying_questions?: string[];
+  extraction_source?: string;
+  demo_fixture?: boolean;
+};
 
 export function LoginModal() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isLoginModalOpen, pendingLoginPath, setIsLoginModalOpen, refresh } = useAuth();
 
   const [mode, setMode] = useState<ModalMode>('login');
@@ -38,6 +46,7 @@ export function LoginModal() {
   const [materialStatus, setMaterialStatus] = useState('');
   const [registrationMaterialFile, setRegistrationMaterialFile] = useState<File | null>(null);
   const [registrationMaterialReady, setRegistrationMaterialReady] = useState(false);
+  const [materialDraft, setMaterialDraft] = useState<MaterialDraft | null>(null);
   const [registerSuccess, setRegisterSuccess] = useState<string | null>(null);
 
   const handleClose = () => {
@@ -63,6 +72,7 @@ export function LoginModal() {
     setMaterialStatus('');
     setRegistrationMaterialFile(null);
     setRegistrationMaterialReady(false);
+    setMaterialDraft(null);
     setRegisterSuccess(null);
     setError(null);
   };
@@ -72,7 +82,7 @@ export function LoginModal() {
     try {
       const body = new FormData(); body.set('file', file);
       const response = await fetch('/auth/register/preview-material', { method: 'POST', body });
-      const payload = await response.json().catch(() => null) as { ok?: boolean; error?: string; draft?: { fields?: Record<string, { value?: unknown }>; clarifying_questions?: string[] } } | null;
+      const payload = await response.json().catch(() => null) as { ok?: boolean; error?: string; draft?: MaterialDraft } | null;
       if (!response.ok || !payload?.ok || !payload.draft) throw new Error(payload?.error || '营业执照识别失败');
       const fields = payload.draft.fields || {};
       const value = (key: string) => fields[key]?.value;
@@ -88,7 +98,9 @@ export function LoginModal() {
       const ready = !payload.draft.clarifying_questions?.length;
       setRegistrationMaterialFile(file);
       setRegistrationMaterialReady(ready);
-      setMaterialStatus(ready ? '已从营业执照自动填报，请核对后点击“确认材料并提交申请”。' : `已自动填报；还需确认：${payload.draft.clarifying_questions?.join('、')}`);
+      setMaterialDraft(payload.draft);
+      const source = payload.draft.demo_fixture ? '视觉 Agent（演示材料）' : payload.draft.extraction_source === 'vision_agent' ? '视觉 Agent' : payload.draft.extraction_source === 'ocr' ? 'OCR' : '识别服务';
+      setMaterialStatus(ready ? `已由${source || '识别服务'}自动填报，请核对下方结果后提交。` : `已自动填报；还需确认：${payload.draft.clarifying_questions?.join('、')}`);
     } catch (err) { setError(err instanceof Error ? err.message : '营业执照识别失败'); setMaterialStatus(''); }
     finally { setSubmitting(false); }
   };
@@ -109,11 +121,20 @@ export function LoginModal() {
       body.set('password', regPassword);
       body.set('password2', regPassword2);
       body.set('confirm', 'true');
+      body.set('overrides', JSON.stringify({
+        name: regName.trim(),
+        address: regAddress.trim(),
+        business_scope: regBusinessScope.trim(),
+        registered_capital: regRegisteredCapital.trim(),
+        unified_social_credit_code: regCreditCode.trim(),
+        legal_representative: regLegalRepresentative.trim(),
+      }));
       const response = await fetch('/auth/register/submit-material', { method: 'POST', credentials: 'include', body });
       const payload = (await response.json().catch(() => null)) as { ok?: boolean; error?: string; message?: string } | null;
       if (!response.ok || !payload?.ok) throw new Error(payload?.error || '入驻申请提交失败');
       setRegisterSuccess(payload.message || '入驻申请已提交，等待管理员审核。');
       setRegistrationMaterialFile(null); setRegistrationMaterialReady(false); setMaterialStatus('');
+      setMaterialDraft(null);
       setRegPassword(''); setRegPassword2('');
     } catch (err) { setError(err instanceof Error ? err.message : '入驻申请提交失败'); }
     finally { setSubmitting(false); }
@@ -122,6 +143,10 @@ export function LoginModal() {
   const handleSubmitLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (!name.trim() || !password) {
+      setError('请填写企业名称与密码');
+      return;
+    }
     setSubmitting(true);
     try {
       const body = new FormData();
@@ -155,7 +180,13 @@ export function LoginModal() {
         pendingLoginPath && canRoleAccessPath(payload.role, pendingLoginPath);
       const fromRedirect =
         typeof payload.redirect === 'string' && payload.redirect.startsWith('/');
-      const target = fromPending
+      // 登录是当前页面上的弹窗操作。除非原页面确实没有权限，否则
+      // 保留当前 URL；后端 redirect 只作为直接进入登录流程时的兜底。
+      const currentPath = `${location.pathname}${location.search}${location.hash}`;
+      const fromCurrentPage = canRoleAccessPath(payload.role, currentPath);
+      const target = fromCurrentPage
+        ? currentPath
+        : fromPending
         ? pendingLoginPath
         : fromRedirect
         ? payload.redirect!
@@ -354,6 +385,20 @@ export function LoginModal() {
                 <input type="file" accept=".pdf,.docx,.png,.jpg,.jpeg" className="hidden" disabled={submitting} onChange={event => { const file = event.currentTarget.files?.[0]; if (file) void handleRegistrationMaterial(file); event.currentTarget.value = ''; }} />
               </label>
               {materialStatus && <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-800">{materialStatus}</p>}
+              {materialDraft && <div className="rounded-xl border border-primary/15 bg-white p-3 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 font-bold text-neutral-800"><Sparkles className="h-3.5 w-3.5 text-primary" />识别结果，请人工核对</span>
+                  <span className="text-[10px] text-neutral-500">{materialDraft.demo_fixture ? '视觉 Agent（演示材料）' : materialDraft.extraction_source === 'vision_agent' ? '视觉 Agent' : materialDraft.extraction_source === 'ocr' ? 'OCR' : '文本解析'}</span>
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {(Object.entries(materialDraft.fields || {}) as [string, MaterialField][]).map(([key, field]) => {
+                    const labels: Record<string, string> = { name: '企业名称', unified_social_credit_code: '统一社会信用代码', legal_representative: '法定代表人', address: '住所', registered_capital: '注册资本', business_scope: '经营范围' };
+                    const confidence = typeof field.confidence === 'number' ? Math.round(field.confidence * 100) : null;
+                    return <div key={key} className="rounded-lg bg-neutral-50 px-2.5 py-2"><div className="flex items-center justify-between gap-1 text-[10px] text-neutral-500"><span>{labels[key] || key}</span>{confidence !== null && <span className={confidence >= 85 ? 'text-emerald-600' : 'text-amber-600'}>{confidence}%</span>}</div><div className="mt-1 break-words font-medium text-neutral-800">{String(field.value ?? '未识别')}</div></div>;
+                  })}
+                </div>
+                <p className="mt-2 flex items-start gap-1 text-[10px] leading-4 text-amber-700"><AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />识别结果仅作为填报建议，提交前请以营业执照原件为准。</p>
+              </div>}
               {registrationMaterialReady && <button type="button" onClick={() => void handleSubmitMaterialRegistration()} disabled={submitting} className="w-full rounded-xl border border-primary bg-primary/5 px-3 py-2.5 text-sm font-bold text-primary hover:bg-primary/10 disabled:opacity-50">确认材料并提交入驻申请</button>}
               <div>
                 <label className="block text-xs font-medium text-neutral-600 mb-1">

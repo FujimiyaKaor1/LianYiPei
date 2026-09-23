@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, Home, LogOut, Moon, Search, Sun, User } from 'lucide-react';
 import { useAuth } from '@/src/context/AuthContext';
 import { useTheme } from '@/src/context/ThemeContext';
@@ -16,9 +16,11 @@ interface TopBarProps {
 export function TopBar({ title, showSearch = true }: TopBarProps) {
   const { user, loading, logout, requestLogin } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const { showToast } = useToast();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [globalSearch, setGlobalSearch] = useState('');
   const dateLabel = new Date().toLocaleDateString('zh-CN', {
     month: '2-digit',
     day: '2-digit',
@@ -33,6 +35,10 @@ export function TopBar({ title, showSearch = true }: TopBarProps) {
   }, [user]);
 
   const currentPath = `${location.pathname}${location.search}`;
+  const submitGlobalSearch = () => {
+    const query = globalSearch.trim();
+    if (query) navigate(`/search?q=${encodeURIComponent(query)}`);
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-[72px] flex-shrink-0 items-center justify-between border-b border-border bg-surface/86 px-6 backdrop-blur-xl">
@@ -63,7 +69,15 @@ export function TopBar({ title, showSearch = true }: TopBarProps) {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
             <input
               type="text"
-              placeholder="搜索合同、商机或客户..."
+              placeholder="搜索企业、产品或工厂..."
+              value={globalSearch}
+              onChange={(event) => setGlobalSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  submitGlobalSearch();
+                }
+              }}
               className="input-search h-9 w-72 pl-9"
             />
           </div>
@@ -150,6 +164,28 @@ export function TopBar({ title, showSearch = true }: TopBarProps) {
 
         </div>
       </div>
+
+      {showSearch && (
+        <div className="absolute left-3 right-3 top-[76px] z-40 lg:hidden">
+          <div className="relative rounded-lg border border-border bg-surface p-1 shadow-elevation-2">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
+            <input
+              type="text"
+              placeholder="搜索企业、产品或工厂..."
+              value={globalSearch}
+              onChange={(event) => setGlobalSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  submitGlobalSearch();
+                }
+              }}
+              aria-label="移动端全局搜索"
+              className="input-search h-10 w-full pl-9"
+            />
+          </div>
+        </div>
+      )}
     </header>
   );
 }

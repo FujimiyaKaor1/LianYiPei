@@ -1154,10 +1154,12 @@ export default function SalesConsole() {
 
       {/* 报价 Modal */}
       <QuoteModal
-        open={showQuoteModal}
+        // auto_quote can be set before the selected InquiryChat has finished
+        // loading; keep the form closed until it has a real chat id.
+        open={showQuoteModal && Boolean(activeInquiryChatId && activeInquiryChat)}
         chatId={activeInquiryChatId}
-        productName={activeInquiryChat?.product_name || activeChat ? extractProductName(selectedMessage || { id: 0, type: '', title: '', content: '', is_read: true }) : ''}
-        counterpartyLabel={activeInquiryChat?.counterparty_name || ''}
+        productName={activeInquiryChat?.product_name || (activeChat ? extractProductName(selectedMessage || { id: 0, type: '', title: '', content: '', is_read: true }) : '')}
+        counterpartyLabel={activeInquiryChat?.counterparty_name || '当前会话对方'}
         isAnonymous={activeInquiryChat?.is_anonymous ?? false}
         onClose={() => setShowQuoteModal(false)}
         onSuccess={handleQuoteSuccess}

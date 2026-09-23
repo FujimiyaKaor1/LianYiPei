@@ -31,7 +31,7 @@ function normalizeLegacyFavorite(item: any): FavoriteSupplierItem {
     supplier_city: item.supplier_city || item.city || item.location || '',
     supplier_industry: item.supplier_industry || item.industry || '',
     capacity: Number(item.capacity || 0),
-    credit_score: Number(item.credit_score || item.score || 70),
+    credit_score: item.credit_score == null && item.score == null ? null : Number(item.credit_score ?? item.score),
     is_green_factory: Boolean(item.is_green_factory),
     patent_count: Number(item.patent_count || 0),
     match_score: Number.isFinite(parsedMatch) ? parsedMatch : null,
@@ -232,7 +232,7 @@ export default function Favorites() {
                   <div className="rounded-md border border-border bg-surface-subtle p-3">
                     <div className="text-[10px] font-bold uppercase text-ink-muted">履约信用</div>
                     <div className="metric-number mt-1 flex items-center gap-1 text-xl font-black text-ink">
-                      {Math.round(item.credit_score || 70)}
+                      {item.credit_score == null ? '未公开' : Math.round(item.credit_score)}
                       <ShieldCheck className="h-4 w-4 text-trust" />
                     </div>
                   </div>

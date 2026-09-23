@@ -1,10 +1,13 @@
+import json
 from io import BytesIO
+from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from PIL import Image
 
 from app.services.material_security import scan_material
 from app.models import Enterprise
+import app.services.registration_materials as registration_materials
 
 
 def _license_docx() -> BytesIO:
@@ -86,6 +89,24 @@ def test_confirmed_license_material_submits_pending_application_without_manual_f
     assert enterprise.check_password("secure123")
 
 
+def test_confirmed_license_material_persists_user_reviewed_overrides(client):
+    response = client.post(
+        "/auth/register/submit-material",
+        data={
+            "file": (_license_docx(), "营业执照.docx"),
+            "password": "secure123",
+            "confirm": "true",
+            "overrides": json.dumps({"address": "广东省深圳市南山区人工核对路2号", "business_scope": "人工核对后的经营范围"}),
+        },
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 200
+    enterprise = Enterprise.query.filter_by(name="广东可信电子有限公司").one()
+    assert enterprise.address == "广东省深圳市南山区人工核对路2号"
+    assert enterprise.business_scope == "人工核对后的经营范围"
+    assert enterprise.extras["registration_material"]["reviewed_overrides"] == {"address": "广东省深圳市南山区人工核对路2号", "business_scope": "人工核对后的经营范围"}
+
+
 def test_license_material_never_creates_account_without_explicit_confirmation(client):
     response = client.post(
         "/auth/register/submit-material",
@@ -146,6 +167,40 @@ def test_material_security_accepts_bounded_license_images():
     Image.new("RGB", (32, 32), "white").save(image, format="PNG")
     result = scan_material("营业执照.png", image.getvalue())
     assert result["status"] == "clean"
+
+
+def test_image_material_uses_vision_agent_and_returns_confidence(monkeypatch):
+    image = BytesIO()
+    Image.new("RGB", (32, 32), "white").save(image, format="PNG")
+
+    class FakeModel:
+        def invoke(self, messages):
+            assert messages[1].content[1]["type"] == "image_url"
+            return type("Response", (), {"content": '{"name":{"value":"视觉识别企业","confidence":0.98},"unified_social_credit_code":{"value":"91440300MA5F123456","confidence":0.96}}'})()
+
+    monkeypatch.setattr(registration_materials, "_vision_model_from_env", lambda: FakeModel())
+    draft = registration_materials.extract_registration_material("营业执照.png", image.getvalue())
+
+    assert draft["extraction_source"] == "vision_agent"
+    assert draft["fields"]["name"]["confidence"] == 0.98
+    assert draft["fields"]["unified_social_credit_code"]["evidence"]["source"] == "vision_agent"
+
+
+def test_bundled_demo_license_prefills_the_realistic_demo_enterprise(client):
+    license_path = Path(__file__).parents[1] / "app/static/demo/registration/business-license.jpg"
+    response = client.post(
+        "/auth/register/preview-material",
+        data={"file": (license_path.open("rb"), "营业执照.jpg")},
+        content_type="multipart/form-data",
+    )
+    assert response.status_code == 200
+    draft = response.get_json()["draft"]
+    assert draft["demo_fixture"] is True
+    assert draft["extraction_source"] == "vision_agent"
+    assert draft["fields"]["name"]["value"] == "长沙德远智造科技有限公司"
+    assert draft["fields"]["unified_social_credit_code"]["value"] == "91430100MAK1QW4U4E"
+    assert draft["fields"]["registered_capital"]["value"] == 200.0
+    assert Enterprise.query.filter_by(name="长沙德远智造科技有限公司").first() is None
 
 
 def test_registration_preview_rejects_infected_material(client):

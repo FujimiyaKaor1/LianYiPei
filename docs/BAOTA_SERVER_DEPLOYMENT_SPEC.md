@@ -48,7 +48,7 @@ Supervisor 单独启动 scheduler：预警、信用、价格、产能、清理�
 - Supervisor 管理器；
 - Git；
 - Certbot 或宝塔 SSL 模块；
-- 可选 Redis 7（当前项目不是核心依赖，可不安装）。
+- Redis 7（生产部署必须安装并通过 `production_smoke.py`；仅本地开发可以省略）。
 
 Neo4j 5.x 建议按 Neo4j 官方 Debian/Ubuntu 包安装并设置为 systemd 服务。若宝塔应用商店没有合适版本，不要从面板随便安装旧版；可以使用 Docker 运行 Neo4j，但仍应绑定到 `127.0.0.1:7687`。
 
@@ -107,20 +107,26 @@ FLUSH PRIVILEGES;
 ```bash
 source /www/wwwroot/lianyipei/.venv/bin/activate
 cd /www/wwwroot/lianyipei
-# 首次安装、确认数据库为空时才执行；init_db.py 内含 db.drop_all()，禁止对已有数据执行
-python scripts/db/init_db.py
-python scripts/seed/seed_all_data.py
-python scripts/seed/seed_demo_full_flow.py
+# 生产环境只执行 Alembic 迁移；不要执行 init_db.py、fresh_init.py 或演示种子脚本。
+# 这些脚本可能清空数据库或写入演示数据。
+FLASK_APP=wsgi:app flask db upgrade
+FLASK_APP=wsgi:app flask db current
 ```
 
-正式数据已经存在时，不要运行 `init_db.py` 或 `fresh_init.py`；它们属于清空重建类脚本。先备份，再按项目已有迁移脚本执行增量变更：
+正式数据已经存在时，不要运行 `init_db.py`、`fresh_init.py`、
+`scripts/migrate/migrate_db.py`、`scripts/migrate/migrate_new_tables.py` 或任何演示
+种子脚本。前两个历史迁移脚本内部仍调用 `db.create_all()`，不符合生产的
+`AUTO_CREATE_SCHEMA=0` 门禁，只能用于隔离的开发/历史环境。生产只允许先备份，
+再按仓库中的 Alembic 迁移执行增量变更：
 
 ```bash
-python scripts/migrate/migrate_db.py
-python scripts/migrate/migrate_new_tables.py
+FLASK_APP=wsgi:app flask db upgrade
+FLASK_APP=wsgi:app flask db current
 ```
 
-完成后用现有 `scripts/verify/` 脚本验证订单、发票、数据授权、消息和调度器。`create_app()` 启动时还会执行 `db.create_all()` 和 `ensure_schema`，但它不替代上线前的备份与迁移检查。
+完成后用现有 `scripts/verify/` 脚本验证订单、发票、数据授权、消息和调度器。
+生产模式下 `AUTO_CREATE_SCHEMA=0`，`create_app()` 不会执行 `db.create_all()`；
+迁移必须在启动 Web 前完成。
 
 ## 7. Neo4j 配置
 
@@ -168,7 +174,7 @@ Agent 工具权限仍按产品设计执行：查询可自动执行；生成询�
 
 将 `deploy/baota/supervisor-lianyipei.conf` 粘贴到宝塔 Supervisor 管理器，替换项目目录。Web 使用 2 个 Gunicorn worker；调度器使用独立单进程。根 `.env` 设置 `SCHEDULER_ENABLED=0`，模板中的 `LIANYIPEI_SCHEDULER_ENABLED` 负责为两个进程分别覆盖配置。
 
-将 `deploy/baota/nginx-lianyipei.conf` 配置到宝塔网站，替换域名和项目绝对路径。Nginx 对 `/static/` 直接提供 Vite 构建产物，其余请求转发给 Flask。`/api/chat` 已单独关闭代理缓冲，否则 Agent 的 SSE 流式回复会被 Nginx 聚合后才显示。
+将 `deploy/baota/nginx-lianyipei.conf` 作为宝塔“网站配置文件”中的 `server` 片段使用，替换域名和项目绝对路径；它不是可直接作为 `/etc/nginx/nginx.conf` 的完整配置。必须同时在宝塔 SSL 模块中启用 HTTPS（80 端口只用于跳转/证书签发），并配置限流和安全响应头。Nginx 对 `/static/` 直接提供 Vite 构建产物，其余请求转发给 Flask。`/api/chat` 已单独关闭代理缓冲，否则 Agent 的 SSE 流式回复会被 Nginx 聚合后才显示。
 
 部署后检查：
 

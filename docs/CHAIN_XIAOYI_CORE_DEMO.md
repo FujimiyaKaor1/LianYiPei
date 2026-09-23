@@ -52,7 +52,7 @@ flask --app wsgi:app run --host 127.0.0.1 --port 5051
 
 ## DeepSeek
 
-不要把密钥写入仓库或 `.env`。在部署平台的密钥管理系统中注入 `DEEPSEEK_API_KEY` 后，链小易会自动启用 `deepseek-chat`；如需紧急停用，设置 `CHAINXIAOYI_CLOUD_ENABLED=false`。模型只参与意图抽取和证据解释，企业事实、分数、排序和报价始终来自数据库与供应商回执。
+不要把密钥写入仓库或 `.env`。在部署平台的密钥管理系统中注入 `DEEPSEEK_API_KEY` 后，链小易默认启用视觉模型 `deepseek-v4-flash-vision-exp`；如需使用已批准的其他模型，可通过部署环境的 `DEEPSEEK_MODEL` 覆盖；如需紧急停用，设置 `CHAINXIAOYI_CLOUD_ENABLED=false`。模型只参与意图抽取、材料理解和证据解释，企业事实、分数、排序和报价始终来自数据库与供应商回执。当前客户端会透传 `text`/`image_url` 多模态消息块；扫描件原图是否送入模型仍由材料解析链路的授权和大小限制控制。
 
 生产模板同时设置 `CHAINXIAOYI_CLOUD_REQUIRED=true`：DeepSeek 鉴权、网络或响应失败时接口会返回 `503 model_unavailable` 并停止本次 Agent 执行，不会把规则降级结果伪装成云模型结果。开发环境未设置该开关时，才会按规则引擎继续演示。
 
@@ -85,12 +85,16 @@ export CHAINXIAOYI_CLOUD_ENABLED=true
   --json --confirm-order --simulate-fulfillment
 ```
 
-如果服务已经由 Flask/Gunicorn 监听，可再执行真实 HTTP smoke（不使用 Flask test client）。它会检查监听服务确实启用 DeepSeek、登录演示采购方、创建会话并发送一条自然语言采购请求；规则模式会直接失败，避免误报：
+如果服务已经由 Flask/Gunicorn 监听，可再执行真实 HTTP smoke（不使用 Flask test client）。它会检查监听服务确实启用 DeepSeek、登录专用验收采购方、创建会话并发送一条自然语言采购请求；规则模式会直接失败，避免误报：
 
 ```bash
+LIVE_SMOKE_BUYER_NAME='专用验收采购账号' \
+LIVE_SMOKE_BUYER_PASSWORD='由密钥管理系统临时注入' \
 ./.venv/bin/python scripts/verify/live_chain_xiaoyi_smoke.py \
   --base-url http://127.0.0.1:5112
 ```
+
+该 smoke 不再内置或创建演示账号；生产/预生产必须使用一次性或专用的低权限采购账号，密码应通过环境变量或密钥管理系统注入，不要写入命令行历史。若要使用虚构企业和固定演示账号，只能运行本地演示种子与演示脚本，不能把它们带入生产库。
 
 该命令用于单个采购项的核心演示；多行 Excel 采购单在网页工作台中使用批量候选、批量询价和批量订单草稿流程。
 

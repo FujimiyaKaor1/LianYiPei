@@ -66,7 +66,7 @@ export default function AdminDashboard() {
     database: '生产数据库', agent_schema: 'Agent 数据结构', material_antivirus: '材料病毒扫描',
     material_storage: '私有材料存储', material_encryption: '材料加密密钥', deepseek: 'DeepSeek 模型',
     econtract: '电子合同', payment: '支付接口', smtp: '邮件触达', work_wechat: '企业微信',
-    business_data: '工商数据', tax_data: '税务数据', power_data: '电力数据', scheduler: '调度器', worker: '后台 Worker', explicit_approval: '询价显式审批',
+    business_data: '工商数据', tax_data: '税务数据', power_data: '电力数据', scheduler: '调度器', worker: '后台 Worker', explicit_approval: '询价显式审批', public_data_mode: '生产数据标识',
   };
 
   return (

@@ -65,7 +65,7 @@ def test_empty_database_reaches_migration_head(tmp_path):
             "external_callback_receipts",
         }.issubset(tables)
         version = connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
-        assert version == "g2c3d4e5f6a7"
+        assert version == "h3d4e5f6a7b8"
         canonical_columns = {
             row[1]: row[2]
             for row in connection.execute("PRAGMA table_info(industry_news_articles)")

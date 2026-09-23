@@ -27,7 +27,7 @@ export default function AlertWorkflow() {
     try {
       const [wfRes, statsRes] = await Promise.all([
         api.getMyWorkflows(filter || undefined),
-        api.getWorkflowStats(),
+        user.role === 'admin' ? api.getWorkflowStats() : Promise.resolve(null),
       ]);
       setWorkflows(wfRes.workflows || []);
       setStats(statsRes);

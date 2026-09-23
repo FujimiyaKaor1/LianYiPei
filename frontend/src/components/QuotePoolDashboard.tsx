@@ -63,7 +63,7 @@ export function QuotePoolDashboard() {
     remarks: '',
   });
 
-  const creditScore = (user as any)?.credit_score ?? 78;
+  const creditScore = (user as any)?.credit_score ?? null;
 
   // 获取价格指数
   const fetchPriceIndex = async (product: string) => {
@@ -197,9 +197,9 @@ export function QuotePoolDashboard() {
             <Award className="w-5 h-5 text-amber-500" />
             <span className="font-medium">当前信用分</span>
           </div>
-          <div className="text-3xl font-black text-blue-600">{creditScore}</div>
+          <div className="text-3xl font-black text-blue-600">{creditScore == null ? '未公开' : creditScore}</div>
           <div className="text-xs px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
-            {creditScore >= 80 ? '优秀' : creditScore >= 70 ? '良好' : '一般'}
+            {creditScore == null ? '暂无评级' : creditScore >= 80 ? '优秀' : creditScore >= 70 ? '良好' : '一般'}
           </div>
         </div>
       </div>

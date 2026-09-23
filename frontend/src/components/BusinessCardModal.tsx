@@ -106,7 +106,7 @@ export interface BusinessCardData {
   contact: string;
   phone: string;
   main_business: string;
-  credit_score: number;
+  credit_score: number | null;
   is_green_factory: boolean;
   tags: string[];
 }
@@ -154,7 +154,7 @@ function SingleCard({
           </div>
           {/* 信用分 */}
           <div className="flex flex-col items-end shrink-0">
-            <span className="text-2xl font-black text-neutral-900">{card.credit_score}</span>
+            <span className="text-2xl font-black text-neutral-900">{card.credit_score == null ? '未公开' : card.credit_score}</span>
             <span className="text-[9px] text-neutral-400">信用分</span>
           </div>
         </div>

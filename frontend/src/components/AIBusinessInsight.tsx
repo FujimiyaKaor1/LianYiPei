@@ -81,7 +81,7 @@ export function AIBusinessInsightCard({
           <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
-          <span className="text-sm font-bold text-blue-900">AI商机洞察</span>
+          <span className="text-sm font-bold text-blue-900">商机洞察</span>
           <Loader2 className="w-4 h-4 animate-spin text-blue-400 ml-auto" />
         </div>
         <div className="space-y-2">
@@ -100,7 +100,7 @@ export function AIBusinessInsightCard({
           <div className="w-8 h-8 rounded-lg bg-neutral-200 flex items-center justify-center">
             <Sparkles className="w-4 h-4 text-neutral-400" />
           </div>
-          <span className="text-sm font-bold text-neutral-600">AI商机洞察</span>
+          <span className="text-sm font-bold text-neutral-600">商机洞察</span>
         </div>
         <p className="text-xs text-neutral-400">暂无法获取商机洞察</p>
       </div>
@@ -117,9 +117,9 @@ export function AIBusinessInsightCard({
           <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
-          <span className="text-sm font-bold text-blue-900">AI商机洞察</span>
+          <span className="text-sm font-bold text-blue-900">商机洞察</span>
           <div className="ml-auto px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full">
-            DeepSeek
+            {insight.generation_mode === 'deepseek' ? 'DeepSeek' : '数据库规则'}
           </div>
         </div>
 
@@ -237,7 +237,7 @@ export function AIInsightBubble({ enterpriseId, productName, onGenerateQuote }: 
       <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
         <div className="flex items-center gap-2 mb-2">
           <Sparkles className="w-3 h-3 text-blue-500" />
-          <span className="text-[10px] font-bold text-blue-700">AI商机洞察</span>
+          <span className="text-[10px] font-bold text-blue-700">商机洞察</span>
           <Loader2 className="w-3 h-3 animate-spin text-blue-400 ml-auto" />
         </div>
         <div className="h-3 bg-blue-100/50 rounded animate-pulse w-4/5" />
@@ -251,7 +251,7 @@ export function AIInsightBubble({ enterpriseId, productName, onGenerateQuote }: 
     <div className="p-3 bg-blue-50 rounded-xl border border-blue-100">
       <div className="flex items-center gap-2 mb-2">
         <Sparkles className="w-3 h-3 text-blue-500" />
-        <span className="text-[10px] font-bold text-blue-700">AI商机洞察</span>
+        <span className="text-[10px] font-bold text-blue-700">商机洞察</span>
         <button
           type="button"
           onClick={() => setShowDetails(!showDetails)}

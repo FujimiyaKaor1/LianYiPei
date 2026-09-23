@@ -3,7 +3,7 @@
  * 
  * 功能：
  * 1. 创建意向报价
- * 2. 获取AI报价建议
+ * 2. 获取基于已持久化报价数据的规则建议
  * 3. 发送意向报价
  */
 import React, { useState, useEffect } from 'react';
@@ -79,7 +79,7 @@ export function IntentQuoteModal({
         quantity: parseInt(quantity) || undefined,
       });
       setAiSuggestion(res.suggestion);
-      if (res.suggestion.suggested_price) {
+      if (res.suggestion.suggested_price !== null && res.suggestion.price_range) {
         setTargetPrice(String(res.suggestion.suggested_price));
         setBudgetRange(`${res.suggestion.price_range.min}-${res.suggestion.price_range.max}`);
       }
@@ -114,7 +114,7 @@ export function IntentQuoteModal({
       });
 
       // 2. 如果有AI建议，应用到意向报价
-      if (aiSuggestion) {
+      if (aiSuggestion?.suggested_price !== null && aiSuggestion?.suggested_price !== undefined) {
         try {
           await api.applyAIQuoteSuggestion(createRes.quote_id, aiSuggestion);
         } catch {
@@ -180,26 +180,16 @@ export function IntentQuoteModal({
             </div>
           ) : (
             <>
-              {/* AI建议区块 */}
+              {/* 报价参考区块 */}
               {aiSuggestion ? (
                 <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100 p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Sparkles className="w-4 h-4 text-blue-500" />
-                    <span className="text-xs font-bold text-blue-700">AI报价建议</span>
+                    <span className="text-xs font-bold text-blue-700">报价参考（数据库规则）</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <span className="text-neutral-500">建议单价</span>
-                      <p className="font-bold text-blue-700 mt-0.5">
-                        ¥{aiSuggestion.suggested_price.toFixed(2)}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-neutral-500">参考区间</span>
-                      <p className="font-medium text-neutral-700 mt-0.5">
-                        ¥{aiSuggestion.price_range.min.toFixed(2)} - ¥{aiSuggestion.price_range.max.toFixed(2)}
-                      </p>
-                    </div>
+                  {aiSuggestion.suggested_price !== null && aiSuggestion.price_range ? <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div><span className="text-neutral-500">参考单价</span><p className="font-bold text-blue-700 mt-0.5">¥{aiSuggestion.suggested_price.toFixed(2)}</p></div>
+                    <div><span className="text-neutral-500">参考区间</span><p className="font-medium text-neutral-700 mt-0.5">¥{aiSuggestion.price_range.min.toFixed(2)} - ¥{aiSuggestion.price_range.max.toFixed(2)}</p></div>
                     <div>
                       <span className="text-neutral-500">预计交期</span>
                       <p className="font-medium text-neutral-700 mt-0.5">
@@ -210,12 +200,12 @@ export function IntentQuoteModal({
                       <span className="text-neutral-500">产能状态</span>
                       <p className={cn(
                         'font-medium mt-0.5',
-                        aiSuggestion.capacity_available ? 'text-blue-600' : 'text-amber-600'
+                        aiSuggestion.capacity_available === null ? 'text-neutral-500' : aiSuggestion.capacity_available ? 'text-blue-600' : 'text-amber-600'
                       )}>
-                        {aiSuggestion.capacity_available ? '产能充足' : '产能紧张'}
+                        {aiSuggestion.capacity_available === null ? '产能未登记' : aiSuggestion.capacity_available ? '产能充足' : '产能紧张'}
                       </p>
                     </div>
-                  </div>
+                  </div> : <p className="text-xs text-amber-700">暂无足够的已持久化报价样本，系统不会生成未经证实的价格。</p>}
                   <p className="text-[10px] text-neutral-500 mt-3 pt-3 border-t border-blue-100">
                     {aiSuggestion.basis}
                   </p>
@@ -235,7 +225,7 @@ export function IntentQuoteModal({
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4" />
-                      获取AI智能报价建议
+                      获取报价参考
                     </>
                   )}
                 </button>
@@ -323,11 +313,11 @@ export function IntentQuoteModal({
               )}
 
               {/* 操作按钮 */}
-              <div className="flex gap-3">
+              <div className="flex flex-col-reverse gap-3 sm:flex-row">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 py-3 border border-neutral-200 text-neutral-700 rounded-xl text-sm font-semibold hover:bg-neutral-50 transition-colors"
+                  className="min-h-11 flex-1 whitespace-nowrap border border-neutral-200 py-3 text-sm font-semibold text-neutral-700 rounded-xl hover:bg-neutral-50 transition-colors"
                 >
                   取消
                 </button>
@@ -335,7 +325,7 @@ export function IntentQuoteModal({
                   type="button"
                   onClick={() => void handleSubmit()}
                   disabled={loading}
-                  className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                  className="min-h-11 flex-1 whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
                 >
                   {loading ? (
                     <>

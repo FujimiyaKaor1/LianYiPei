@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 const session = { id: 42, title: '找工业电机', surface: 'public', status: 'active', intent: {}, updated_at: '2026-09-17T00:00:00' };
-const modelStatus = { local_enabled: false, cloud_enabled: false, local_model: '', cloud_provider: 'deepseek', cloud_model: 'deepseek-chat', active_provider: 'rules', is_configured: false, message: '本轮使用确定性规则与数据库匹配' };
+const modelStatus = { local_enabled: false, cloud_enabled: false, local_model: '', cloud_provider: 'deepseek', cloud_model: 'deepseek-v4-flash-vision-exp', active_provider: 'rules', is_configured: false, message: '本轮使用确定性规则与数据库匹配' };
 
 async function mockAgent(page: import('@playwright/test').Page) {
   await page.route('**/api/session', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: false, user: null }) }));
@@ -114,6 +114,20 @@ test('上传多行采购单后为每个采购项自动找厂并可切换结果',
       ],
     }),
   }));
+  await page.route('**/api/chain-xiaoyi/procurement-tasks/77/auto-plan', route => route.fulfill({
+    status: 201,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      success: true,
+      idempotent: false,
+      task: { id: 77, type: 'procurement_intake', status: 'awaiting_approval', requires_approval: true },
+      item_matches: [
+        { item_index: 1, intent: { product: '连接器', quantity: 2000 }, evidence: {}, match_result: { total: 1, degraded: false, explanation_provider: 'rules', results: [{ id: 31, name: '连接器工厂', province: '广东', city: '东莞', business_scope: '连接器制造', score: 91, confidence_index: 91, dimensions: {}, trusted_labels: [], reason: '产品能力匹配', degraded: false, contact_eligible: true }] } },
+        { item_index: 2, intent: { product: '五金冲压件', quantity: 5000 }, evidence: {}, match_result: { total: 1, degraded: false, explanation_provider: 'rules', results: [{ id: 32, name: '五金冲压工厂', province: '广东', city: '佛山', business_scope: '五金加工', score: 89, confidence_index: 89, dimensions: {}, trusted_labels: [], reason: '工艺能力匹配', degraded: false, contact_eligible: true }] } },
+      ],
+      preview: { status: 'awaiting_approval', item_count: 2, supplier_count: 2, channels: ['site'], task_ids: [81, 82], disclosures: [] },
+    }),
+  }));
   await page.route('**/api/chain-xiaoyi/tasks/77/rfq-batch-preview', route => route.fulfill({
     status: 201,
     contentType: 'application/json',
@@ -176,7 +190,6 @@ test('上传多行采购单后为每个采购项自动找厂并可切换结果',
   await expect(workWeChatChannel).toHaveAttribute('aria-pressed', 'true');
   await page.locator('button:visible', { hasText: '#2 五金冲压件' }).click();
   await expect(page.locator('h3:visible', { hasText: '五金冲压工厂' })).toBeVisible();
-  await page.locator('button:visible', { hasText: '生成全部采购项统一询价预览' }).click();
   await expect(page.locator('p:visible', { hasText: '将发送 2 个采购项，共 2 个供应商触达记录' })).toBeVisible();
   page.once('dialog', dialog => dialog.accept());
   await page.locator('button:visible', { hasText: '一次确认并全部加入发送队列' }).click();

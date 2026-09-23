@@ -1,0 +1,10 @@
+{
+  "baseUrl": "http://127.0.0.1:3000",
+  "recordedAt": "2026-09-23T03:29:58.766Z",
+  "segments": [
+    {
+      "segment": "enterprise",
+      "file": "02-enterprise-platform.webm"
+    }
+  ]
+}

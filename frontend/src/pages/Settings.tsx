@@ -3,7 +3,6 @@ import {
   User,
   Bell,
   Shield,
-  ChevronRight,
   LogOut,
   Loader2,
   AlertTriangle,
@@ -16,8 +15,11 @@ import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { useToast } from '@/src/components/ToastProvider';
 import { api, ApiError, type UserSettingsData, NETWORK_ERROR_MESSAGE } from '@/src/services/api';
+import { useAuth } from '@/src/context/AuthContext';
+import { GUEST_HOME_PATH } from '@/src/lib/rbac';
 export default function Settings() {
   const { showToast } = useToast();
+  const { logout } = useAuth();
   const [activeTab, setActiveTab] = useState(0);
   const [data, setData] = useState<UserSettingsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -163,8 +165,8 @@ export default function Settings() {
   const handleLogout = async () => {
     if (confirm('确定要退出登录吗？')) {
       try {
-        await api.logout();
-        window.location.href = '/login';
+        await logout();
+        window.location.href = GUEST_HOME_PATH;
       } catch (err) {
         showToast('退出登录失败，请重试', 'error');
         console.error(err);
@@ -238,9 +240,8 @@ export default function Settings() {
               <h3 className="text-xl font-bold">个人账户设置</h3>
               <div className="bg-white rounded-[2rem] border border-neutral-100 shadow-sm p-8 space-y-8">
                 <div className="flex items-center gap-8 pb-8 border-b border-neutral-50">
-                  <div className="w-24 h-24 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-400 relative group cursor-pointer font-black text-2xl overflow-hidden shrink-0">
+                  <div className="w-24 h-24 rounded-full bg-neutral-100 flex items-center justify-center text-neutral-400 relative font-black text-2xl overflow-hidden shrink-0">
                     {data?.name.slice(0, 1)}
-                    <div className="absolute inset-0 bg-brand-solid/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold">更换头像</div>
                   </div>
                   <div className="flex-1">
                     <h4 className="text-lg font-bold">{data?.name} · {data?.role === 'buyer' ? '采购商' : data?.role === 'supplier' ? '供应商' : '企业账户'}</h4>
@@ -290,18 +291,17 @@ export default function Settings() {
               <h3 className="text-xl font-bold">安全设置</h3>
               <div className="bg-white rounded-[2rem] border border-neutral-100 shadow-sm divide-y divide-neutral-50">
                 {[
-                  { title: '双重身份验证', desc: '开启后，登录时需要验证码。', status: '已开启', color: 'text-blue-500' },
-                  { title: '登录日志', desc: '查看最近的账户登录活动。', status: '查看', color: 'text-black font-bold' },
-                  { title: 'API 密钥管理', desc: '管理用于外部集成的 API 密钥。', status: '管理', color: 'text-black font-bold' },
+                  { title: '双重身份验证', desc: '当前平台尚未配置短信、邮箱或身份验证器校验。', status: '未配置', color: 'text-neutral-400' },
+                  { title: '登录日志', desc: '登录日志功能尚未开放。', status: '暂不可用', color: 'text-neutral-400' },
+                  { title: 'API 密钥管理', desc: '外部集成密钥管理功能尚未开放。', status: '暂不可用', color: 'text-neutral-400' },
                 ].map((item, i) => (
-                  <div key={i} className="p-8 flex items-center justify-between hover:bg-neutral-50/50 transition-colors cursor-pointer group">
+                  <div key={i} className="p-8 flex items-center justify-between">
                     <div>
                       <h4 className="text-sm font-bold">{item.title}</h4>
                       <p className="text-xs text-neutral-400 mt-1">{item.desc}</p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className={cn("text-xs", item.color)}>{item.status}</span>
-                      <ChevronRight className="w-4 h-4 text-neutral-300 group-hover:text-black transition-colors" />
+                        <span className={cn("text-xs", item.color)}>{item.status}</span>
                     </div>
                   </div>
                 ))}

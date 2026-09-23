@@ -8,6 +8,10 @@ from app.routes.api import _build_deepseek_match_reasons, get_llm_instance
 from app.services.deepseek_client import DEFAULT_DEEPSEEK_BASE_URL, DEFAULT_DEEPSEEK_MODEL, DeepSeekChatModel
 
 
+def test_default_deepseek_model_is_vision_experiment():
+    assert DEFAULT_DEEPSEEK_MODEL == "deepseek-v4-flash-vision-exp"
+
+
 def test_get_llm_instance_uses_deepseek_config(monkeypatch):
     monkeypatch.setenv("DEEPSEEK_API_KEY", "deepseek-test-key")
     monkeypatch.setenv("DEEPSEEK_MODEL", "deepseek-custom")
@@ -87,6 +91,43 @@ def test_deepseek_chat_model_posts_bearer_authorization(monkeypatch):
         {"role": "system", "content": "你是链易配助手"},
         {"role": "user", "content": "生成供应商推荐理由"},
     ]
+
+
+def test_deepseek_chat_model_preserves_multimodal_message_content(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"choices": [{"message": {"content": "已识别"}}]}
+
+    def fake_post(url, **kwargs):
+        captured.update(kwargs)
+        return FakeResponse()
+
+    monkeypatch.setattr("app.services.deepseek_client.requests.post", fake_post)
+    image_url = "data:image/png;base64," + ("A" * 128)
+    content = [
+        {"type": "text", "text": "请识别采购需求"},
+        {"type": "image_url", "image_url": {"url": image_url, "detail": "high"}},
+    ]
+
+    DeepSeekChatModel(api_key="deepseek-test-key").invoke([HumanMessage(content=content)])
+
+    assert captured["json"]["model"] == DEFAULT_DEEPSEEK_MODEL
+    assert captured["json"]["messages"] == [{"role": "user", "content": content}]
+
+
+def test_deepseek_chat_model_rejects_oversized_inline_image(monkeypatch):
+    monkeypatch.setattr("app.services.deepseek_client.requests.post", lambda *_args, **_kwargs: pytest.fail("request must not be sent"))
+    image_url = "data:image/png;base64," + ("A" * (10 * 1024 * 1024))
+
+    with pytest.raises(ValueError, match="图片内容过大"):
+        DeepSeekChatModel(api_key="deepseek-test-key").invoke(
+            [HumanMessage(content=[{"type": "image_url", "image_url": {"url": image_url}}])]
+        )
 
 
 def test_deepseek_chat_model_retries_transient_http_failures(monkeypatch):

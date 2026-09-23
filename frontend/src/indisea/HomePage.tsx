@@ -20,7 +20,7 @@ function Hero() {
         <span className="indisea-hero__verbs"><mark className={wordClass(0)}>找到</mark><i>·</i><mark className={wordClass(1)}>匹配</mark><i>·</i><mark className={wordClass(2)}>评估</mark></span>
         <span>优质的制造能力</span>
       </h1>
-      <div data-motion-reveal><TalkButton className="indisea-hero__cta" /></div>
+      <div data-motion-reveal><TalkButton className="indisea-hero__cta" href="/search" label="开始找厂" /></div>
       <a className="indisea-scroll" href="#connector-wall"><span aria-hidden="true">↓</span> 向下滚动</a>
     </section>
   );
@@ -206,7 +206,7 @@ function FinalCta() {
     <section className="indisea-final-cta" data-spine-section="11">
       <SectionLabel>11 / 开始协同</SectionLabel>
       <h2><span data-cta-line>从一条真实需求</span><span data-cta-line>开始，连接</span><span data-cta-line>可靠的制造能力。</span></h2>
-      <div data-motion-reveal><TalkButton /><a href="/search">公开找厂</a><a href="/aia">AI 找工厂</a></div>
+      <div data-motion-reveal><TalkButton href="/search" label="开始找厂" /><a href="/aia">AI 找工厂</a><a href="/#services">查看服务</a></div>
     </section>
   );
 }

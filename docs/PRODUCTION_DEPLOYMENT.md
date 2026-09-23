@@ -20,7 +20,7 @@
 独立 ClamAV（clamd）以及 Web/迁移/Worker 进程。Web 进程通过内部网络使用
 ClamAV 的 INSTREAM 协议扫描材料，不需要在 Web 容器里安装或暴露病毒扫描端口。
 生产镜像同时内置 `poppler-utils`、`tesseract-ocr` 和 `tesseract-ocr-chi-sim`，扫描版 PDF 会走受限 OCR，不会因缺少 OCR 二进制而静默降级。
-使用前请在部署平台注入 `MYSQL_*`、`DATABASE_URL`、`SECRET_KEY`、`DEEPSEEK_API_KEY`、
+使用前请在部署平台注入 `MYSQL_*`、`DATABASE_URL`、`SECRET_KEY`、`DEEPSEEK_API_KEY`（除非明确执行紧急关闭）、
 `MATERIAL_ENCRYPTION_KEY`、`S3_ACCESS_KEY` 和 `S3_SECRET_KEY`，再执行：
 
 生产进程环境变量优先于工作区 `.env`；`.env` 只用于补充未注入的本地开发默认值，
@@ -40,7 +40,7 @@ Nginx、Supervisor 或容器编排可使用两个不需要登录的探针：`GET
 
 前端使用 Vite 构建到 `app/static/frontend`，由 Flask/Nginx 托管静态资源，不需要线上长期运行 Vite dev server。
 
-生产启动时 `AUTO_CREATE_SCHEMA` 必须为 `0`（默认在 `APP_ENV=production` 下关闭）。部署顺序应为：备份数据库 → 在迁移进程执行 `FLASK_APP=wsgi:app flask db upgrade` → 验证 `GET /readyz` → 再启动 Gunicorn。Web 进程不会隐式 `create_all`，避免 Alembic 迁移记录与实际表结构漂移。
+生产启动时 `AUTO_CREATE_SCHEMA` 必须为 `0`（默认在 `APP_ENV=production` 下关闭），并且生产进程会拒绝 `sqlite://` 数据库 URL，只允许显式配置生产数据库（推荐 MySQL）。部署顺序应为：备份数据库 → 在迁移进程执行 `FLASK_APP=wsgi:app flask db upgrade` → 验证 `GET /readyz` → 再启动 Gunicorn。Web 进程不会隐式 `create_all`，避免 Alembic 迁移记录与实际表结构漂移。
 
 ## 关键生产环境变量
 
@@ -52,9 +52,17 @@ NEO4J_USER=neo4j
 NEO4J_PASSWORD=change-me
 REDIS_URL=redis://redis-host:6379/0
 
+# Browser origins allowed to create/update Chain XiaoYi sessions.
+# Use the public HTTPS origin of the site, without a path; comma-separate
+# multiple trusted frontends. Do not use localhost in production.
+TRUSTED_ORIGINS=https://your-domain.example
+
 DISABLE_API_AUTH=0
 SCHEDULER_ENABLED=1
 SCHEDULER_LOCK_FILE=/tmp/lianyipei-scheduler.lock
+# Split Web/Worker deployments use Redis for cross-container Worker liveness.
+WORKER_HEARTBEAT_KEY=lianyipei:worker:heartbeat
+WORKER_HEARTBEAT_TTL_SECONDS=30
 
 # 采购材料生产安全：ClamAV + 加密私有对象存储（不能使用 basic/none）
 MATERIAL_AV_MODE=clamav
@@ -84,9 +92,9 @@ curl -b session.cookie https://your-domain.example/api/admin/production-readines
 
 该命令会检查数据库、Redis、ClamAV、S3 和后台 Worker；DeepSeek 默认只检查配置而不消耗配额，确认要做真实模型探针时再显式加 `--probe-deepseek`。输出只包含状态、耗时和脱敏错误类型，不会打印密钥或连接串。
 
-`data.ready=false` 时，优先处理 `data.required_failures`。生产硬门槛包括非默认高强度 `SECRET_KEY`、正常登录鉴权、关闭 Mock 路由、显式数据库连接、关键 Agent 数据表/列、ClamAV、S3 私有材料存储、Fernet 加密密钥、显式询价审批，以及实际可运行的后台 Worker。Worker 可通过独立调度进程、`LIANYIPEI_WORKER_ENABLED=1` 或配置消息队列声明；Web 进程可以关闭 `SCHEDULER_ENABLED`，只要独立 Worker 持有调度器锁或显式声明 Worker。仅设置调度器开关但没有任何进程持有调度器锁时会失败关闭。电子签、支付、SMTP、企业微信及工商/税务/电力接口会作为可选集成显示，未配置时业务必须保持失败关闭。该检查会只读检查当前数据库结构，但不会写入数据库或主动连接第三方系统；真实第三方连通性仍需在部署环境用供应商沙盒回调验收。
+`data.ready=false` 时，优先处理 `data.required_failures`。生产硬门槛包括非默认高强度 `SECRET_KEY`、正常登录鉴权、关闭 Mock 路由、显式数据库连接、关键 Agent 数据表/列、ClamAV、S3 私有材料存储、Fernet 加密密钥、显式询价审批、HTTPS `TRUSTED_ORIGINS`，以及实际可运行的后台 Worker。Web 进程可以关闭 `SCHEDULER_ENABLED`，但独立 Worker 必须发布有效的 Redis 心跳；仅设置 `LIANYIPEI_WORKER_ENABLED`、消息队列 URL 或调度器开关都不能伪造存活证据。仅设置调度器开关但没有任何进程持有调度器锁/心跳时会失败关闭。电子签、支付、SMTP、企业微信及工商/税务/电力接口会作为可选集成显示，未配置时业务必须保持失败关闭。该检查会只读检查当前数据库结构，但不会写入数据库或主动连接第三方系统；真实第三方连通性仍需在部署环境用供应商沙盒回调验收。独立 Worker 每 10 秒向 Redis 发布短期心跳，Web 可跨容器检测其存活；心跳过期后 readiness 会失败关闭。
 
-只要密钥管理系统向进程注入 `DEEPSEEK_API_KEY`，链小易默认启用 DeepSeek；将 `CHAINXIAOYI_CLOUD_ENABLED=false` 可作为紧急关闭开关。生产模板将 `CHAINXIAOYI_CLOUD_REQUIRED=true`，因此未注入密钥时生产就绪检查会失败，而且会把运行时模型故障返回为 `503 model_unavailable`，不会悄悄以规则模式上线。密钥不会被接口状态或审计接口返回。
+只要密钥管理系统向进程注入 `DEEPSEEK_API_KEY`，链小易默认启用 DeepSeek；将 `CHAINXIAOYI_CLOUD_ENABLED=false` 可作为紧急关闭开关。Compose 允许在该紧急模式下不注入模型密钥；默认的 `CHAINXIAOYI_CLOUD_REQUIRED=true` 仍会让未配置真实密钥的实例 readiness 失败关闭。若确需关闭云模型，必须同时显式设置 `CHAINXIAOYI_CLOUD_ENABLED=false`，并确认主流程按文档允许的规则/人工降级运行；不能只删除密钥后把 required 保持为 true。模型启用时，运行时故障返回 `503 model_unavailable`，不会悄悄以规则模式冒充云模型。密钥不会被接口状态或审计接口返回。
 
 DeepSeek 调用对连接超时、429 和 5xx 等临时错误使用有上限的指数退避重试，默认最多重试 2 次。可通过 `DEEPSEEK_MAX_RETRIES`（0–5）和 `DEEPSEEK_RETRY_BACKOFF_SECONDS`（0–10 秒）调节；鉴权错误等 4xx 不重试，避免放大配额消耗或掩盖密钥配置问题。
 

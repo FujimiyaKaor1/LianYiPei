@@ -67,137 +67,6 @@ const EMPTY_SOURCE_STATE: SourceState = {
   directory: false,
 };
 
-const FALLBACK_STATS: GovStatsData = {
-  enterprise_count: 78,
-  supply_count: 814,
-  demand_count: 562,
-  alert_count: 8,
-};
-
-const FALLBACK_ALERTS: GovAlertItem[] = [
-  {
-    id: 9001,
-    product_name: '高精度传感器',
-    message: '核心零部件库存低于安全阈值，建议联动成渝和长三角供应商。',
-    level: 'red',
-    dimension: '库存',
-    suggestion: '优先调度备选供应商并跟踪交付周期。',
-    created_at: '2026-06-10 09:42',
-  },
-  {
-    id: 9002,
-    product_name: '工业控制主板',
-    message: '近 7 日采购需求上涨，需关注交付周期。',
-    level: 'yellow',
-    dimension: '需求',
-    suggestion: '建议扩充二级供应池。',
-    created_at: '2026-06-10 09:31',
-  },
-  {
-    id: 9003,
-    product_name: '智能网关模组',
-    message: '区域供应偏集中，建议补充备选供应商。',
-    level: 'blue',
-    dimension: '集中度',
-    suggestion: '持续观察区域备份能力。',
-    created_at: '2026-06-10 08:58',
-  },
-  {
-    id: 9004,
-    product_name: '伺服驱动器',
-    message: '部分企业报价波动，需要持续跟踪。',
-    level: 'yellow',
-    dimension: '价格',
-    suggestion: '纳入价格指数观察清单。',
-    created_at: '2026-06-10 08:21',
-  },
-];
-
-const FALLBACK_WORKFLOW: WorkflowStatsData = {
-  total: 32,
-  pending: 7,
-  processing: 11,
-  completed: 23,
-  rejected: 2,
-  avg_response_hours: 5.6,
-  completion_rate: 0.72,
-};
-
-const FALLBACK_GAPS: RecruitmentGap[] = [
-  {
-    product_name: '高精度传感器',
-    gap_type: 'localization_shortage',
-    gap_type_label: '本地供应不足',
-    supplier_count: 3,
-    local_ratio: 0.18,
-    urgency: 'critical',
-    urgency_label: '极紧迫',
-    affected_enterprises: 24,
-    suggestion: {
-      enterprise_type: '精密电子制造企业',
-      estimated_investment: '3000 万元',
-    },
-  },
-  {
-    product_name: '工业控制主板',
-    gap_type: 'supplier_shortage',
-    gap_type_label: '产能缺口',
-    supplier_count: 5,
-    local_ratio: 0.34,
-    urgency: 'high',
-    urgency_label: '紧迫',
-    affected_enterprises: 18,
-    suggestion: {
-      enterprise_type: '工控主板配套企业',
-      estimated_investment: '5000 万元',
-    },
-  },
-  {
-    product_name: '智能网关模组',
-    gap_type: 'graph_gap',
-    gap_type_label: '图谱缺口',
-    supplier_count: 7,
-    local_ratio: 0.42,
-    urgency: 'medium',
-    urgency_label: '一般',
-    affected_enterprises: 15,
-  },
-];
-
-const FALLBACK_TASKS: RecruitmentTask[] = [
-  {
-    id: 1,
-    task_name: '招商任务-高精度传感器',
-    target_product: '高精度传感器',
-    target_enterprise_name: null,
-    target_enterprise_location: null,
-    status: 'pending',
-    priority: 'high',
-    progress_notes: null,
-    deadline: null,
-    created_at: '2026-06-10 09:10',
-  },
-  {
-    id: 2,
-    task_name: '招商任务-工业控制主板',
-    target_product: '工业控制主板',
-    target_enterprise_name: null,
-    target_enterprise_location: null,
-    status: 'negotiating',
-    priority: 'normal',
-    progress_notes: null,
-    deadline: null,
-    created_at: '2026-06-10 08:50',
-  },
-];
-
-const FALLBACK_RANK_ITEMS: RankItem[] = [
-  { name: '工业控制主板', value: 92 },
-  { name: '智能网关模组', value: 84 },
-  { name: '高精度传感器', value: 78 },
-  { name: '伺服驱动器', value: 66 },
-];
-
 const PROVINCE_COORDS: Record<string, [number, number]> = {
   北京: [116.4, 39.9],
   天津: [117.2, 39.13],
@@ -238,12 +107,12 @@ type EChartsWindow = {
 };
 
 const EMPTY_DATA: ScreenData = {
-  stats: FALLBACK_STATS,
-  alerts: FALLBACK_ALERTS,
-  workflow: FALLBACK_WORKFLOW,
-  gaps: FALLBACK_GAPS,
-  tasks: FALLBACK_TASKS,
-  rankItems: FALLBACK_RANK_ITEMS,
+  stats: { enterprise_count: 0, supply_count: 0, demand_count: 0, alert_count: 0 },
+  alerts: [],
+  workflow: { total: 0, pending: 0, processing: 0, completed: 0, rejected: 0, avg_response_hours: 0, completion_rate: 0 },
+  gaps: [],
+  tasks: [],
+  rankItems: [],
   directory: [],
 };
 
@@ -279,40 +148,6 @@ function urgencyRank(gap: RecruitmentGap) {
   return 1;
 }
 
-const FALLBACK_PROVINCE_RATIOS: Array<[string, number]> = [
-  ['江苏', 0.069],
-  ['浙江', 0.066],
-  ['山东', 0.064],
-  ['广东', 0.061],
-  ['河南', 0.054],
-  ['湖北', 0.051],
-  ['四川', 0.05],
-  ['河北', 0.046],
-  ['安徽', 0.044],
-  ['湖南', 0.041],
-  ['福建', 0.039],
-  ['上海', 0.036],
-  ['重庆', 0.033],
-  ['江西', 0.032],
-  ['北京', 0.03],
-  ['陕西', 0.029],
-  ['辽宁', 0.028],
-  ['天津', 0.026],
-  ['广西', 0.025],
-  ['山西', 0.024],
-  ['云南', 0.022],
-  ['贵州', 0.021],
-  ['吉林', 0.018],
-  ['黑龙江', 0.017],
-  ['内蒙古', 0.015],
-  ['甘肃', 0.014],
-  ['新疆', 0.012],
-  ['海南', 0.011],
-  ['宁夏', 0.008],
-  ['青海', 0.008],
-  ['西藏', 0.007],
-];
-
 function normalizeProvinceName(value: string | null | undefined) {
   const text = String(value || '').trim();
   if (!text) return '';
@@ -320,24 +155,7 @@ function normalizeProvinceName(value: string | null | undefined) {
   return Object.keys(PROVINCE_COORDS).find((province) => text.includes(province)) || '';
 }
 
-function fallbackProvinceItems(totalEnterpriseCount: number): ProvinceMapItem[] {
-  const total = totalEnterpriseCount || FALLBACK_STATS.enterprise_count;
-  let assigned = 0;
-  return FALLBACK_PROVINCE_RATIOS.map(([name, ratio], index) => {
-    const isLast = index === FALLBACK_PROVINCE_RATIOS.length - 1;
-    const value = isLast
-      ? Math.max(total - assigned, 0)
-      : Math.max(Math.round(total * ratio), 0);
-    assigned += value;
-    return {
-      name,
-      value,
-      coord: PROVINCE_COORDS[name],
-    };
-  }).filter((item) => item.value > 0);
-}
-
-function buildProvinceItems(directory: EnterpriseDirectoryItem[], stats: GovStatsData): ProvinceMapItem[] {
+function buildProvinceItems(directory: EnterpriseDirectoryItem[]): ProvinceMapItem[] {
   const counts = new Map<string, number>();
 
   directory.forEach((item) => {
@@ -357,9 +175,7 @@ function buildProvinceItems(directory: EnterpriseDirectoryItem[], stats: GovStat
     .filter((item) => item.value > 0)
     .sort((a, b) => b.value - a.value);
 
-  return provinceItems.length > 0
-    ? provinceItems
-    : fallbackProvinceItems(stats.enterprise_count || FALLBACK_STATS.enterprise_count);
+  return provinceItems;
 }
 
 function buildProvincePieData(provinceItems: ProvinceMapItem[]) {
@@ -389,13 +205,7 @@ function normalizeRankItems(value: unknown): RankItem[] {
     })
     .filter(Boolean) as RankItem[];
 
-  return normalized.length > 0 ? normalized.slice(0, 6) : FALLBACK_RANK_ITEMS;
-}
-
-function trendValues(base: number, offset: number) {
-  return Array.from({ length: 8 }, (_, index) => (
-    Math.max(0, Math.round(base * (0.56 + index * 0.06 + (index % 2 === 0 ? 0.03 : -0.01)) + offset))
-  ));
+  return normalized.slice(0, 6);
 }
 
 function resolveResult<T>(result: PromiseSettledResult<T>, fallback: T): T {
@@ -663,16 +473,16 @@ export default function GovDigitalScreen() {
       directoryResult,
     ] = results;
 
-    const nextStats = resolveResult(statsResult as PromiseSettledResult<GovStatsData>, FALLBACK_STATS);
-    const nextAlerts = resolveResult(alertsResult as PromiseSettledResult<GovAlertItem[]>, FALLBACK_ALERTS);
-    const nextWorkflow = resolveResult(workflowResult as PromiseSettledResult<WorkflowStatsData>, FALLBACK_WORKFLOW);
+    const nextStats = resolveResult(statsResult as PromiseSettledResult<GovStatsData>, EMPTY_DATA.stats);
+    const nextAlerts = resolveResult(alertsResult as PromiseSettledResult<GovAlertItem[]>, []);
+    const nextWorkflow = resolveResult(workflowResult as PromiseSettledResult<WorkflowStatsData>, EMPTY_DATA.workflow);
     const nextGapsPayload = resolveResult(
       gapsResult as PromiseSettledResult<{ success: boolean; total: number; gaps: RecruitmentGap[] }>,
-      { success: false, total: FALLBACK_GAPS.length, gaps: FALLBACK_GAPS },
+      { success: false, total: 0, gaps: [] },
     );
     const nextTasksPayload = resolveResult(
       tasksResult as PromiseSettledResult<{ success: boolean; tasks: RecruitmentTask[]; total: number; page: number }>,
-      { success: false, tasks: FALLBACK_TASKS, total: FALLBACK_TASKS.length, page: 1 },
+      { success: false, tasks: [], total: 0, page: 1 },
     );
     const nextDirectoryPayload = resolveResult(
       directoryResult as PromiseSettledResult<{ count: number; enterprises: EnterpriseDirectoryItem[] }>,
@@ -681,10 +491,10 @@ export default function GovDigitalScreen() {
 
     setData({
       stats: nextStats,
-      alerts: Array.isArray(nextAlerts) && nextAlerts.length > 0 ? nextAlerts : FALLBACK_ALERTS,
+      alerts: Array.isArray(nextAlerts) ? nextAlerts : [],
       workflow: nextWorkflow,
-      gaps: Array.isArray(nextGapsPayload.gaps) && nextGapsPayload.gaps.length > 0 ? nextGapsPayload.gaps : FALLBACK_GAPS,
-      tasks: Array.isArray(nextTasksPayload.tasks) && nextTasksPayload.tasks.length > 0 ? nextTasksPayload.tasks : FALLBACK_TASKS,
+      gaps: Array.isArray(nextGapsPayload.gaps) ? nextGapsPayload.gaps : [],
+      tasks: Array.isArray(nextTasksPayload.tasks) ? nextTasksPayload.tasks : [],
       rankItems: normalizeRankItems(pagerankResult.status === 'fulfilled' ? pagerankResult.value : []),
       directory: Array.isArray(nextDirectoryPayload.enterprises) ? nextDirectoryPayload.enterprises : [],
     });
@@ -704,9 +514,9 @@ export default function GovDigitalScreen() {
     .filter((key) => !sources[key])
     .map((key) => SOURCE_META[key]);
 
-  const provinceItems = useMemo(() => buildProvinceItems(data.directory, data.stats), [data.directory, data.stats]);
+  const provinceItems = useMemo(() => buildProvinceItems(data.directory), [data.directory]);
   const provincePieData = useMemo(() => buildProvincePieData(provinceItems), [provinceItems]);
-  const topProvince = provinceItems[0];
+  const topProvince = provinceItems[0] || { name: '暂无', value: 0, coord: [104, 35] as [number, number] };
   const alertCounts = useMemo(() => {
     const counts = { red: 0, yellow: 0, blue: 0 };
     data.alerts.forEach((alert) => {
@@ -720,14 +530,14 @@ export default function GovDigitalScreen() {
     () => [...data.gaps].sort((a, b) => urgencyRank(b) - urgencyRank(a)).slice(0, 3),
     [data.gaps],
   );
-  const marketTotal = data.stats.supply_count + data.stats.demand_count;
-  const completionRate = Math.round((data.workflow.completion_rate || 0) * 100);
-  const provinceTotal = Math.max(provinceItems.reduce((sum, item) => sum + item.value, 0), 1);
-  const taskActiveCount = data.tasks.filter((task) => task.status !== 'signed').length;
+  const marketTotal = sources.stats ? data.stats.supply_count + data.stats.demand_count : null;
+  const completionRate = sources.workflows ? Math.round((data.workflow.completion_rate || 0) * 100) : null;
+  const provinceTotal = sources.directory ? provinceItems.reduce((sum, item) => sum + item.value, 0) : null;
+  const taskActiveCount = sources.tasks ? data.tasks.filter((task) => task.status !== 'signed').length : null;
 
   const supplyTrendOption = useMemo<EChartsOption>(() => {
-    const supply = trendValues(data.stats.supply_count || FALLBACK_STATS.supply_count, 12);
-    const demand = trendValues(data.stats.demand_count || FALLBACK_STATS.demand_count, -18);
+    const supply = sources.stats ? [data.stats.supply_count] : [];
+    const demand = sources.stats ? [data.stats.demand_count] : [];
     return {
       ...chartBase(),
       color: ['#2f89cf', '#00d4ff', '#f6d365'],
@@ -741,7 +551,7 @@ export default function GovDigitalScreen() {
       grid: { left: 4, top: 30, right: 8, bottom: 2, containLabel: true },
       xAxis: {
         type: 'category',
-        data: ['3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月'],
+        data: ['当前'],
         axisTick: { show: false },
         axisLine: { show: false },
         axisLabel: { color: 'rgba(214,235,255,.68)', fontSize: 10 },
@@ -771,11 +581,11 @@ export default function GovDigitalScreen() {
           type: 'line',
           smooth: true,
           symbolSize: 5,
-          data: supply.map((value, index) => Math.round((value + demand[index]) / 2)),
+          data: supply.length && demand.length ? [Math.round((supply[0] + demand[0]) / 2)] : [],
         },
       ],
     };
-  }, [data.stats]);
+  }, [data.stats, sources.stats]);
 
   const riskOption = useMemo<EChartsOption>(() => ({
     ...chartBase(),
@@ -814,10 +624,10 @@ export default function GovDigitalScreen() {
             ],
           },
         },
-        data: [alertCounts.red, alertCounts.yellow, alertCounts.blue],
+        data: sources.alerts ? [alertCounts.red, alertCounts.yellow, alertCounts.blue] : [],
       },
     ],
-  }), [alertCounts]);
+  }), [alertCounts, sources.alerts]);
 
   const workflowOption = useMemo<EChartsOption>(() => ({
     ...chartBase(),
@@ -838,15 +648,15 @@ export default function GovDigitalScreen() {
         avoidLabelOverlap: true,
         label: { color: '#d8ecff', formatter: '{b}\n{c}', fontSize: 10 },
         labelLine: { lineStyle: { color: 'rgba(216,236,255,.36)' } },
-        data: [
+        data: sources.workflows ? [
           { name: '待处理', value: data.workflow.pending },
           { name: '处理中', value: data.workflow.processing },
           { name: '已完成', value: data.workflow.completed },
           { name: '退回', value: data.workflow.rejected },
-        ],
+        ] : [],
       },
     ],
-  }), [data.workflow]);
+  }), [data.workflow, sources.workflows]);
 
   const alertBarOption = useMemo<EChartsOption>(() => ({
     ...chartBase(),
@@ -1008,8 +818,8 @@ export default function GovDigitalScreen() {
           <div className="no">
             <div className="no-hd">
               <ul>
-                <li>{formatNumber(data.stats.enterprise_count)}</li>
-                <li>{formatNumber(marketTotal)}</li>
+                <li>{sources.stats ? formatNumber(data.stats.enterprise_count) : '暂无'}</li>
+                <li>{marketTotal === null ? '暂无' : formatNumber(marketTotal)}</li>
               </ul>
             </div>
             <div className="no-bd">
@@ -1020,10 +830,10 @@ export default function GovDigitalScreen() {
             </div>
             <div className="no-kpis">
               {[
-                ['活跃供应', formatNumber(data.stats.supply_count)],
-                ['活跃采购', formatNumber(data.stats.demand_count)],
-                ['风险预警', formatNumber(data.stats.alert_count || data.alerts.length)],
-                ['闭环完成率', `${completionRate}%`],
+                ['活跃供应', sources.stats ? formatNumber(data.stats.supply_count) : '暂无'],
+                ['活跃采购', sources.stats ? formatNumber(data.stats.demand_count) : '暂无'],
+                ['风险预警', sources.alerts ? formatNumber(data.stats.alert_count || data.alerts.length) : '暂无'],
+                ['闭环完成率', completionRate === null ? '暂无' : `${completionRate}%`],
               ].map(([label, value]) => (
                 <div key={label}>
                   <span>{label}</span>
@@ -1038,7 +848,7 @@ export default function GovDigitalScreen() {
             topProvince={topProvince}
             provinceTotal={provinceTotal}
             rankItems={data.rankItems}
-            healthIndex={Math.max(42, Math.min(96, 88 - alertCounts.red * 7 - alertCounts.yellow * 3 + completionRate * 0.12))}
+            healthIndex={sources.stats && sources.workflows && sources.alerts ? Math.max(0, Math.min(100, 100 - alertCounts.red * 7 - alertCounts.yellow * 3 + (completionRate || 0) * 0.12)) : null}
           />
 
           <div className="screen-summary">
@@ -1111,10 +921,10 @@ export default function GovDigitalScreen() {
 
       {failedSources.length > 0 && (
         <div className="screen-warning">
-          待恢复数据源：{failedSources.join('、')}；当前使用最近可用数据与演示兜底值保障大屏展示。
+          数据源暂不可用：{failedSources.join('、')}；对应指标已停止展示，恢复数据源后自动同步。
         </div>
       )}
-      <div className="screen-task-count">待推进招商任务 {taskActiveCount} 项</div>
+      <div className="screen-task-count">待推进招商任务 {taskActiveCount === null ? '暂无数据' : `${taskActiveCount} 项`}</div>
     </div>
   );
 }
@@ -1158,11 +968,11 @@ function ChinaMapStage({
 }: {
   provinceItems: ProvinceMapItem[];
   topProvince: ProvinceMapItem;
-  provinceTotal: number;
+  provinceTotal: number | null;
   rankItems: RankItem[];
-  healthIndex: number;
+  healthIndex: number | null;
 }) {
-  const leadingProduct = rankItems[0]?.name || '关键产品';
+  const leadingProduct = rankItems[0]?.name || '暂无';
   const chinaMapReady = useChinaMapReady();
   const chinaMapOption = useMemo(
     () => buildChinaMapOption(provinceItems, topProvince),
@@ -1189,20 +999,20 @@ function ChinaMapStage({
         </div>
 
         <div className="map-health">
-          <strong>{Math.round(healthIndex)}</strong>
+          <strong>{healthIndex === null ? '暂无' : Math.round(healthIndex)}</strong>
           <span>健康指数</span>
         </div>
 
         <div className="map-metrics">
           <div><span>标注省份</span><strong>{provinceItems.length}</strong></div>
-          <div><span>平台企业</span><strong>{provinceTotal}</strong></div>
+          <div><span>平台企业</span><strong>{provinceTotal === null ? '暂无' : provinceTotal}</strong></div>
         </div>
 
         <div className="region-cards">
           {provinceItems.slice(0, 3).map((province) => (
             <article key={province.name}>
               <span>{province.name}</span>
-              <strong>企业占比 {Math.round((province.value / provinceTotal) * 100)}%</strong>
+              <strong>企业占比 {provinceTotal ? Math.round((province.value / provinceTotal) * 100) : 0}%</strong>
               <em>{province.value}家</em>
             </article>
           ))}
@@ -1211,8 +1021,9 @@ function ChinaMapStage({
         <div className="map-insight">
           <strong>监管研判</strong>
           <p>
-            以中国地图标注省域企业数量，当前 {topProvince.name} 标注 {topProvince.value} 家，
-            优先关注 {leadingProduct}。
+            {provinceTotal === null
+              ? '企业地区数据暂不可用，当前未生成区域研判。'
+              : `以中国地图标注省域企业数量，当前 ${topProvince.name} 标注 ${topProvince.value} 家，优先关注 ${leadingProduct}。`}
           </p>
         </div>
       </div>

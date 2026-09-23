@@ -24,6 +24,50 @@ from app.services.chain_xiaoyi.orchestrator import ChainXiaoYiOrchestrator, _bes
 from app.applications.fulfillment.services.intent_quote_service import IntentQuoteService
 from app.services.rfq_delivery import deliver_rfq
 from app.services.material_storage import retrieve_material
+from app.routes.chain_xiaoyi import _origin_is_allowed, verify_write_origin
+
+
+def test_origin_policy_allows_same_origin_and_configured_dev_origin(app, monkeypatch):
+    monkeypatch.setitem(app.config, "TRUSTED_ORIGINS", ["http://localhost:3000"])
+    with app.test_request_context("/", base_url="http://127.0.0.1:5050"):
+        assert _origin_is_allowed("http://127.0.0.1:5050") is True
+        assert _origin_is_allowed("http://localhost:3000") is True
+
+
+def test_origin_policy_rejects_unconfigured_cross_site_origin(app, monkeypatch):
+    monkeypatch.setitem(app.config, "TRUSTED_ORIGINS", ["http://localhost:3000"])
+    with app.test_request_context("/", base_url="http://127.0.0.1:5050"):
+        assert _origin_is_allowed("https://attacker.example") is False
+        assert _origin_is_allowed("http://localhost:3001") is False
+        assert _origin_is_allowed("not-an-origin") is False
+
+
+def test_origin_policy_does_not_use_dev_defaults_in_production(app, monkeypatch):
+    monkeypatch.setitem(app.config, "APP_ENV", "production")
+    monkeypatch.setitem(app.config, "TRUSTED_ORIGINS", [])
+    with app.test_request_context("/", base_url="http://127.0.0.1:5050"):
+        assert _origin_is_allowed("http://localhost:3000") is False
+        assert _origin_is_allowed("http://127.0.0.1:5050") is True
+
+
+def test_write_origin_guard_enforces_policy_when_request_is_not_testing(app, monkeypatch):
+    monkeypatch.setattr(app, "testing", False)
+    monkeypatch.setitem(app.config, "TRUSTED_ORIGINS", ["http://localhost:3000"])
+    with app.test_request_context(
+        "/api/chain-xiaoyi/sessions",
+        method="POST",
+        base_url="http://127.0.0.1:5050",
+        headers={"Origin": "http://localhost:3000"},
+    ):
+        assert verify_write_origin() is None
+    with app.test_request_context(
+        "/api/chain-xiaoyi/sessions",
+        method="POST",
+        base_url="http://127.0.0.1:5050",
+        headers={"Origin": "https://attacker.example"},
+    ):
+        rejected = verify_write_origin()
+        assert rejected[1] == 403
 
 
 def test_production_matching_excludes_explicit_mock_supplier(app, test_supplier, monkeypatch):
@@ -249,6 +293,17 @@ def test_model_status_explains_fail_closed_cloud_policy(app, monkeypatch):
         status = get_model_status().to_dict()
     assert status["active_provider"] == "deepseek"
     assert "不会降级" in status["message"]
+
+
+def test_model_status_uses_vision_experiment_model_by_default(app, monkeypatch):
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-key")
+    monkeypatch.delenv("DEEPSEEK_MODEL", raising=False)
+    monkeypatch.setenv("CHAINXIAOYI_CLOUD_ENABLED", "true")
+    with app.app_context():
+        from app.services.chain_xiaoyi.model_router import get_model_status
+
+        status = get_model_status().to_dict()
+    assert status["cloud_model"] == "deepseek-v4-flash-vision-exp"
 
 
 def test_guest_session_uses_http_only_cookie_and_returns_database_matches(
@@ -547,6 +602,7 @@ def test_rfq_worker_recovers_stale_running_task_before_processing(
     app,
     test_enterprise,
     test_supplier,
+    monkeypatch,
 ):
     test_enterprise.verification_status = "approved"
     test_enterprise.is_verified = True
@@ -565,7 +621,7 @@ def test_rfq_worker_recovers_stale_running_task_before_processing(
     task.updated_at = datetime.utcnow() - timedelta(minutes=30)
     task.output_json = {"queue": {"attempts": 1, "started_at": (datetime.utcnow() - timedelta(minutes=30)).isoformat()}}
     db.session.commit()
-    app.config["CHAIN_XIAOYI_QUEUE_LEASE_SECONDS"] = 900
+    monkeypatch.setitem(app.config, "CHAIN_XIAOYI_QUEUE_LEASE_SECONDS", 900)
 
     result = ChainXiaoYiOrchestrator.process_queued_rfq_tasks()
 
@@ -1452,14 +1508,14 @@ def test_rfq_quote_summary_and_order_draft(client, test_enterprise, test_supplie
     assert confirmed_again.get_json()["idempotent"] is True
 
 
-def test_signed_quote_callback_is_confirmable_and_idempotent(client, app, test_enterprise, test_supplier):
+def test_signed_quote_callback_is_confirmable_and_idempotent(client, app, test_enterprise, test_supplier, monkeypatch):
     test_enterprise.verification_status = "approved"
     test_enterprise.is_verified = True
     test_supplier.verification_status = "approved"
     test_supplier.is_verified = True
     test_supplier.extras = {"trust_profile": {"claim_status": "claimed", "contact_authorized": True}}
     db.session.commit()
-    app.config["RFQ_QUOTE_CALLBACK_SECRET"] = "quote-callback-test-secret"
+    monkeypatch.setitem(app.config, "RFQ_QUOTE_CALLBACK_SECRET", "quote-callback-test-secret")
     assert client.post(
         "/auth/login",
         data={"name": test_enterprise.name, "password": "test123456"},

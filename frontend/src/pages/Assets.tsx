@@ -96,7 +96,7 @@ export default function Assets() {
           
           <div className="flex gap-8 shrink-0">
             <div className="text-center">
-              <div className="text-5xl font-black tracking-tighter">{data.credit_score}</div>
+              <div className="text-5xl font-black tracking-tighter">{data.credit_score == null ? '未公开' : data.credit_score}</div>
               <div className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest mt-2">履约信用分</div>
             </div>
             <div className="w-px h-16 bg-white/10"></div>
@@ -204,7 +204,7 @@ export default function Assets() {
               ))}
             </div>
             <p className="text-[11px] text-neutral-500 leading-relaxed italic">
-              * 信用分由 AI 引擎根据链上存证、税务公开数据及行业评价实时计算得出。
+              * 这里只展示已持久化的信用事件和授权数据；缺少证据时不会补出信用分。
             </p>
           </div>
 

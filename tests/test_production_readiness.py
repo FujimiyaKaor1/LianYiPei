@@ -95,6 +95,42 @@ def test_readiness_checks_auth_mock_secret_and_agent_schema(app, _db, monkeypatc
 
 
 @pytest.mark.unit
+def test_production_readiness_requires_https_browser_origin(app, monkeypatch):
+    monkeypatch.setitem(app.config, "APP_ENV", "production")
+    monkeypatch.setitem(app.config, "TRUSTED_ORIGINS", ["http://localhost:3000"])
+
+    with app.app_context():
+        report = build_readiness_report()
+
+    assert report["checks"]["trusted_origins"]["configured"] is False
+    assert "trusted_origins" in report["required_failures"]
+
+
+@pytest.mark.unit
+def test_production_readiness_rejects_origin_template_placeholder(app, monkeypatch):
+    monkeypatch.setitem(app.config, "APP_ENV", "production")
+    monkeypatch.setitem(app.config, "TRUSTED_ORIGINS", ["https://your-domain.example"])
+
+    with app.app_context():
+        report = build_readiness_report()
+
+    assert report["checks"]["trusted_origins"]["configured"] is False
+
+
+@pytest.mark.unit
+def test_production_readiness_rejects_demo_public_data_label(app, monkeypatch):
+    monkeypatch.setitem(app.config, "APP_ENV", "production")
+    monkeypatch.setitem(app.config, "PUBLIC_DATA_MODE", "demo")
+
+    with app.app_context():
+        report = build_readiness_report()
+
+    assert report["checks"]["public_data_mode"]["required"] is True
+    assert report["checks"]["public_data_mode"]["configured"] is False
+    assert "public_data_mode" in report["required_failures"]
+
+
+@pytest.mark.unit
 def test_readiness_requires_explicit_rfq_approval(app, monkeypatch):
     monkeypatch.setitem(app.config, "CHAINXIAOYI_REQUIRE_EXPLICIT_APPROVAL", False)
     with app.app_context():
@@ -128,16 +164,17 @@ def test_production_readiness_requires_a_real_background_worker(app, monkeypatch
 
 
 @pytest.mark.unit
-def test_split_production_worker_satisfies_background_execution_without_web_scheduler(app, monkeypatch):
+def test_worker_flag_alone_does_not_claim_a_background_worker(app, monkeypatch):
     monkeypatch.setitem(app.config, "APP_ENV", "production")
     monkeypatch.setitem(app.config, "SCHEDULER_ENABLED", False)
     monkeypatch.setenv("LIANYIPEI_WORKER_ENABLED", "1")
+    monkeypatch.delenv("CELERY_BROKER_URL", raising=False)
     with app.app_context():
         report = build_readiness_report()
     assert report["checks"]["scheduler"]["required"] is False
     assert report["checks"]["scheduler"]["configured"] is False
-    assert report["checks"]["worker"]["configured"] is True
-    assert "worker" not in report["required_failures"]
+    assert report["checks"]["worker"]["configured"] is False
+    assert "worker" in report["required_failures"]
 
 
 @pytest.mark.unit
@@ -152,6 +189,32 @@ def test_worker_flag_zero_does_not_claim_a_background_worker(app, monkeypatch):
 
     assert report["checks"]["worker"]["configured"] is False
     assert "worker" in report["required_failures"]
+
+
+@pytest.mark.unit
+def test_split_worker_heartbeat_is_visible_across_pid_namespaces(app, monkeypatch):
+    import sys
+    import types
+
+    class _RedisClient:
+        def get(self, key):
+            assert key == "lianyipei:worker:heartbeat"
+            return b"worker-host:123"
+
+    fake_redis = types.SimpleNamespace(Redis=types.SimpleNamespace(from_url=lambda *args, **kwargs: _RedisClient()))
+    monkeypatch.setitem(sys.modules, "redis", fake_redis)
+    # This test intentionally models the production process rather than the
+    # Flask test isolation path below.
+    monkeypatch.setitem(app.config, "TESTING", False)
+    monkeypatch.setitem(app.config, "APP_ENV", "production")
+    monkeypatch.setitem(app.config, "SCHEDULER_ENABLED", False)
+    monkeypatch.delenv("LIANYIPEI_WORKER_ENABLED", raising=False)
+    monkeypatch.delenv("CELERY_BROKER_URL", raising=False)
+    with app.app_context():
+        report = build_readiness_report()
+
+    assert report["checks"]["worker"]["configured"] is True
+    assert "worker" not in report["required_failures"]
 
 
 @pytest.mark.unit

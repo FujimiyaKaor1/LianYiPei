@@ -9,7 +9,7 @@ export interface ApiResponse<T> {
 export interface CreditScoreData {
   success?: boolean;
   enterprise_id?: number;
-  credit_score: number;
+  credit_score: number | null;
   level: string;
   privileges?: Record<string, unknown>;
 }
@@ -104,7 +104,7 @@ export interface SupplierSearchItem {
   id: number;
   name: string;
   address: string;
-  credit_score: number;
+  credit_score: number | null;
   score: number;
   match: string;
   desc: string;
@@ -133,13 +133,13 @@ export interface EnterpriseDirectoryItem {
   address: string;
   province: string;
   city: string;
-  credit_score: number;
+  credit_score: number | null;
   business_scope: string;
   industry_code: string;
   tech_keywords?: string;
-  capacity?: number;
-  max_capacity?: number;
-  current_orders?: number;
+  capacity?: number | null;
+  max_capacity?: number | null;
+  current_orders?: number | null;
   capacity_status?: 'ample' | 'tight' | string;
   is_export?: boolean;
   has_decision_maker?: boolean;
@@ -257,8 +257,21 @@ export interface PublicAgentMarketResponse {
     summary: string;
     demo: boolean;
     agents: string[];
+    skills: PublicAgentSkill[];
   }[];
   layers: { key: string; title: string; description: string }[];
+}
+
+export interface PublicAgentSkill {
+  name: string;
+  label: string;
+  purpose: string;
+  repo: string;
+  path: string;
+  branch: string;
+  source_url: string;
+  download_url: string;
+  usage: string[];
 }
 
 export interface PublicAiFindResponse {
@@ -677,7 +690,7 @@ export interface FavoriteSupplierItem {
   supplier_city: string;
   supplier_industry: string;
   capacity: number;
-  credit_score: number;
+  credit_score: number | null;
   is_green_factory: boolean;
   patent_count: number;
   match_score: number | null;
@@ -744,11 +757,12 @@ export interface IntentQuoteResponse {
 }
 
 export interface AIQuoteSuggestion {
-  suggested_price: number;
-  price_range: { min: number; max: number };
+  generation_mode: 'database_rules' | 'deepseek' | string;
+  suggested_price: number | null;
+  price_range: { min: number; max: number } | null;
   delivery_estimate: string;
   basis: string;
-  capacity_available: boolean;
+  capacity_available: boolean | null;
   median_price?: number;
   credit_score?: number;
   capacity_ratio?: number;
@@ -768,7 +782,7 @@ export interface EnterpriseProfile {
   main_products: string;
   capacity_status: string;
   capacity_usage: string;
-  credit_score: number;
+  credit_score: number | null;
   credit_level: string;
   green_level: string;
   patent_count: number;
@@ -783,6 +797,7 @@ export interface EnterpriseProfileResponse {
 
 export interface BusinessInsightMessage {
   type: string;
+  generation_mode?: 'database_rules' | 'deepseek' | 'local' | string;
   enterprise_id: number;
   enterprise_name: string;
   insight_summary: string;
@@ -817,7 +832,7 @@ export interface EnterpriseAssetData {
   location: string;
   industry_tag: string;
   tags: string[];
-  credit_score: number;
+  credit_score: number | null;
   patent_count: number;
   qualifications: {
     title: string;
@@ -889,9 +904,9 @@ export interface OpportunityScoreResult {
 }
 
 export interface CreditRiskResult {
-  credit_score: number;
+  credit_score: number | null;
   level: string;
-  risk_level: '低风险' | '中风险' | '高风险';
+  risk_level: '低风险' | '中风险' | '高风险' | '未知';
   risk_text: string;
 }
 
@@ -1505,7 +1520,15 @@ export const api = {
 
   async fetchCreditRisk(enterpriseId: number | string): Promise<CreditRiskResult> {
     const scoreData = await this.fetchCreditScore(enterpriseId);
-    const score = Number(scoreData.credit_score || 0);
+    const score = scoreData.credit_score == null ? null : Number(scoreData.credit_score);
+    if (score == null) {
+      return {
+        credit_score: null,
+        level: scoreData.level || '未公开',
+        risk_level: '未知',
+        risk_text: '企业尚未公开信用分，请结合真实履约记录评估。',
+      };
+    }
     let riskLevel: CreditRiskResult['risk_level'] = '中风险';
     let riskText = '信用表现一般，建议谨慎合作并关注账期。';
     if (score >= 85) {
@@ -2213,7 +2236,7 @@ export const api = {
   createInquiryChat(payload: {
     buyer_id: number;
     seller_id: number;
-    match_record_id: number;
+    match_record_id?: number;
     is_anonymous?: boolean;
     product_name?: string;
     match_score?: number;
@@ -2343,7 +2366,7 @@ export const api = {
         phone: string;
         main_business: string;
         business_scope: string;
-        credit_score: number;
+        credit_score: number | null;
         is_green_factory: boolean;
         tags: string[];
         collaboration_code: string | null;
@@ -2364,7 +2387,7 @@ export const api = {
         contact: string;
         phone: string;
         main_business: string;
-        credit_score: number;
+        credit_score: number | null;
         is_green_factory: boolean;
         tags: string[];
       };
@@ -2432,7 +2455,7 @@ export interface ActiveFulfillmentItem {
 
 export interface FulfillmentDashboardData {
   success: boolean;
-  current_score: number;
+  current_score: number | null;
   trend: { month: string; score: number }[];
   delivery_stats: {
     own_rate: number;

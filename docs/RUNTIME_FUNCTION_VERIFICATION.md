@@ -1,5 +1,10 @@
 # 链易配本地拉起与功能验证文档
 
+> 历史本地验证记录（2026-06-12），不是生产可用性证明。文中的账号、密码、
+> SQLite/MySQL 本地路径和页面巡检结果只适用于当时的开发演示；不得复制到生产库。
+> 当前生产结论以 [`PRODUCTION_AUDIT_2026-09-18.md`](PRODUCTION_AUDIT_2026-09-18.md)
+> 和 [`PRODUCTION_DEPLOYMENT.md`](PRODUCTION_DEPLOYMENT.md) 为准。
+
 验证日期：2026-06-12  
 验证环境：macOS，本地 MySQL，Flask 后端 + Vite/React 前端
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
@@ -19,7 +19,7 @@ export type CollaborationModalProps = {
   open: boolean;
   onClose: () => void;
   enterpriseId: number | null;
-  currentCreditScore: number;
+  currentCreditScore: number | null;
 };
 
 function scoreDeltaLabel(record: CreditHistoryRecord): string {
@@ -49,14 +49,14 @@ export function CollaborationModal({
 }: CollaborationModalProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [history, setHistory] = useState<CreditHistoryRecord[]>([]);
-  const [score, setScore] = useState(currentCreditScore || 70);
+  const [score, setScore] = useState<number | null>(currentCreditScore);
   const [isLoading, setIsLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
-    setScore(currentCreditScore || 70);
+    setScore(currentCreditScore);
   }, [currentCreditScore]);
 
   useEffect(() => {
@@ -72,7 +72,7 @@ export function CollaborationModal({
         ]);
         const records = historyResp.records || [];
         setHistory(records);
-        setScore(Number(scoreResp.credit_score || currentCreditScore || 70));
+        setScore(scoreResp.credit_score == null ? currentCreditScore : Number(scoreResp.credit_score));
         localStorage.setItem(cacheKey, JSON.stringify(records));
       } catch {
         try {
@@ -96,12 +96,6 @@ export function CollaborationModal({
     };
   }, [open]);
 
-  const safeScore = useMemo(() => {
-    const numeric = Number(score || 70);
-    if (Number.isNaN(numeric)) return 70;
-    return Math.max(0, Math.min(100, Math.round(numeric)));
-  }, [score]);
-
   const handleFile = async (file: File | null) => {
     if (!file || uploading) return;
     if (!enterpriseId) {
@@ -120,7 +114,7 @@ export function CollaborationModal({
       const now = new Date();
       const invoiceNo = `INV${now.getTime()}`;
       const invoiceDate = now.toISOString().slice(0, 10);
-      const resp = await api.uploadInvoice(file, {
+      await api.uploadInvoice(file, {
         seller_id: enterpriseId,
         invoice_no: invoiceNo,
         invoice_date: invoiceDate,
@@ -128,18 +122,17 @@ export function CollaborationModal({
         quality_rating: 5,
       });
 
-      const newScore = Math.min(100, safeScore + 10);
-      const newRecord: CreditHistoryRecord = {
-        id: `FULFILL-${resp.fulfillment_id || Date.now()}`,
-        old_score: safeScore,
-        new_score: newScore,
-        change_value: 10,
-        change_type: 'fulfillment',
-        reason: `交易凭证 ${resp.invoice_info?.invoice_no || invoiceNo} 验证通过`,
-        created_at: new Date().toISOString(),
-      };
-      setHistory((prev) => [newRecord, ...prev]);
-      setScore(newScore);
+      try {
+        const [historyResp, scoreResp] = await Promise.all([
+          api.fetchCreditHistory(enterpriseId, { limit: 12 }),
+          api.fetchCreditScore(enterpriseId),
+        ]);
+        setHistory(historyResp.records || []);
+        setScore(scoreResp.credit_score == null ? null : Number(scoreResp.credit_score));
+      } catch {
+        // The upload has already been persisted; do not manufacture a local
+        // score or credit-history entry when the refresh endpoint is down.
+      }
       setMessage({ type: 'success', text: '交易凭证验证通过，已写入履约记录。' });
     } catch (error) {
       setMessage({
@@ -213,14 +206,14 @@ export function CollaborationModal({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold text-ink-muted">当前履约信用</p>
-                  <div className="metric-number mt-2 text-5xl font-black text-ink">{safeScore}</div>
+                  <div className="metric-number mt-2 text-5xl font-black text-ink">{score == null ? '未公开' : Math.round(score)}</div>
                 </div>
                 <div className="flex h-10 w-10 items-center justify-center rounded-md bg-brand-soft text-brand">
                   <Sparkles className="h-5 w-5" />
                 </div>
               </div>
               <div className="mt-5 h-2 overflow-hidden rounded-full bg-surface-subtle">
-                <div className="h-full rounded-full bg-brand" style={{ width: `${safeScore}%` }} />
+                <div className="h-full rounded-full bg-brand" style={{ width: `${score == null ? 0 : Math.max(0, Math.min(100, score))}%` }} />
               </div>
               <p className="mt-4 text-xs font-medium leading-6 text-ink-muted">
                 真实交易凭证会用于履约信用记录，不会向游客或公开查询接口展示敏感票据信息。

@@ -7,7 +7,8 @@
 - [`启动说明.md`](启动说明.md)：本地启动、初始化、账号和常见问题
 - [`PRODUCTION_DEPLOYMENT.md`](PRODUCTION_DEPLOYMENT.md)：生产部署
 - [`BAOTA_SERVER_DEPLOYMENT_SPEC.md`](BAOTA_SERVER_DEPLOYMENT_SPEC.md)：宝塔服务器部署规范
-- [`RUNTIME_FUNCTION_VERIFICATION.md`](RUNTIME_FUNCTION_VERIFICATION.md)：运行功能验证记录
+- [`PRODUCTION_EXTERNAL_ACCEPTANCE_TEMPLATE.md`](PRODUCTION_EXTERNAL_ACCEPTANCE_TEMPLATE.md)：目标服务器与供应商外部验收模板
+- [`RUNTIME_FUNCTION_VERIFICATION.md`](RUNTIME_FUNCTION_VERIFICATION.md)：历史本地运行验证记录（不是生产验收）
 - [`scheduler_guide.md`](scheduler_guide.md)：调度器说明
 
 ## 架构与开发

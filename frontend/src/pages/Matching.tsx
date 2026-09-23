@@ -164,7 +164,9 @@ export default function Matching() {
       return typeof parsed?.delivery_days === 'number' ? parsed.delivery_days : 30;
     } catch { return 30; }
   });
-  const [creditLevel, setCreditLevel] = useState<(typeof CREDIT_LEVELS)[number]>('AAA');
+  // 不给自然语言搜索附加隐含信用门槛；否则普通关键词搜索会默认发送
+  // min_credit=AAA，把真实数据库中的大多数供应商过滤掉。用户仍可在筛选器中主动选择信用等级。
+  const [creditLevel, setCreditLevel] = useState<(typeof CREDIT_LEVELS)[number]>('不限');
   const [suppliers, setSuppliers] = useState<SupplierSearchItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorText, setErrorText] = useState('');
@@ -400,13 +402,13 @@ export default function Matching() {
   // ── 指标分析（基于真实数据动态生成） ────────────────────────────────────
 
   const getMetrics = (item: SupplierSearchItem) => {
-    const creditScore = Number(item.credit_score) || 70;
+    const creditScore = item.credit_score == null ? null : Number(item.credit_score);
     return [
       { label: '价格竞争力 (同级对比)', value: null, icon: TrendingUp },
       { label: '历史交期达成率', value: null, icon: Clock },
       { label: '质量控制水平 (良品率)', value: null, icon: CheckCircle },
       { label: '产线数字化覆盖率', value: null, icon: Zap },
-      { label: '信用综合评定', value: Math.round(creditScore), icon: ShieldCheck },
+      { label: '信用综合评定', value: creditScore == null ? null : Math.round(creditScore), icon: ShieldCheck },
     ];
   };
 
@@ -731,16 +733,16 @@ export default function Matching() {
               </div>
               
               {/* Footer Actions */}
-              <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border bg-surface-subtle px-7 py-4">
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-border bg-surface-subtle px-5 py-4 sm:px-7">
                 <button
                   disabled={inquirySendingId !== null}
                   onClick={(e) => handleAnonymousInquiry(e, activeSupplier)}
-                  className="btn-secondary btn-sm gap-1.5"
+                  className="btn-secondary btn-sm shrink-0 gap-1.5 whitespace-nowrap"
                 >
                   {inquirySendingId === Number(activeSupplier.id) ? (
                     <><Loader2 className="h-3 w-3 animate-spin" /> 准备发送中</>
                   ) : (
-                    <><Send className="h-3 w-3" /> 发起匿名询价</>
+                    <><Send className="h-3 w-3" /> 发送匿名报价</>
                   )}
                 </button>
                 <button
@@ -757,7 +759,6 @@ export default function Matching() {
                       const chatResp = await api.createInquiryChat({
                         buyer_id: user.id,
                         seller_id: sid,
-                        match_record_id: 0,
                         is_anonymous: false,
                         product_name: searchQuery || '精密零部件',
                         match_score: Number(activeSupplier.score || 0),
@@ -773,7 +774,7 @@ export default function Matching() {
                       setInquirySendingId(null);
                     }
                   }}
-                  className="btn-primary btn-sm gap-1.5 disabled:opacity-50"
+                  className="btn-primary btn-sm shrink-0 gap-1.5 whitespace-nowrap disabled:opacity-50"
                 >
                   <ArrowRightLeft className="h-3 w-3" />
                   带信息交换

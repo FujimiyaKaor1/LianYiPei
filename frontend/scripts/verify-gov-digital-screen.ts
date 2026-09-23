@@ -37,7 +37,7 @@ const page = 'src/pages/gov/GovDigitalScreen.tsx';
   '柱形图-活跃预警',
   '折线图-补链强链缺口',
   '饼形图-地区分布',
-  'api.fetchEnterpriseDirectory({ limit: 200 })',
+  'api.fetchEnterpriseDirectory({ limit: 10000, include_self: true })',
 ].forEach((needle) => assertIncludes(page, needle, 'GovDigitalScreen structure'));
 
 assertPattern('src/App.tsx', /path="\/gov\/screen"[\s\S]*<GovDigitalScreen \/>/, 'route registration');

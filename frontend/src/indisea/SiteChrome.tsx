@@ -15,10 +15,10 @@ function ArrowIcon({ direction = 'up' }: { direction?: 'up' | 'down' }) {
   );
 }
 
-export function TalkButton({ className = '' }: { className?: string }) {
+export function TalkButton({ className = '', href = '/search', label = '开始找厂' }: { className?: string; href?: string; label?: string }) {
   return (
-    <a className={`indisea-pill ${className}`} href="/">
-      <span>进入平台</span><ArrowIcon />
+    <a className={`indisea-pill ${className}`} href={href}>
+      <span>{label}</span><ArrowIcon />
     </a>
   );
 }
