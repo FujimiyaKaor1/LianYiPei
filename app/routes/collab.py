@@ -29,6 +29,12 @@ from app.services.collaboration_service import (
 from app.services.quote_pool import add_quote, get_price_index, get_quotes_for_inquiry
 from app.services.credit_engine import update_credit_score
 from app.services.invoice_validator import validate_invoice, store_fulfillment_data
+from app.services.material_security import (
+    InvalidMaterial,
+    MaterialInfected,
+    MaterialScanUnavailable,
+    scan_material,
+)
 
 collab_bp = Blueprint('collab', __name__)
 logger = logging.getLogger(__name__)
@@ -235,6 +241,18 @@ def upload_invoice():
             'error': f'文件大小超过限制（最大16MB），当前文件: {file_size / 1024 / 1024:.2f}MB'
         }), 400
 
+    # Invoice uploads are user-controlled documents too. Run the same
+    # bounded format/malware scan used by procurement materials before the
+    # file reaches tax parsing or is persisted under uploads/.
+    try:
+        content = file.stream.read(10 * 1024 * 1024 + 1)
+        scan_material(file.filename, content)
+    except (InvalidMaterial, MaterialInfected) as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 400
+    except MaterialScanUnavailable as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 503
+    file.stream.seek(0)
+
     # 4. 保存文件
     from flask import current_app
     upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
@@ -243,7 +261,8 @@ def upload_invoice():
     file_path = os.path.join(upload_folder, unique_filename)
     
     try:
-        file.save(file_path)
+        with open(file_path, 'wb') as handle:
+            handle.write(content)
         logger.info(f"发票文件已保存: {file_path}")
     except Exception as e:
         logger.error(f"保存文件失败: {str(e)}")
@@ -454,7 +473,7 @@ def fulfillment_dashboard():
     credit_history = get_credit_history(ent_id, limit=10)
 
     return jsonify({
-        'credit_score': float(ent.credit_score or 60.0),
+        'credit_score': float(ent.credit_score) if ent.credit_score is not None else None,
         'on_time_rate': on_time_rate,
         'total_fulfillments': total,
         'on_time_count': on_time_count,
@@ -904,7 +923,7 @@ def join_group_purchase(gp_id: int):
     gb = _group_ctx(inq)
     min_cs = float(gb.get('min_credit_score') or 60.0)
     ent = Enterprise.query.get(current_user.id)
-    if float(ent.credit_score or 60.0) < min_cs:
+    if ent.credit_score is None or float(ent.credit_score) < min_cs:
         return jsonify({'error': f'信用分不足，需要{min_cs}分以上'}), 400
 
     members = list(inq.group_members) if isinstance(inq.group_members, list) else []

@@ -56,7 +56,7 @@ def api_create_or_get_chat():
     {
         "buyer_id": int,          # 买方企业 ID（必填）
         "seller_id": int,          # 卖方企业 ID（必填）
-        "match_record_id": int,     # 匹配记录 ID（必填）
+        "match_record_id": int,     # 匹配记录 ID（可选；缺省时自动创建）
         "is_anonymous": bool,       # 是否匿名询价（默认 False，需求15）
         "product_name": str,        # 产品名称（用于新建 MatchRecord 时）
         "match_score": float,      # 匹配度（可选）
@@ -80,6 +80,8 @@ def api_create_or_get_chat():
 
     buyer_id = data.get("buyer_id")
     seller_id = data.get("seller_id")
+    # Direct interaction from the matching page may not have a persisted
+    # MatchRecord yet; the service will create one from the parties/product.
     match_record_id = data.get("match_record_id")
     is_anonymous = bool(data.get("is_anonymous", False))
     product_name = data.get("product_name", "未知产品")
@@ -87,8 +89,8 @@ def api_create_or_get_chat():
     dim_scores = data.get("dim_scores")
     match_feedback_id = data.get("match_feedback_id")
 
-    if not buyer_id or not seller_id or not match_record_id:
-        return jsonify({"error": "缺少必填参数：buyer_id, seller_id, match_record_id"}), 400
+    if not buyer_id or not seller_id:
+        return jsonify({"error": "缺少必填参数：buyer_id, seller_id"}), 400
 
     current_id = _current_enterprise_id()
     if buyer_id != current_id and seller_id != current_id:
@@ -98,10 +100,10 @@ def api_create_or_get_chat():
     if is_anonymous:
         from app.models import Enterprise
         ent = Enterprise.query.get(current_id)
-        if ent and (ent.credit_score or 60) < 80:
+        if ent and (ent.credit_score is None or ent.credit_score < 80):
             return jsonify({
-                "error": "信用分低于80分，无法使用匿名询价功能",
-                "credit_score": ent.credit_score or 60,
+                "error": "信用分未登记或低于80分，无法使用匿名询价功能",
+                "credit_score": ent.credit_score,
             }), 403
 
     # 先确保 MatchRecord 存在
@@ -548,7 +550,7 @@ def api_submit_quote(chat_id: int):
         return jsonify({
             "error": error,
             "credit_limit_reached": is_credit_limit,
-            "credit_score": float(ent.credit_score or 60) if ent else 60,
+            "credit_score": float(ent.credit_score) if ent and ent.credit_score is not None else None,
             "daily_quote_limit": privileges.get("daily_quote_limit", 3),
         }), 429 if is_credit_limit else 400
 
@@ -791,7 +793,7 @@ def api_exchange_card(chat_id: int):
             "contact": counterparty.contact or "",
             "phone": counterparty.phone or "",
             "main_business": main_business,
-            "credit_score": int(counterparty.credit_score or 70),
+            "credit_score": int(counterparty.credit_score) if counterparty.credit_score is not None else None,
             "is_green_factory": counterparty.is_green_factory,
             "tags": tags,
         }

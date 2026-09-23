@@ -38,12 +38,29 @@ def create_app(config_class=Config):
     if "AUTO_CREATE_SCHEMA" not in getattr(config_class, "__dict__", {}):
         app.config["AUTO_CREATE_SCHEMA"] = str(app.config.get("APP_ENV") or "development").lower() != "production"
 
+    # Derived class attributes are evaluated when ``Config`` is imported. A
+    # deployment/test config may override APP_ENV later, so enforce the
+    # production cookie policy after Flask has loaded the effective config.
+    if str(app.config.get("APP_ENV") or "development").lower() == "production":
+        app.config.update(
+            SESSION_COOKIE_SECURE=True,
+            SESSION_COOKIE_HTTPONLY=True,
+            SESSION_COOKIE_SAMESITE="Lax",
+            REMEMBER_COOKIE_SECURE=True,
+            REMEMBER_COOKIE_HTTPONLY=True,
+            REMEMBER_COOKIE_SAMESITE="Lax",
+        )
+
     if app.config.get("APP_ENV") == "production":
         unsafe = []
         if app.config.get("SECRET_KEY_IS_DEFAULT"):
             unsafe.append("SECRET_KEY")
         if not app.config.get("DATABASE_URL_CONFIGURED"):
             unsafe.append("DATABASE_URL")
+        else:
+            database_uri = str(app.config.get("SQLALCHEMY_DATABASE_URI") or "").lower()
+            if database_uri.startswith("sqlite:"):
+                unsafe.append("DATABASE_URL_NON_SQLITE")
         if app.config.get("DISABLE_API_AUTH"):
             unsafe.append("DISABLE_API_AUTH")
         if app.config.get("ENABLE_MOCK_API"):

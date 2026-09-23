@@ -154,7 +154,7 @@ class FavoriteService:
                 "supplier_city": supplier.city or "",
                 "supplier_industry": supplier.industry_code or "",
                 "capacity": supplier.capacity or 0,
-                "credit_score": supplier.credit_score or 70.0,
+                "credit_score": supplier.credit_score,
                 "is_green_factory": supplier.is_green_factory or False,
                 "patent_count": supplier.patent_count or 0,
                 "match_score": fav.match_score,

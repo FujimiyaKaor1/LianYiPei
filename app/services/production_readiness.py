@@ -21,16 +21,6 @@ def _present(value: Any) -> bool:
     return bool(str(value or "").strip())
 
 
-def _enabled_flag(value: Any) -> bool:
-    """Interpret process flags explicitly so ``0``/``false`` cannot pass.
-
-    Deployment manifests commonly inject both ``..._ENABLED=1`` and
-    ``..._ENABLED=0``.  Treating any non-empty string as enabled would make a
-    web-only process look like it had a durable worker.
-    """
-    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
-
-
 _PLACEHOLDER_MARKERS = (
     "placeholder",
     "change-me",
@@ -70,6 +60,23 @@ def _provider_url_safe(value: Any, *, require_https: bool) -> bool:
     if parsed.username or parsed.password or parsed.query or parsed.fragment:
         return False
     return not require_https or parsed.scheme == "https"
+
+
+def _browser_origins_ready(value: Any, *, require_https: bool) -> bool:
+    """Validate the configured browser origins without exposing them."""
+    if not isinstance(value, (list, tuple, set)) or not value:
+        return False
+    for raw in value:
+        if not _credential_present(raw):
+            return False
+        parsed = urlparse(str(raw or "").strip())
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            return False
+        if parsed.username or parsed.password or parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+            return False
+        if require_https and parsed.scheme != "https":
+            return False
+    return True
 
 
 def _external_interface_ready(raw: Any, *, require_https: bool) -> bool:
@@ -113,13 +120,34 @@ def _fernet_configured() -> bool:
 def _queue_worker_configured() -> bool:
     """Check whether a process can actually drain durable Agent jobs.
 
-    The explicit worker/broker flags cover a split production deployment. A
-    running in-process scheduler is valid for the local single-process demo,
-    but merely enabling the scheduler setting is not enough when another
-    process owns the lock.
+    A Redis heartbeat, a running in-process scheduler, or a same-host lock
+    process proves liveness. Environment flags and broker URLs are only
+    declarations and must not make a web-only process look ready.
     """
-    if _enabled_flag(os.getenv("LIANYIPEI_WORKER_ENABLED")) or _credential_present(os.getenv("CELERY_BROKER_URL")):
-        return True
+    # Unit and integration tests must not inherit liveness from a developer's
+    # local Redis or scheduler process. Production still performs the real
+    # heartbeat/lock checks below.
+    if current_app.testing:
+        return False
+
+    # In a containerized split deployment the worker has a different PID
+    # namespace and cannot be detected via the scheduler lock file. The
+    # dedicated scheduler publishes a short-lived Redis key instead.
+    try:
+        import redis
+
+        heartbeat_key = str(current_app.config.get("WORKER_HEARTBEAT_KEY") or "").strip()
+        redis_url = str(current_app.config.get("REDIS_URL") or "").strip()
+        if heartbeat_key and redis_url:
+            heartbeat = redis.Redis.from_url(
+                redis_url,
+                socket_connect_timeout=2,
+                socket_timeout=2,
+            ).get(heartbeat_key)
+            if heartbeat:
+                return True
+    except Exception:
+        pass
     try:
         from app.services import scheduler as scheduler_module
 
@@ -216,14 +244,33 @@ def build_readiness_report() -> dict[str, Any]:
             provider="application_secret",
         ),
         "authentication": _check(not bool(cfg.get("DISABLE_API_AUTH")), required=required, provider="session_auth"),
+        "trusted_origins": _check(
+            _browser_origins_ready(cfg.get("TRUSTED_ORIGINS"), require_https=production_environment),
+            required=required,
+            provider="browser_write_origins",
+            reason="Configure TRUSTED_ORIGINS with the public HTTPS origin(s).",
+        ),
         "mock_api_disabled": _check(not bool(cfg.get("ENABLE_MOCK_API")), required=required, provider="production_routes"),
+        "public_data_mode": _check(
+            not production_environment or str(cfg.get("PUBLIC_DATA_MODE") or "").lower() == "production",
+            required=required,
+            provider="public_data_labeling",
+        ),
         "explicit_approval": _check(bool(cfg.get("CHAINXIAOYI_REQUIRE_EXPLICIT_APPROVAL")), required=required, provider="chain_xiaoyi_approval"),
         "deepseek": _check(
             _credential_present(os.getenv("DEEPSEEK_API_KEY")),
             required=bool(cfg.get("CHAINXIAOYI_CLOUD_REQUIRED")),
             provider="deepseek",
         ),
-        "database": _check(bool(cfg.get("DATABASE_URL_CONFIGURED")), required=required, provider="configured_database"),
+        "database": _check(
+            bool(cfg.get("DATABASE_URL_CONFIGURED"))
+            and (
+                not production_environment
+                or not str(cfg.get("SQLALCHEMY_DATABASE_URI") or "").lower().startswith("sqlite:")
+            ),
+            required=required,
+            provider="configured_non_sqlite_database",
+        ),
         "agent_schema": _check(_agent_schema_ready(), required=required, provider="durable_agent_schema"),
         "material_antivirus": _check(str(cfg.get("MATERIAL_AV_MODE") or "").lower() == "clamav", required=required, provider=str(cfg.get("MATERIAL_AV_MODE") or "unset")),
         "material_storage": _check(str(cfg.get("MATERIAL_STORAGE_BACKEND") or "").lower() == "s3" and _credential_present(cfg.get("MATERIAL_S3_BUCKET")), required=required, provider=str(cfg.get("MATERIAL_STORAGE_BACKEND") or "unset")),

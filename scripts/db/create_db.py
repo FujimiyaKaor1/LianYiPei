@@ -15,6 +15,9 @@ def _parse_db_url():
     return None, None, None, None
 
 def create_database():
+    if (os.environ.get("APP_ENV") or "development").strip().lower() == "production":
+        print("拒绝在 APP_ENV=production 下运行 create_db.py；请由数据库管理员显式创建数据库。")
+        return False
     try:
         from dotenv import load_dotenv
         load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
@@ -45,4 +48,4 @@ def create_database():
         return False
 
 if __name__ == "__main__":
-    create_database()
+    raise SystemExit(0 if create_database() else 1)

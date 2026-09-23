@@ -8,6 +8,8 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from app.services.deepseek_client import DEFAULT_DEEPSEEK_MODEL
+
 
 @dataclass(frozen=True)
 class ModelStatus:
@@ -128,7 +130,7 @@ def get_model_status() -> ModelStatus:
         cloud_enabled=cloud_enabled,
         local_model=local_model,
         cloud_provider="deepseek",
-        cloud_model=os.getenv("DEEPSEEK_MODEL", "deepseek-chat").strip() or "deepseek-chat",
+        cloud_model=os.getenv("DEEPSEEK_MODEL", DEFAULT_DEEPSEEK_MODEL).strip() or DEFAULT_DEEPSEEK_MODEL,
         cloud_required=cloud_required,
         configured_provider=configured_provider,
         active_provider=active_provider,

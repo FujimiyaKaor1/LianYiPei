@@ -16,14 +16,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from urllib.parse import urlsplit, urlunsplit
 
 import requests
 
 
 DEFAULT_BASE_URL = "http://127.0.0.1:5050"
-DEMO_BUYER_NAME = "链易配演示·湾区采购中心"
-DEMO_BUYER_PASSWORD = "DemoAgent2026!"
 DEFAULT_PROMPT = "找广东能做精密连接器的工厂，采购100件，30天内交付"
 
 
@@ -48,9 +47,18 @@ def _json(response: requests.Response) -> dict:
     return payload
 
 
-def run_live_smoke(base_url: str, *, prompt: str = DEFAULT_PROMPT, timeout: float = 30.0) -> dict:
+def run_live_smoke(
+    base_url: str,
+    *,
+    buyer_name: str,
+    buyer_password: str,
+    prompt: str = DEFAULT_PROMPT,
+    timeout: float = 30.0,
+) -> dict:
     """Run one authenticated buyer request and return a redacted summary."""
     origin = normalize_base_url(base_url)
+    if not str(buyer_name or "").strip() or not str(buyer_password or "").strip():
+        raise ValueError("必须提供专用验收采购账号；不会使用内置演示账号")
     session = requests.Session()
     status_response = session.get(f"{origin}/api/chain-xiaoyi/model-status", timeout=timeout)
     status = _json(status_response)
@@ -59,7 +67,7 @@ def run_live_smoke(base_url: str, *, prompt: str = DEFAULT_PROMPT, timeout: floa
 
     login_response = session.post(
         f"{origin}/auth/login",
-        data={"name": DEMO_BUYER_NAME, "password": DEMO_BUYER_PASSWORD},
+        data={"name": buyer_name, "password": buyer_password},
         headers={"X-Login-Modal": "1"},
         timeout=timeout,
     )
@@ -106,9 +114,24 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="链小易真实 HTTP DeepSeek smoke")
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
     parser.add_argument("--prompt", default=DEFAULT_PROMPT)
+    parser.add_argument(
+        "--buyer-name",
+        default=os.getenv("LIVE_SMOKE_BUYER_NAME", ""),
+        help="专用采购验收账号名称；也可使用 LIVE_SMOKE_BUYER_NAME",
+    )
+    parser.add_argument(
+        "--buyer-password",
+        default=os.getenv("LIVE_SMOKE_BUYER_PASSWORD", ""),
+        help="采购验收账号密码；优先使用 LIVE_SMOKE_BUYER_PASSWORD，避免出现在 shell 历史",
+    )
     args = parser.parse_args()
     try:
-        result = run_live_smoke(args.base_url, prompt=args.prompt)
+        result = run_live_smoke(
+            args.base_url,
+            buyer_name=args.buyer_name,
+            buyer_password=args.buyer_password,
+            prompt=args.prompt,
+        )
     except Exception as exc:
         print(json.dumps({"success": False, "error": type(exc).__name__}, ensure_ascii=False))
         return 1

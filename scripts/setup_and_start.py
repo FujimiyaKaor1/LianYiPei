@@ -28,6 +28,12 @@ def run(cmd, desc):
     return True
 
 def main():
+    if (os.environ.get("APP_ENV") or "development").strip().lower() == "production":
+        raise SystemExit(
+            "拒绝在 APP_ENV=production 下运行 setup_and_start.py；"
+            "生产环境请使用 docker-compose.production.yml 或 Alembic + Gunicorn/Worker。"
+        )
+
     print("=" * 55)
     print("  链易配 - 数据库初始化 & 启动")
     print("=" * 55)

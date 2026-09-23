@@ -58,6 +58,7 @@ def init_scheduler(app):
     
     # 启动调度器
     scheduler.start()
+    _publish_worker_heartbeat(app)
     logger.info("定时任务调度器已启动")
     
     return scheduler
@@ -230,6 +231,55 @@ def _register_jobs(app):
     )
     logger.info("已注册任务: 每60秒检查链小易询价截止时间")
 
+    scheduler.add_job(
+        func=_publish_worker_heartbeat,
+        trigger=IntervalTrigger(seconds=10),
+        id="publish_worker_heartbeat",
+        name="发布 Worker 存活心跳",
+        replace_existing=True,
+        args=[app],
+    )
+    logger.info("已注册任务: 每10秒发布 Worker 存活心跳")
+
+
+def _worker_heartbeat_key(app):
+    return str(app.config.get("WORKER_HEARTBEAT_KEY") or "lianyipei:worker:heartbeat").strip()
+
+
+def _publish_worker_heartbeat(app):
+    """Publish a short-lived Redis heartbeat visible to web containers."""
+    try:
+        import socket
+        import redis
+
+        key = _worker_heartbeat_key(app)
+        ttl = max(10, int(app.config.get("WORKER_HEARTBEAT_TTL_SECONDS") or 30))
+        client = redis.Redis.from_url(
+            str(app.config.get("REDIS_URL") or ""),
+            socket_connect_timeout=2,
+            socket_timeout=2,
+        )
+        client.set(key, f"{socket.gethostname()}:{os.getpid()}", ex=ttl)
+    except Exception as exc:
+        # Redis is a production prerequisite, but a transient heartbeat error
+        # must not crash all scheduled business jobs. The readiness probe will
+        # fail closed until the heartbeat is observed again.
+        logger.warning("Worker 心跳发布失败: %s", type(exc).__name__)
+
+
+def _clear_worker_heartbeat(app):
+    try:
+        import redis
+
+        client = redis.Redis.from_url(
+            str(app.config.get("REDIS_URL") or ""),
+            socket_connect_timeout=2,
+            socket_timeout=2,
+        )
+        client.delete(_worker_heartbeat_key(app))
+    except Exception:
+        pass
+
 
 def _process_chain_xiaoyi_queue_job(app):
     with app.app_context():
@@ -321,6 +371,11 @@ def shutdown_scheduler():
     """
     global scheduler
     if scheduler is not None:
+        # The app object is attached to the heartbeat job args; retrieve it
+        # before shutting down so graceful worker stops clear the key early.
+        heartbeat_job = scheduler.get_job("publish_worker_heartbeat")
+        if heartbeat_job and heartbeat_job.args:
+            _clear_worker_heartbeat(heartbeat_job.args[0])
         scheduler.shutdown(wait=False)
         logger.info("定时任务调度器已关闭")
         scheduler = None

@@ -17,7 +17,7 @@ from sqlalchemy import String, and_, cast, false, func, or_
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.authz import role_required, user_effective_role, user_session_role
-from app.models import Enterprise, Inquiry, Product, Quote, Transaction, IndustryNewsArticle, IndustryNewsSource
+from app.models import Enterprise, Inquiry, Product, Quote, Transaction, IndustryNewsArticle, IndustryNewsSource, MatchFeedback
 from app.services.industry_news_service import ALLOWED_CATEGORIES, fetch_newsapi, newsapi_query_for_category, persist_newsapi_articles
 from app.services import map_service
 from app.services import finance_service
@@ -1270,14 +1270,18 @@ def api_enterprises_directory():
                     "address": _enterprise_public_address(ent) if is_guest else (ent.address or ""),
                     "province": ent.province or "",
                     "city": ent.city or "",
-                    "credit_score": float(ent.credit_score or 0.0),
+                    "credit_score": float(ent.credit_score) if ent.credit_score is not None else None,
                     "business_scope": (ent.business_scope or "")[:280],
                     "industry_code": ent.industry_code or "",
                     "tech_keywords": ent.tech_keywords or "",
-                    "capacity": float(ent.capacity or 0),
-                    "max_capacity": float(ent.max_capacity or ent.capacity or 0),
-                    "current_orders": int(ent.current_orders or 0),
-                    "capacity_status": "ample" if (ent.capacity or 0) > (ent.current_orders or 0) else "tight",
+                    "capacity": float(ent.capacity) if ent.capacity is not None else None,
+                    "max_capacity": float(ent.max_capacity) if ent.max_capacity is not None else None,
+                    "current_orders": int(ent.current_orders) if ent.current_orders is not None else None,
+                    "capacity_status": (
+                        "ample" if ent.capacity is not None and ent.current_orders is not None and ent.capacity > ent.current_orders
+                        else "tight" if ent.capacity is not None and ent.current_orders is not None
+                        else None
+                    ),
                     "is_export": _enterprise_is_export_capable(ent),
                     "has_decision_maker": _enterprise_has_decision_maker(ent),
                     "is_little_giant": _enterprise_is_little_giant(ent),
@@ -1933,14 +1937,68 @@ def api_public_enterprise_detail(enterprise_id: int):
 @api_bp.route("/public/agent-market", methods=["GET"])
 def api_public_agent_market():
     """公开 Agent 能力目录，能力数量按真实展示内容计算。"""
+    def github_skill(name, label, purpose, repo, path, usage):
+        branch = "main"
+        return {
+            "name": name,
+            "label": label,
+            "purpose": purpose,
+            "repo": repo,
+            "path": path,
+            "branch": branch,
+            "source_url": f"https://github.com/{repo}/tree/{branch}/{path}",
+            "download_url": f"https://github.com/{repo}/archive/refs/heads/{branch}.zip",
+            "usage": usage,
+        }
+
+    sales_enablement = github_skill(
+        "sales-enablement", "Sales Enablement", "销售话术、跟进节奏与成交材料",
+        "coreyhaines31/marketingskills", "skills/sales-enablement",
+        ["解压 ZIP", "将 skills/sales-enablement 放入项目的 .agents/skills/", "重启 Codex 后，提出销售赋能或客户跟进任务"],
+    )
+    cold_email = github_skill(
+        "cold-email", "Cold Email", "生成 B2B 冷启动邮件和跟进序列",
+        "coreyhaines31/marketingskills", "skills/cold-email",
+        ["解压 ZIP", "将 skills/cold-email 放入项目的 .agents/skills/", "在任务中说明目标客户、价值主张和语气，要求生成邮件序列"],
+    )
+    customer_research = github_skill(
+        "customer-research", "Customer Research", "客户访谈、需求洞察与采购画像",
+        "coreyhaines31/marketingskills", "skills/customer-research",
+        ["解压 ZIP", "将 skills/customer-research 放入项目的 .agents/skills/", "提供访谈记录或公开资料，让 Agent 输出研究结论和证据"],
+    )
+    marketing_plan = github_skill(
+        "marketing-plan", "Marketing Plan", "市场进入、渠道和增长计划",
+        "coreyhaines31/marketingskills", "skills/marketing-plan",
+        ["解压 ZIP", "将 skills/marketing-plan 放入项目的 .agents/skills/", "提供产品、行业和目标市场，要求生成可执行计划"],
+    )
+    task_breakdown = github_skill(
+        "planning-and-task-breakdown", "Task Breakdown", "把订单与复杂目标拆成可执行任务",
+        "addyosmani/agent-skills", "skills/planning-and-task-breakdown",
+        ["解压 ZIP", "将 skills/planning-and-task-breakdown 放入项目的 .agents/skills/", "描述订单目标、约束和截止时间，让 Agent 输出任务分解"],
+    )
+    frontend_ui = github_skill(
+        "frontend-ui-engineering", "UI Engineering", "生产执行看板和业务界面设计",
+        "addyosmani/agent-skills", "skills/frontend-ui-engineering",
+        ["解压 ZIP", "将 skills/frontend-ui-engineering 放入项目的 .agents/skills/", "说明页面目标、数据字段和交互，要求输出可验证的 UI 方案"],
+    )
+    security = github_skill(
+        "security-and-hardening", "Security Hardening", "合同、财务和业务数据的安全检查",
+        "addyosmani/agent-skills", "skills/security-and-hardening",
+        ["解压 ZIP", "将 skills/security-and-hardening 放入项目的 .agents/skills/", "在审查任务中明确系统边界、敏感数据和威胁模型"],
+    )
+    competitor = github_skill(
+        "competitor-profiling", "Competitor Profiling", "竞争对手和产业情报分析",
+        "coreyhaines31/marketingskills", "skills/competitor-profiling",
+        ["解压 ZIP", "将 skills/competitor-profiling 放入项目的 .agents/skills/", "提供竞品名单或公开链接，要求输出带来源的比较分析"],
+    )
     groups = [
-        {"title": "AI 销售员", "summary": "线索获取、客户跟进和报价成交", "demo": False, "agents": ["客户线索整理", "智能报价助手", "企微跟进助手"]},
-        {"title": "AI 采购员", "summary": "供应商寻源、比价决策和绩效风控", "demo": True, "agents": ["全国快速询价", "供应商筛选", "供应商风险检查"]},
-        {"title": "AI 计划员", "summary": "订单分解、生产计划和交期协调", "demo": False, "agents": ["订单计划助手", "产能排程建议", "交期风险提醒"]},
-        {"title": "AI 生产员", "summary": "车间执行、质量记录和异常闭环", "demo": False, "agents": ["生产执行助手", "质量异常归因", "工艺知识助手"]},
-        {"title": "AI 财法务", "summary": "合同审查、单据处理和资金风险", "demo": False, "agents": ["合同审查", "发票单据处理", "财务风险告警"]},
-        {"title": "AI 出海专员", "summary": "海外获客、合规检查和出口协同", "demo": False, "agents": ["海外客户开发", "出口资质检查", "跨境合规助手"]},
-        {"title": "AI 情报官", "summary": "产业监测、竞争分析和政策匹配", "demo": False, "agents": ["产业监测", "招商线索发现", "政策匹配助手"]},
+        {"title": "AI 销售员", "summary": "线索获取、客户跟进和报价成交", "demo": False, "agents": ["客户线索整理", "智能报价助手", "企微跟进助手"], "skills": [sales_enablement, cold_email]},
+        {"title": "AI 采购员", "summary": "供应商寻源、比价决策和绩效风控", "demo": True, "agents": ["全国快速询价", "供应商筛选", "供应商风险检查"], "skills": [customer_research]},
+        {"title": "AI 计划员", "summary": "订单分解、生产计划和交期协调", "demo": False, "agents": ["订单计划助手", "产能排程建议", "交期风险提醒"], "skills": [task_breakdown]},
+        {"title": "AI 生产员", "summary": "车间执行、质量记录和异常闭环", "demo": False, "agents": ["生产执行助手", "质量异常归因", "工艺知识助手"], "skills": [frontend_ui, task_breakdown]},
+        {"title": "AI 财法务", "summary": "合同审查、单据处理和资金风险", "demo": False, "agents": ["合同审查", "发票单据处理", "财务风险告警"], "skills": [security]},
+        {"title": "AI 出海专员", "summary": "海外获客、合规检查和出口协同", "demo": False, "agents": ["海外客户开发", "出口资质检查", "跨境合规助手"], "skills": [marketing_plan, cold_email]},
+        {"title": "AI 情报官", "summary": "产业监测、竞争分析和政策匹配", "demo": False, "agents": ["产业监测", "招商线索发现", "政策匹配助手"], "skills": [competitor, customer_research]},
     ]
     return jsonify(
         {
@@ -2105,7 +2163,7 @@ def finance_apply_order_financing():
 
     if not bank_name:
         preview = finance_service.calculate_loan_eligibility(current_user.id)
-        bank_name = (preview or {}).get("bank_name") or "合作银行"
+        bank_name = (preview or {}).get("bank_name") or ""
 
     try:
         result = finance_service.apply_order_financing(
@@ -2114,6 +2172,8 @@ def finance_apply_order_financing():
             amount,
             supplier_id=sid,
         )
+    except RuntimeError as e:
+        return jsonify({"error": str(e), "code": "finance_provider_unavailable"}), 503
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
@@ -2135,15 +2195,23 @@ def get_favorites():
     
     result = []
     for s in suppliers:
-        # Mocking some metrics that might not be directly available for the UI
+        latest_feedback = (
+            MatchFeedback.query
+            .filter_by(buyer_id=current_user.id, supplier_id=s.id)
+            .order_by(MatchFeedback.created_at.desc(), MatchFeedback.id.desc())
+            .first()
+        )
+        match_score = latest_feedback.match_score if latest_feedback else None
         result.append({
             "id": s.id,
             "name": s.name,
             "industry": s.industry_code or "未知行业",
             "location": s.city or s.province or "未知地区",
-            "score": float(s.credit_score or 0.0),
-            "match": f"{int(round(float(s.credit_score or 0.0)))}%", # Mock match rate relative to credit score
-            "tags": s.business_scope.split(',')[:2] if s.business_scope else ["优质客商"]
+            "score": float(s.credit_score) if s.credit_score is not None else None,
+            "credit_score": float(s.credit_score) if s.credit_score is not None else None,
+            "match": f"{int(round(float(match_score)))}%" if match_score is not None else None,
+            "match_score": float(match_score) if match_score is not None else None,
+            "tags": [tag.strip() for tag in (s.business_scope or "").split(",") if tag.strip()][:2],
         })
         
     return jsonify({"success": True, "favorites": result})
@@ -2184,20 +2252,14 @@ def remove_favorite(supplier_id):
         
     return jsonify({"success": True, "message": "已取消收藏"})
 def _asset_default_qualifications():
-    return [
-        {"title": "ISO 9001 质量管理体系", "date": "有效期至 2026.12", "status": "有效"},
-        {"title": "高新技术企业证书", "date": "有效期至 2025.08", "status": "有效"},
-        {"title": "安全生产标准化二级", "date": "有效期至 2027.03", "status": "有效"},
-        {"title": "精密加工特种行业许可证", "date": "有效期至 2026.01", "status": "有效"},
-    ]
+    # Empty is intentional: this endpoint must never invent certificates.
+    return []
 
 
 def _asset_default_data_auth():
-    return [
-        {"name": "金蝶云星空 ERP", "status": "已连接", "data": "订单、库存、财务"},
-        {"name": "钉钉数字化办公", "status": "已连接", "data": "组织架构、审批流"},
-        {"name": "顺丰物流开放平台", "status": "未连接", "data": "实时轨迹、电子面单"},
-    ]
+    # Empty is intentional: an absent authorization record is not a
+    # connected external system.
+    return []
 
 
 def _normalize_asset_qualifications(raw):
@@ -2216,9 +2278,9 @@ def _normalize_asset_qualifications(raw):
             or "企业资质"
         )
         valid_until = item.get("valid_until") or item.get("expire_at") or item.get("date")
-        date_text = item.get("date") or (f"有效期至 {valid_until}" if valid_until else "长期有效")
+        date_text = item.get("date") or (f"有效期至 {valid_until}" if valid_until else "日期未登记")
         status_raw = str(item.get("status") or "").lower()
-        status = "有效" if status_raw in {"valid", "active", "enabled", "有效"} else item.get("status") or "有效"
+        status = "有效" if status_raw in {"valid", "active", "enabled", "有效"} else item.get("status") or "未核验"
         normalized.append({"title": str(title), "date": str(date_text), "status": str(status)})
     return normalized or _asset_default_qualifications()
 
@@ -2232,7 +2294,7 @@ def _normalize_asset_data_auth(raw):
             normalized.append(
                 {
                     "name": str(item.get("name") or item.get("system") or "外部数据接口"),
-                    "status": str(item.get("status") or "已连接"),
+                    "status": str(item.get("status") or "未连接"),
                     "data": str(item.get("data") or item.get("scope") or "授权数据"),
                 }
             )
@@ -2273,33 +2335,58 @@ def api_user_assets():
     qualifications = _normalize_asset_qualifications(ent.qualifications)
     data_auth = _normalize_asset_data_auth(ent.data_auth)
 
-    # 团队成员 (Mock数据，实际中可以从另一个表或extras读取)
-    team_members = [
-        {"name": "张建国", "role": "法定代表人 / CEO", "avatar": "张"},
-        {"name": "李晓琳", "role": "财务总监", "avatar": "李"},
-        {"name": "王志强", "role": "生产主管", "avatar": "王"}
-    ]
+    extras = ent.extras if isinstance(ent.extras, dict) else {}
+    raw_team_members = extras.get("team_members")
+    team_members = []
+    if isinstance(raw_team_members, list):
+        for item in raw_team_members:
+            if not isinstance(item, dict) or not str(item.get("name") or "").strip():
+                continue
+            name = str(item["name"]).strip()
+            team_members.append(
+                {
+                    "name": name,
+                    "role": str(item.get("role") or "未填写").strip(),
+                    "avatar": str(item.get("avatar") or name[:1]),
+                }
+            )
+
+    raw_breakdown = extras.get("credit_breakdown")
+    credit_breakdown = []
+    if isinstance(raw_breakdown, list):
+        for item in raw_breakdown:
+            if not isinstance(item, dict) or not str(item.get("label") or "").strip():
+                continue
+            try:
+                score = float(item.get("score"))
+            except (TypeError, ValueError):
+                continue
+            credit_breakdown.append({"label": str(item["label"]).strip(), "score": max(0, min(100, score))})
+
+    tags = []
+    if ent.is_green_factory:
+        tags.append("政府绿标")
+    for qualification in ent.qualifications if isinstance(ent.qualifications, list) else []:
+        if isinstance(qualification, dict) and qualification.get("status") in {"有效", "active", "valid"}:
+            label = qualification.get("label_name") or qualification.get("title") or qualification.get("name")
+            if label and str(label) not in tags:
+                tags.append(str(label)[:40])
 
     return jsonify({
         "success": True,
         "assets": {
             "id": ent.id,
             "name": ent.name,
-            "is_certified": True,
+            "is_certified": bool(ent.is_verified or ent.verification_status == "approved"),
             "location": f"{ent.province or '未知'} · {ent.city or '未知'}",
-            "industry_tag": str(ent.business_scope).split(',')[0] if ent.business_scope else "精密制造",
-            "tags": ["专精特新“小巨人”", "高新技术企业", "绿色工厂"] if ent.is_green_factory else ["优质客商", "信守承诺"],
-            "credit_score": int(ent.credit_score or 0),
-            "patent_count": ent.patent_count or 12,
+            "industry_tag": str(ent.business_scope).split(',')[0] if ent.business_scope else "未登记",
+            "tags": tags,
+            "credit_score": int(ent.credit_score) if ent.credit_score is not None else None,
+            "patent_count": int(ent.patent_count or 0),
             "qualifications": qualifications,
             "data_auth": data_auth,
             "team_members": team_members,
-            "credit_breakdown": [
-                {"label": "履约真实度", "score": 98},
-                {"label": "交付准时率", "score": 92},
-                {"label": "财务稳健性", "score": 85},
-                {"label": "行业影响力", "score": 78}
-            ]
+            "credit_breakdown": credit_breakdown,
         }
     })
 
@@ -2348,7 +2435,7 @@ def api_enterprise_profile_mini(ent_id: int):
             "phone": ent.phone or "",
             "main_business": main_business,
             "business_scope": ent.business_scope or "",
-            "credit_score": int(ent.credit_score or 70),
+            "credit_score": int(ent.credit_score) if ent.credit_score is not None else None,
             "is_green_factory": ent.is_green_factory,
             "tags": tags,
             "collaboration_code": None,

@@ -15,7 +15,7 @@ from app import db
 from app.models import Enterprise, Inquiry
 from app.applications.fulfillment.services.intent_quote_service import IntentQuoteService
 from app.applications.matching.services.matcher import DEFAULT_WEIGHTS, match_suppliers
-from app.services.deepseek_client import create_deepseek_chat_model_from_env
+from app.services.deepseek_client import DEFAULT_DEEPSEEK_MODEL, create_deepseek_chat_model_from_env
 from app.services.ollama_client import invoke_ollama
 from app.models_chain_xiaoyi import (
     ChainXiaoYiApproval,
@@ -113,7 +113,7 @@ def _run_trace_metadata(provider: str, **extra) -> dict:
     selected = str(provider or "rules").strip().lower()
     status = get_model_status()
     if selected == "deepseek":
-        model_version = status.cloud_model or "deepseek-chat"
+        model_version = status.cloud_model or DEFAULT_DEEPSEEK_MODEL
     elif selected == "local":
         model_version = status.local_model or "configured-local"
     else:

@@ -453,7 +453,7 @@ def _find_internal_candidates(product_name: str) -> List[Dict]:
                 'registered_capital': ent.registered_capital or 0,
                 'business_scope': scope[:100],
                 'patent_count': ent.patent_count or 0,
-                'credit_score': float(ent.credit_score or 70),
+                'credit_score': float(ent.credit_score) if ent.credit_score is not None else None,
                 'is_green_factory': ent.is_green_factory or False,
                 # 未认领企业只参与公开能力检索，不暴露私人联系方式。
                 'contact': ent.contact or '' if contact_authorized else '',
@@ -486,7 +486,7 @@ def _query_industrial_commerce_api(product_name: str, enterprise_type: str) -> L
                     'registered_capital': item.get('registered_capital', ''),
                     'business_scope': item.get('business_scope', ''),
                     'patent_count': item.get('patent_count', 0),
-                    'credit_score': 70.0,
+                    'credit_score': item.get('credit_score') if item.get('credit_score') is not None else None,
                     'is_green_factory': False,
                     'contact': '',
                     'phone': '',
@@ -544,9 +544,13 @@ def _score_candidate(candidate: Dict, product_name: str) -> Dict:
     score += min(20, patents * 2)
 
     # 信用分（0-10分）
-    credit = candidate.get('credit_score', 70)
-    credit_bonus = min(10, max(0, (credit - 60) / 4))
-    score += credit_bonus
+    credit = candidate.get('credit_score')
+    if credit is not None:
+        try:
+            credit_bonus = min(10, max(0, (float(credit) - 60) / 4))
+        except (TypeError, ValueError):
+            credit_bonus = 0
+        score += credit_bonus
 
     # 绿色工厂加分（0-10分）
     if candidate.get('is_green_factory'):

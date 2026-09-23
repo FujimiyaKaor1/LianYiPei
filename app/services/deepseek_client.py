@@ -12,7 +12,11 @@ from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, Huma
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 
 DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
-DEFAULT_DEEPSEEK_MODEL = "deepseek-chat"
+# The Chain XiaoYi default is the vision-capable experimental model.  Keep the
+# environment override below for deployments that have an approved fallback,
+# but make the vision model the honest out-of-box behavior.
+DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-flash-vision-exp"
+MAX_INLINE_IMAGE_BYTES = 10 * 1024 * 1024
 _RETRYABLE_STATUS_CODES = frozenset({408, 409, 425, 429, 500, 502, 503, 504})
 
 
@@ -33,6 +37,48 @@ def _text(value: Any) -> str:
     if isinstance(value, list):
         return "".join(str(item.get("text", "")) if isinstance(item, dict) and item.get("type") == "text" else str(item) if isinstance(item, str) else "" for item in value)
     return str(value or "")
+
+
+def _message_content(value: Any) -> str | list[dict[str, Any]]:
+    """Prepare LangChain content without dropping vision blocks.
+
+    DeepSeek's OpenAI-compatible endpoint accepts plain strings as well as a
+    list of ``text``/``image_url`` blocks.  Older code flattened every list to
+    text, which made a vision model receive no image at all.  Validate the
+    small supported block vocabulary here so malformed user-controlled
+    content fails before a network request and inline data URLs cannot create
+    unbounded request bodies.
+    """
+    if isinstance(value, str):
+        return value
+    if not isinstance(value, list):
+        return str(value or "")
+
+    blocks: list[dict[str, Any]] = []
+    for block in value:
+        if not isinstance(block, dict):
+            raise ValueError("DeepSeek 多模态消息块格式无效")
+        block_type = block.get("type")
+        if block_type == "text":
+            text = block.get("text")
+            if not isinstance(text, str):
+                raise ValueError("DeepSeek 文本消息块格式无效")
+            blocks.append({"type": "text", "text": text})
+            continue
+        if block_type == "image_url":
+            image_url = block.get("image_url")
+            if not isinstance(image_url, dict) or not isinstance(image_url.get("url"), str):
+                raise ValueError("DeepSeek 图片消息块格式无效")
+            url = image_url["url"]
+            if url.startswith("data:") and len(url.encode("utf-8")) > MAX_INLINE_IMAGE_BYTES:
+                raise ValueError("DeepSeek 图片内容过大")
+            normalized_image_url: dict[str, Any] = {"url": url}
+            if image_url.get("detail") is not None:
+                normalized_image_url["detail"] = image_url["detail"]
+            blocks.append({"type": "image_url", "image_url": normalized_image_url})
+            continue
+        raise ValueError(f"DeepSeek 不支持的消息块类型: {block_type or 'unknown'}")
+    return blocks
 
 
 def _choice_content(data: dict[str, Any], streaming: bool = False) -> str:
@@ -70,7 +116,7 @@ class DeepSeekChatModel(BaseChatModel):
     def _payload(self, messages: list[BaseMessage], stop: list[str] | None, stream: bool) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": self.model,
-            "messages": [{"role": _role(message), "content": _text(message.content)} for message in messages],
+            "messages": [{"role": _role(message), "content": _message_content(message.content)} for message in messages],
             "temperature": self.temperature,
             "stream": stream,
         }

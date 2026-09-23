@@ -209,8 +209,10 @@ def toggle_case_visibility(case_id: str, enterprise_id: int, is_public: bool) ->
 
 def get_public_cases(supplier_id: int, limit: int = 10) -> list:
     supplier = Enterprise.query.get(supplier_id)
-    score = float(supplier.credit_score or 60.0) if supplier else 60.0
-    max_cases = 3 if score < 80 else limit
+    score = float(supplier.credit_score) if supplier and supplier.credit_score is not None else None
+    # Missing credit evidence must not silently restrict or classify the
+    # supplier.  The caller can still review explicitly public cases.
+    max_cases = 3 if score is not None and score < 80 else limit
     cases = [c for c in _coop_cases(supplier) if isinstance(c, dict) and c.get("is_public")]
     cases = sorted(cases, key=lambda x: x.get("created_at") or "", reverse=True)[:max_cases]
     return cases

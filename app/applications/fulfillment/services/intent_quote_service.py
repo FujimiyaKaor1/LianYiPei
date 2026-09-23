@@ -379,7 +379,7 @@ class IntentQuoteService:
         quotes = query.order_by(IntentQuote.created_at.desc()).offset(offset).limit(limit).all()
         return [self._serialize_quote(q, seller_id) for q in quotes]
 
-    # ── AI报价建议 ──────────────────────────────────────────────────────────
+    # ── 报价建议 ─────────────────────────────────────────────────────────────
 
     def generate_ai_price_suggestion(
         self,
@@ -388,51 +388,70 @@ class IntentQuoteService:
         quantity: Optional[int] = None,
     ) -> dict:
         """
-        生成AI意向报价建议。
+        根据已持久化的报价指数、信用和产能字段生成可解释的规则建议。
+
+        该接口当前不调用大模型，也不会用默认常数补齐缺失的价格或产能事实。
 
         基于供应商产能、信用、市场价格生成建议报价。
         
         返回：
         {
-            "suggested_price": float,
-            "price_range": {"min": float, "max": float},
+            "generation_mode": "database_rules",
+            "suggested_price": float | None,
+            "price_range": {"min": float, "max": float} | None,
             "delivery_estimate": str,
             "basis": str,
-            "capacity_available": bool,
+            "capacity_available": bool | None,
         }
         """
         supplier = Enterprise.query.get(seller_id)
         if not supplier:
             return {
-                "suggested_price": 0,
-                "price_range": {"min": 0, "max": 0},
+                "generation_mode": "database_rules",
+                "suggested_price": None,
+                "price_range": None,
                 "delivery_estimate": "无法估算",
                 "basis": "供应商信息不存在",
-                "capacity_available": False,
+                "capacity_available": None,
+                "capacity_ratio": None,
             }
 
         # 获取价格指数
         from app.services.quote_pool import get_price_index
         price_data = get_price_index(product_name)
-        median_price = price_data.get("median_price") or 50.0
+        median_price = price_data.get("median_price")
+        if median_price is None or float(median_price) <= 0:
+            return {
+                "generation_mode": "database_rules",
+                "suggested_price": None,
+                "price_range": None,
+                "delivery_estimate": "无法根据历史报价估算",
+                "basis": "没有已持久化的有效报价样本，无法估算价格",
+                "capacity_available": None,
+                "median_price": None,
+                "credit_score": supplier.credit_score,
+                "capacity_ratio": None,
+            }
+        median_price = float(median_price)
 
         # 基于供应商信用和产能调整报价
-        credit_score = supplier.credit_score or 70.0
-        capacity = supplier.capacity or 50
-        max_cap = supplier.max_capacity or 100
+        credit_score = supplier.credit_score
 
         # 信用溢价（高信用供应商可适当提高报价）
         credit_premium = 1.0
-        if credit_score >= 90:
+        if credit_score is not None and credit_score >= 90:
             credit_premium = 1.1
-        elif credit_score >= 85:
+        elif credit_score is not None and credit_score >= 85:
             credit_premium = 1.05
-        elif credit_score < 70:
+        elif credit_score is not None and credit_score < 70:
             credit_premium = 0.95
 
         # 产能充足度影响报价（产能紧张时略微提价）
-        capacity_ratio = capacity / max_cap if max_cap else 0.5
-        capacity_premium = 1.0 + (1 - capacity_ratio) * 0.05
+        capacity_ratio = None
+        capacity_premium = 1.0
+        if supplier.capacity is not None and supplier.max_capacity is not None and supplier.max_capacity > 0:
+            capacity_ratio = min(1.0, max(0.0, supplier.capacity / supplier.max_capacity))
+            capacity_premium = 1.0 + (1 - capacity_ratio) * 0.05
 
         # 数量折扣（大批量采购价格更低）
         quantity_discount = 1.0
@@ -454,7 +473,9 @@ class IntentQuoteService:
         }
 
         # 交期估算
-        if capacity_ratio > 0.8:
+        if capacity_ratio is None:
+            delivery_estimate = "无法根据已登记产能估算"
+        elif capacity_ratio > 0.8:
             delivery_estimate = "7-10天"
         elif capacity_ratio > 0.5:
             delivery_estimate = "10-15天"
@@ -462,20 +483,24 @@ class IntentQuoteService:
             delivery_estimate = "15-30天"
 
         # 产能是否充足
-        capacity_available = capacity_ratio < 0.9
+        capacity_available = capacity_ratio < 0.9 if capacity_ratio is not None else None
 
         # 报价依据
         basis_parts = []
-        if price_data.get("is_cold_start"):
-            basis_parts.append("参考行业均价")
+        basis_parts.append(f"基于已持久化报价指数（{price_data.get('sample_count', 0)}条样本）")
+        if credit_score is not None:
+            basis_parts.append(f"供应商信用调整({(credit_premium-1)*100:+.0f}%)")
         else:
-            basis_parts.append("基于市场实时报价")
-        basis_parts.append(f"供应商信用调整(+{(credit_premium-1)*100:+.0f}%)")
-        basis_parts.append(f"产能状态调整(+{(capacity_premium-1)*100:+.0f}%)")
+            basis_parts.append("信用分未登记，未做信用调整")
+        if capacity_ratio is not None:
+            basis_parts.append(f"产能状态调整({(capacity_premium-1)*100:+.0f}%)")
+        else:
+            basis_parts.append("产能数据未登记，未做产能调整")
         if quantity and quantity >= 100:
             basis_parts.append(f"批量折扣(-{(1-quantity_discount)*100:.0f}%)")
 
         return {
+            "generation_mode": "database_rules",
             "suggested_price": suggested,
             "price_range": price_range,
             "delivery_estimate": delivery_estimate,
@@ -483,7 +508,7 @@ class IntentQuoteService:
             "capacity_available": capacity_available,
             "median_price": median_price,
             "credit_score": credit_score,
-            "capacity_ratio": round(capacity_ratio * 100, 1),
+            "capacity_ratio": round(capacity_ratio * 100, 1) if capacity_ratio is not None else None,
         }
 
     def apply_ai_suggestion(
@@ -493,7 +518,7 @@ class IntentQuoteService:
         price_basis: str,
         delivery_estimate: str,
     ) -> tuple[bool, str]:
-        """将AI报价建议应用到意向报价"""
+        """将规则或模型报价参考应用到意向报价（保留旧方法名兼容已有 API）。"""
         quote = IntentQuote.query.get(quote_id)
         if not quote:
             return False, "意向报价不存在"

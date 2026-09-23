@@ -1,0 +1,1 @@
+import{A as t}from"./LoginModal.js";import{b$ as o,bQ as r,r as e,c0 as s}from"./vendor.js";import i from"./App.js";import"./icons.js";import"./PublicSiteHeader.js";o.createRoot(document.getElementById("indisea-root")).render(r.jsx(e.StrictMode,{children:r.jsx(s,{children:r.jsx(t,{children:r.jsx(i,{})})})}));

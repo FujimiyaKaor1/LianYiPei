@@ -35,13 +35,19 @@ class Enterprise(db.Model, UserMixin):
     company_images = db.Column(db.JSON)
     contact = db.Column(db.String(50))
     phone = db.Column(db.String(20))
-    credit_score = db.Column(db.Float, default=70.0)
-    capacity = db.Column(db.Integer, default=50)
+    # These are measured/business facts, not onboarding defaults.  A new
+    # enterprise must remain unrated and have unknown capacity until evidence
+    # or an explicit operator update is stored.
+    credit_score = db.Column(db.Float)
+    capacity = db.Column(db.Integer)
     current_orders = db.Column(db.Integer, default=0)
     max_capacity = db.Column(db.Integer)
     last_order_update = db.Column(db.DateTime)
     capacity_calendar_visibility = db.Column(db.String(20), default="private")
-    password_hash = db.Column(db.String(128))
+    # Werkzeug's current scrypt hashes are longer than the historical 128
+    # character column.  Keep room for future password hash formats so MySQL
+    # does not reject otherwise valid account creation/login setup.
+    password_hash = db.Column(db.String(255))
     is_admin = db.Column(db.Boolean, default=False)
     role = db.Column(db.String(20), nullable=False, default="enterprise")
 

@@ -187,24 +187,37 @@ def clip_match_page():
 
 
 @main.route('/api/clip-match', methods=['POST'])
+@login_required
 def api_clip_match():
     from app.services.clip_matcher import clip_available, match_image_to_products
+    from app.services.material_security import InvalidMaterial, MaterialInfected, MaterialScanUnavailable, scan_material
     from app.models import Product
     if not clip_available():
         return jsonify({'success': False, 'error': 'CLIP 未安装。请执行: pip install open-clip-torch torch'})
     f = request.files.get('image')
     if not f:
         return jsonify({'success': False, 'error': '请上传图片'})
+    filename = (f.filename or '').strip()
+    if not filename:
+        return jsonify({'success': False, 'error': '文件名为空'}), 400
+    try:
+        content = f.stream.read(10 * 1024 * 1024 + 1)
+        scan_material(filename, content)
+    except (InvalidMaterial, MaterialInfected) as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 400
+    except MaterialScanUnavailable as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 503
     import uuid
     from werkzeug.utils import secure_filename
     from flask import current_app
-    ext = os.path.splitext(secure_filename(f.filename) or 'img')[1] or '.jpg'
+    ext = os.path.splitext(secure_filename(filename) or 'img')[1] or '.jpg'
     fname = f"clip_{uuid.uuid4().hex[:12]}{ext}"
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     upload_dir = current_app.config.get('UPLOAD_FOLDER') or os.path.join(base, 'uploads')
     save_path = os.path.join(upload_dir, fname)
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    f.save(save_path)
+    with open(save_path, 'wb') as handle:
+        handle.write(content)
     try:
         products = Product.query.limit(50).all()
         texts = [f"{p.name} {p.category or ''} {p.industry_code or ''}" for p in products]

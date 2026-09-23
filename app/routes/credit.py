@@ -30,8 +30,11 @@ def get_credit_score(enterprise_id: int):
         raise APIError.not_found('企业不存在', ERR_ENTERPRISE_NOT_FOUND)
 
     privileges = check_credit_privileges(enterprise_id)
-    score = float(ent.credit_score or 60.0)
-    level = '优秀' if score >= 90 else ('良好' if score >= 75 else ('一般' if score >= 60 else '较差'))
+    score = float(ent.credit_score) if ent.credit_score is not None else None
+    level = (
+        '未公开' if score is None else
+        ('优秀' if score >= 90 else ('良好' if score >= 75 else ('一般' if score >= 60 else '较差')))
+    )
 
     return jsonify({
         'success': True,

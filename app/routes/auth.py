@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 import re
 
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify
@@ -91,6 +92,40 @@ def submit_registration_material():
         field = fields.get(name)
         return field.get("value") if isinstance(field, dict) else None
 
+    # The browser may send the values the user reviewed/edited.  They are
+    # never trusted blindly: the uploaded material is still scanned and
+    # parsed above, then the same normalization and uniqueness checks below
+    # are applied to the reviewed values.
+    reviewed_overrides: dict[str, object] = {}
+    raw_overrides = request.form.get("overrides")
+    if raw_overrides:
+        try:
+            candidate = json.loads(raw_overrides)
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "识别结果修改格式无效", "code": "invalid_overrides"}), 400
+        if not isinstance(candidate, dict):
+            return jsonify({"ok": False, "error": "识别结果修改格式无效", "code": "invalid_overrides"}), 400
+        allowed = {"name", "unified_social_credit_code", "legal_representative", "address", "registered_capital", "business_scope"}
+        for key in allowed:
+            if key not in candidate:
+                continue
+            raw_value = candidate[key]
+            if raw_value is None:
+                continue
+            if key == "registered_capital":
+                if isinstance(raw_value, str) and not raw_value.strip():
+                    continue
+                try:
+                    normalized = float(raw_value)
+                except (TypeError, ValueError):
+                    return jsonify({"ok": False, "error": "注册资本格式不正确", "code": "invalid_overrides"}), 400
+            else:
+                normalized = str(raw_value).strip()
+                if not normalized:
+                    continue
+            reviewed_overrides[key] = normalized
+            fields[key] = {"value": normalized, "confidence": 1.0, "evidence": {"source": "user_review"}}
+
     name = str(value("name") or "").strip()[:200]
     credit_code = re.sub(r"\s+", "", str(value("unified_social_credit_code") or "")).upper()
     if not name or not re.fullmatch(r"[0-9A-Z]{18}", credit_code):
@@ -132,6 +167,7 @@ def submit_registration_material():
                 "source": "confirmed_uploaded_business_license",
                 "schema_version": draft.get("schema_version"),
                 "evidence": evidence,
+                "reviewed_overrides": reviewed_overrides,
                 "submitted_at": datetime.utcnow().isoformat(),
                 "review_status": "pending",
             }
@@ -286,6 +322,12 @@ def login():
         name = (request.form.get('name') or '').strip()
         password = request.form.get('password') or ''
 
+        if not name or not password:
+            if spa_modal:
+                return jsonify({'ok': False, 'error': '请填写企业名称与密码'}), 400
+            flash('请填写企业名称与密码', 'danger')
+            return redirect(url_for('main.index', login='1'))
+
         enterprise = Enterprise.query.filter_by(name=name).first()
 
         if enterprise is None or not enterprise.check_password(password):
@@ -319,9 +361,11 @@ def login():
 
     return redirect(url_for('main.index', login='1'))
 
-@auth.route('/logout')
+@auth.route('/logout', methods=['GET', 'POST'])
 @login_required
 def logout():
     logout_user()
+    if request.method == 'POST' and request.headers.get('X-Login-Modal') == '1':
+        return jsonify({'ok': True})
     flash('已退出登录', 'info')
     return redirect(url_for('main.index'))

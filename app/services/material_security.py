@@ -213,7 +213,9 @@ def ping_clamd(*, host: str, port: int, timeout: float = 3.0) -> bool:
         with socket.create_connection((host, int(port)), timeout=max(0.5, float(timeout))) as connection:
             connection.settimeout(max(0.5, float(timeout)))
             connection.sendall(b"zPING\0")
-            response = connection.recv(64).decode("ascii", errors="ignore").strip().upper()
+            # clamd returns ``PONG\0`` for the NUL-terminated command form;
+            # ``str.strip`` does not remove NUL bytes.
+            response = connection.recv(64).decode("ascii", errors="ignore").strip("\x00\r\n \t").upper()
             return response == "PONG"
     except (OSError, ValueError, socket.timeout):
         return False

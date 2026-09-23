@@ -37,6 +37,47 @@ GUEST_COOKIE = "chain_xiaoyi_guest"
 _AUDIT_REDACTED_KEYS = {"phone", "contact", "email", "address", "api_key", "token", "secret", "password", "access_token"}
 
 
+def _origin_key(value: str | None) -> str | None:
+    """Normalize an HTTP Origin without accepting paths, credentials, or junk."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    parsed = urlsplit(value.strip())
+    if parsed.scheme.lower() not in {"http", "https"}:
+        return None
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        return None
+    if parsed.path not in {"", "/"} or not parsed.hostname:
+        return None
+    try:
+        port = parsed.port
+    except ValueError:
+        return None
+    scheme = parsed.scheme.lower()
+    host = parsed.hostname.lower()
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    if (scheme == "http" and port == 80) or (scheme == "https" and port == 443):
+        port = None
+    return f"{scheme}://{host}{f':{port}' if port is not None else ''}"
+
+
+def _origin_is_allowed(origin: str | None) -> bool:
+    """Allow same-origin writes or an explicitly configured SPA origin."""
+    incoming = _origin_key(origin)
+    if incoming is None:
+        return False
+
+    # Do not trust a client-supplied forwarding header here. Public HTTPS
+    # origins behind a proxy are explicitly listed in TRUSTED_ORIGINS.
+    request_origin = _origin_key(f"{request.scheme}://{request.host}")
+    configured = {
+        normalized
+        for item in current_app.config.get("TRUSTED_ORIGINS", [])
+        if (normalized := _origin_key(item)) is not None
+    }
+    return incoming == request_origin or incoming in configured
+
+
 def _redact_audit(value):
     """Defence-in-depth redaction for persisted metadata returned by audit APIs."""
     if isinstance(value, dict):
@@ -505,7 +546,7 @@ def verify_write_origin():
     if request.method not in {"POST", "PUT", "PATCH", "DELETE"} or current_app.testing:
         return None
     origin = request.headers.get("Origin")
-    if origin and urlsplit(origin).netloc != request.host:
+    if origin and not _origin_is_allowed(origin):
         return jsonify({"error": "请求来源校验失败"}), 403
     return None
 

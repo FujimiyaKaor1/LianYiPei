@@ -377,9 +377,13 @@ class InquiryChatService:
                 "level": "未知",
             }
 
-        credit_score = float(counterparty.credit_score or 60.0)
-        level = self._score_to_level(credit_score)
-        risk_level, risk_detail = self._score_to_risk(credit_score)
+        credit_score = float(counterparty.credit_score) if counterparty.credit_score is not None else None
+        if credit_score is None:
+            level = "未知"
+            risk_level, risk_detail = "未知", "对方企业尚未公开信用分"
+        else:
+            level = self._score_to_level(credit_score)
+            risk_level, risk_detail = self._score_to_risk(credit_score)
 
         raw_ms = float(record.match_score or 0)
         ms_unit = raw_ms if raw_ms <= 1.0001 else min(raw_ms / 100.0, 1.0)

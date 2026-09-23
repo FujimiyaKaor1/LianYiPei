@@ -248,7 +248,18 @@ class CreditEngine:
         if not ent:
             return {}
 
-        score = float(ent.credit_score or 60.0)
+        score = float(ent.credit_score) if ent.credit_score is not None else None
+
+        # Keep the operational policy conservative without exposing its
+        # fallback as an actual enterprise credit score.
+        if score is None:
+            return {
+                "credit_score": None,
+                "daily_quote_limit": 3,
+                "matching_weight_boost": 1.0,
+                "financing_priority": False,
+                "preferred_supplier": False,
+            }
 
         if score >= 90:
             daily_limit = "unlimited"
@@ -314,7 +325,14 @@ class CreditEngine:
                 "risk_level": "未知",
                 "risk_detail": "企业不存在",
             }
-        score = float(ent.credit_score or 60.0)
+        score = float(ent.credit_score) if ent.credit_score is not None else None
+        if score is None:
+            return {
+                "credit_score": None,
+                "level": "未公开",
+                "risk_level": "未知",
+                "risk_detail": "企业尚未公开信用分",
+            }
         if score >= 90:
             level, risk_level, risk_detail = "AAA", "低风险", "信用表现优秀，违约风险极低"
         elif score >= 85:

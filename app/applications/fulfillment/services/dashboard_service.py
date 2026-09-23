@@ -169,7 +169,7 @@ def get_dashboard_payload(eid: int) -> Dict[str, Any]:
     history = build_history(eid)
 
     ent = Enterprise.query.get(eid)
-    current_score = float(ent.credit_score or 60.0) if ent else 60.0
+    current_score = float(ent.credit_score) if ent and ent.credit_score is not None else None
 
     return {
         "success": True,

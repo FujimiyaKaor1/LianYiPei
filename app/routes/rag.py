@@ -12,6 +12,13 @@ from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
+from app.services.material_security import (
+    InvalidMaterial,
+    MaterialInfected,
+    MaterialScanUnavailable,
+    scan_material,
+)
+
 rag_bp = Blueprint("rag", __name__, url_prefix="/api/rag")
 
 
@@ -66,7 +73,13 @@ def rag_ingest():
     file_path = upload_dir / f"{int(time.time())}_{uuid.uuid4().hex[:12]}__{safe_name}"
 
     try:
-        file_storage.save(str(file_path))
+        content = file_storage.stream.read(10 * 1024 * 1024 + 1)
+        scan_material(filename, content)
+        file_path.write_bytes(content)
+    except (InvalidMaterial, MaterialInfected) as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    except MaterialScanUnavailable as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
     except Exception as exc:
         current_app.logger.exception("rag_ingest: save failed")
         return jsonify({"ok": False, "error": f"文件保存失败：{exc}"}), 500

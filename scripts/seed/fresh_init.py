@@ -7,6 +7,11 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 if __name__ == '__main__':
+    if (os.environ.get("APP_ENV") or "development").strip().lower() == "production":
+        raise SystemExit(
+            "拒绝在 APP_ENV=production 下清空数据库；生产环境请只执行 Alembic 迁移。"
+        )
+
     from sqlalchemy import text
 
     from app import create_app, db

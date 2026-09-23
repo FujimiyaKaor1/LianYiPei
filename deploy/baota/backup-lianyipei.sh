@@ -16,7 +16,7 @@ WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
 PYTHON_BIN="${LIANYIPEI_PYTHON_BIN:-$APP_DIR/.venv/bin/python}"
-read -r DB_HOST DB_PORT DB_USER DB_PASSWORD DB_NAME < <(
+mapfile -t DB_CONFIG < <(
   LIANYIPEI_APP_DIR="$APP_DIR" \
   "$PYTHON_BIN" - <<'PY'
 from os.path import join
@@ -32,14 +32,25 @@ parsed = urlparse(raw)
 if not parsed.hostname or not parsed.path.strip("/"):
     raise SystemExit("DATABASE_URL 格式无效")
 print(
-    parsed.hostname,
+    parsed.hostname or "",
     parsed.port or 3306,
     unquote(parsed.username or ""),
     unquote(parsed.password or ""),
     parsed.path.strip("/").split("/", 1)[0],
+    sep="\n",
 )
 PY
 )
+
+if [[ "${#DB_CONFIG[@]}" -ne 5 || -z "${DB_CONFIG[0]}" || -z "${DB_CONFIG[4]}" ]]; then
+  echo "DATABASE_URL 解析结果无效" >&2
+  exit 1
+fi
+DB_HOST="${DB_CONFIG[0]}"
+DB_PORT="${DB_CONFIG[1]}"
+DB_USER="${DB_CONFIG[2]}"
+DB_PASSWORD="${DB_CONFIG[3]}"
+DB_NAME="${DB_CONFIG[4]}"
 
 MYSQL_PWD="$DB_PASSWORD" mysqldump \
   --protocol=tcp \

@@ -20,6 +20,24 @@ def _load_project_env(path):
 
 _load_project_env(os.path.join(basedir, ".env"))
 
+
+def _resolve_dev_sqlite_path() -> str:
+    """Choose the local SQLite dataset used by the development fallback.
+
+    The repository contains both the complete imported dataset and a small
+    demo database.  The complete database must win whenever it is present;
+    otherwise a fresh checkout would silently make every search look empty.
+    An explicit path remains available for tests and local experiments.
+    """
+    configured = (os.environ.get("LIANYIPEI_DEV_SQLITE_PATH") or "").strip()
+    if configured:
+        return configured if os.path.isabs(configured) else os.path.join(basedir, configured)
+
+    complete_path = os.path.join(basedir, "instance", "lianyipei.db")
+    if os.path.exists(complete_path):
+        return complete_path
+    return os.path.join(basedir, "instance", "lianyipei-dev.sqlite")
+
 # Ollama 原生 API 根地址（无 /v1 后缀），与 app.services.ollama_client 一致
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 
@@ -107,6 +125,26 @@ def _env_int(name: str, default: int, minimum: int, maximum: int) -> int:
     except (TypeError, ValueError):
         return default
     return max(minimum, min(value, maximum))
+
+
+def _trusted_origins(app_env: str) -> list[str]:
+    """Return explicit browser origins allowed to write to the SPA APIs.
+
+    Development gets only loopback Vite origins because the dev server is a
+    separate browser origin. Production has no implicit dev origins; the
+    public HTTPS origin must be configured by the deployment environment.
+    """
+    raw = os.environ.get("TRUSTED_ORIGINS")
+    if raw is not None:
+        return [item.strip().rstrip("/") for item in raw.split(",") if item.strip()]
+    if app_env != "production":
+        return [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ]
+    return []
 
 
 # 管理后台创建的密钥（进程内；重启后丢失，生产请写入 COLLAB_API_KEYS）
@@ -207,13 +245,28 @@ EXTERNAL_INTERFACES = build_external_interfaces()
 
 class Config:
     APP_ENV = (os.environ.get("APP_ENV") or os.environ.get("FLASK_ENV") or "development").strip().lower()
+    TRUSTED_ORIGINS = _trusted_origins(APP_ENV)
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-12345'
     SECRET_KEY_IS_DEFAULT = not bool(os.environ.get("SECRET_KEY"))
+    # Session cookies must not be sent over plain HTTP in production. SameSite
+    # Lax keeps normal same-origin SPA navigation working while blocking the
+    # common cross-site form-post cookie flow; HttpOnly prevents script access.
+    SESSION_COOKIE_SECURE = APP_ENV == "production"
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    REMEMBER_COOKIE_SECURE = APP_ENV == "production"
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = "Lax"
     # Production schema changes must be applied by the checked-in Alembic
     # migrations. Implicit ``create_all`` is retained only for local demos and
     # tests, where it keeps the bundled SQLite fixture convenient.
     AUTO_CREATE_SCHEMA = _env_bool("AUTO_CREATE_SCHEMA", APP_ENV != "production")
-    PUBLIC_DATA_MODE = (os.environ.get('PUBLIC_DATA_MODE') or 'demo').strip().lower()
+    # Production must label public records as production data by default. A
+    # missing flag must never make real database rows look like demo content.
+    PUBLIC_DATA_MODE = (
+        os.environ.get('PUBLIC_DATA_MODE')
+        or ('production' if APP_ENV == 'production' else 'demo')
+    ).strip().lower()
     ENABLE_MOCK_API = _env_bool("ENABLE_MOCK_API", False)
 
     # 本地联调：顶层 /api/… 可通过 request_loader 自动登录，生产默认关闭。
@@ -253,16 +306,23 @@ class Config:
         APP_ENV == "production",
     )
     SCHEDULER_LOCK_FILE = os.environ.get("SCHEDULER_LOCK_FILE") or "/tmp/lianyipei-scheduler.lock"
+    # A file lock prevents duplicate schedulers on one host, while the Redis
+    # heartbeat lets a web container observe a dedicated worker in a separate
+    # PID namespace. The heartbeat expires automatically if the worker dies.
+    WORKER_HEARTBEAT_KEY = os.environ.get("WORKER_HEARTBEAT_KEY") or "lianyipei:worker:heartbeat"
+    WORKER_HEARTBEAT_TTL_SECONDS = _env_int("WORKER_HEARTBEAT_TTL_SECONDS", 30, 10, 300)
 
     # 为扩展注入的 /hybridaction/* JSONP 探测提供空响应；与业务无关，可减少本地 404
     BROWSER_EXTENSION_PROBE_NOOP = True
 
     # 本地开发可显式启用项目自带 SQLite，避免 MySQL 凭据失效时页面完全无法启动。
+    # 仓库同时保留完整数据集和小型演示库时，优先使用完整数据集，避免搜索
+    # 页面在未配置 DATABASE_URL 的新环境中静默显示为空。
     # 生产环境不允许静默回退，必须显式提供 DATABASE_URL。
     _configured_database_url = os.environ.get('DATABASE_URL')
     DATABASE_URL_CONFIGURED = bool(_configured_database_url)
     SQLALCHEMY_DATABASE_URI = _configured_database_url or (
-        f"sqlite:///{os.path.join(basedir, 'instance', 'lianyipei-dev.sqlite')}"
+        f"sqlite:///{_resolve_dev_sqlite_path()}"
         if _env_bool('LIANYIPEI_DEV_SQLITE_FALLBACK', False)
         else 'mysql+pymysql://root:password@localhost/lianyipei'
     )

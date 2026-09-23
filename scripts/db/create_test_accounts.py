@@ -3,12 +3,18 @@
 """
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from app import create_app, db
-from app.models import Enterprise
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, ROOT)
 
 def create_test_accounts():
+    if (os.environ.get("APP_ENV") or "development").strip().lower() == "production":
+        raise RuntimeError(
+            "拒绝在 APP_ENV=production 下创建或重置固定测试账号；"
+            "请使用密钥管理系统创建专用验收账号。"
+        )
+    from app import create_app, db
+    from app.models import Enterprise
+
     app = create_app()
     
     print("=" * 50)

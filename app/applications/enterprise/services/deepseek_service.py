@@ -89,25 +89,31 @@ class DeepSeekProfileService:
             "main_products": self._truncate_text(ent.business_scope or "未填写", 100),
         }
 
-        # 产能状态
-        capacity = ent.capacity or 0
-        max_cap = ent.max_capacity or 100
-        usage_ratio = (capacity / max_cap * 100) if max_cap > 0 else 0
-
-        if usage_ratio >= 90:
-            capacity_status = "产能紧张"
-        elif usage_ratio >= 70:
-            capacity_status = "产能正常"
+        # 产能状态：current_orders 是当前负载，max_capacity 是能力上限。
+        # 缺少任一事实时不能用默认值伪造实时利用率。
+        current_orders = ent.current_orders
+        max_cap = ent.max_capacity
+        if max_cap is None or max_cap <= 0 or current_orders is None:
+            usage_ratio = None
+            capacity_status = "未公开"
+            capacity_usage = "未公开"
         else:
-            capacity_status = "产能充裕"
+            usage_ratio = min(100.0, max(0.0, float(current_orders) / float(max_cap) * 100))
+            if usage_ratio >= 90:
+                capacity_status = "产能紧张"
+            elif usage_ratio >= 70:
+                capacity_status = "产能正常"
+            else:
+                capacity_status = "产能充裕"
+            capacity_usage = f"{usage_ratio:.0f}%"
 
         profile["capacity_status"] = capacity_status
-        profile["capacity_usage"] = f"{usage_ratio:.0f}%"
+        profile["capacity_usage"] = capacity_usage
 
         # 信用评分
-        credit_score = ent.credit_score or 70.0
+        credit_score = float(ent.credit_score) if ent.credit_score is not None else None
         profile["credit_score"] = credit_score
-        profile["credit_level"] = self._score_to_level(credit_score)
+        profile["credit_level"] = self._score_to_level(credit_score) if credit_score is not None else "未公开"
 
         # 绿色等级
         if ent.is_green_factory:
@@ -119,7 +125,7 @@ class DeepSeekProfileService:
         profile["patent_count"] = ent.patent_count or 0
 
         # 合作风险评估
-        profile["cooperation_risk"] = self._assess_risk(credit_score, usage_ratio)
+        profile["cooperation_risk"] = self._assess_risk(credit_score, usage_ratio or 0.0) if credit_score is not None else "未知"
 
         # 注册资本
         reg_cap = ent.registered_capital
@@ -159,10 +165,10 @@ class DeepSeekProfileService:
                 reasons.append("产能正常，交期有保障")
 
         # 信用匹配
-        credit = ent.credit_score or 70
-        if credit >= 85:
+        credit = ent.credit_score
+        if credit is not None and credit >= 85:
             reasons.append("信用优秀，合作风险低")
-        elif credit >= 75:
+        elif credit is not None and credit >= 75:
             reasons.append("信用良好，值得信赖")
 
         # 绿色认证
@@ -228,7 +234,7 @@ class DeepSeekProfileService:
         # 生成商机摘要
         insight_summary = self._generate_insight_text(
             product_name=product_name,
-            capacity=ent.capacity,
+            capacity=ent.current_orders,
             max_cap=ent.max_capacity,
             credit_score=ent.credit_score,
             is_green=ent.is_green_factory,
@@ -236,18 +242,19 @@ class DeepSeekProfileService:
 
         # 产能信息
         capacity_info = ""
-        if ent.capacity and ent.max_capacity:
-            usage = ent.capacity / ent.max_capacity * 100
+        if ent.current_orders is not None and ent.max_capacity:
+            usage = min(100.0, max(0.0, ent.current_orders / ent.max_capacity * 100))
             capacity_info = f"当前产能利用率{int(usage)}%，"
 
         return {
             "type": "ai_business_insight",
+            "generation_mode": "database_rules",
             "enterprise_id": enterprise_id,
             "enterprise_name": ent.name,
             "insight_summary": (
                 f"已为您提取商机：{product_name}。"
-                f"根据实时库存与产排计划分析：{capacity_info}"
-                f"建议结合价格指数后快速报价。"
+                f"根据企业登记的产能字段分析：{capacity_info}"
+                f"建议结合价格指数和供应商回执后报价。"
             ),
             "enterprise_profile": profile,
             "actions": {
@@ -259,7 +266,7 @@ class DeepSeekProfileService:
             }
         }
 
-    # ── AI对话生成（模拟云端大模型调用） ────────────────────────────────────
+    # ── 可解释规则洞察（不冒充云端模型调用） ────────────────────────────────
 
     def generate_ai_insight_text(
         self,
@@ -270,9 +277,7 @@ class DeepSeekProfileService:
         is_green: bool,
     ) -> str:
         """
-        模拟云端大模型调用生成AI洞察文本。
-
-        实际项目中应替换为真实的 DeepSeek API 调用。
+        根据已持久化的企业事实生成可解释文本；不会伪称已调用 DeepSeek。
         """
         return self._generate_insight_text(
             product_name=product_name,
@@ -296,8 +301,8 @@ class DeepSeekProfileService:
         parts = []
 
         # 产能评估
-        if capacity and max_cap:
-            usage = capacity / max_cap * 100
+        if capacity is not None and max_cap:
+            usage = min(100.0, max(0.0, float(capacity) / float(max_cap) * 100))
             if usage >= 90:
                 parts.append("当前产能紧张，可能需要排队等待")
             elif usage >= 70:
@@ -306,13 +311,20 @@ class DeepSeekProfileService:
                 parts.append("产能充裕，可快速响应您的需求")
 
         # 信用评估
-        score = credit_score or 70
-        if score >= 85:
-            parts.append("企业信用表现优秀，合作风险低")
-        elif score >= 75:
-            parts.append("企业信用表现良好，合作较为可靠")
+        if credit_score is None:
+            # Do not turn missing evidence into a negative or positive
+            # credit judgment.
+            score = None
         else:
+            score = float(credit_score)
+        if score is not None and score >= 85:
+            parts.append("企业信用表现优秀，合作风险低")
+        elif score is not None and score >= 75:
+            parts.append("企业信用表现良好，合作较为可靠")
+        elif score is not None:
             parts.append("建议关注企业履约情况")
+        else:
+            parts.append("企业信用分尚未公开，需结合履约记录评估")
 
         # 绿色认证
         if is_green:

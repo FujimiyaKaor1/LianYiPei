@@ -144,6 +144,25 @@ def probe_worker(app, *, required: bool) -> dict[str, Any]:
         return _check("worker", ok=False, required=required, started=started, reason=safe_error(error))
 
 
+def probe_trusted_origins(app, *, required: bool) -> dict[str, Any]:
+    """Check that browser write origins are explicit and HTTPS in production."""
+    started = time.monotonic()
+    try:
+        from app.services.production_readiness import _browser_origins_ready
+
+        production = str(app.config.get("APP_ENV") or "development").lower() == "production"
+        ok = _browser_origins_ready(app.config.get("TRUSTED_ORIGINS"), require_https=production)
+        return _check(
+            "trusted_origins",
+            ok=ok,
+            required=required,
+            started=started,
+            reason=None if ok else "missing_or_invalid_origins",
+        )
+    except Exception as error:  # pragma: no cover - exercised by deployment
+        return _check("trusted_origins", ok=False, required=required, started=started, reason=safe_error(error))
+
+
 def probe_deepseek(app) -> dict[str, Any]:
     """Send one minimal non-business prompt without returning model content."""
     started = time.monotonic()
@@ -174,9 +193,13 @@ def run_smoke(app, *, probe_deepseek_enabled: bool = False) -> dict[str, Any]:
         "clamav": probe_clamav(app, required=production),
         "s3": probe_s3(app, required=production),
         "worker": probe_worker(app, required=production),
+        "trusted_origins": probe_trusted_origins(app, required=production),
         "deepseek": probe_deepseek(app) if probe_deepseek_enabled else _check(
             "deepseek",
-            ok=False,
+            # The normal smoke command is intentionally non-billable.  It
+            # verifies that the required credential is present; only the
+            # explicit --probe-deepseek flag performs a network request.
+            ok=_credential_present(os.getenv("DEEPSEEK_API_KEY")),
             required=bool(app.config.get("CHAINXIAOYI_CLOUD_REQUIRED")),
             started=time.monotonic(),
             status="skipped",
