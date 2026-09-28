@@ -183,7 +183,10 @@ export function LoginModal() {
       // 登录是当前页面上的弹窗操作。除非原页面确实没有权限，否则
       // 保留当前 URL；后端 redirect 只作为直接进入登录流程时的兜底。
       const currentPath = `${location.pathname}${location.search}${location.hash}`;
-      const fromCurrentPage = canRoleAccessPath(payload.role, currentPath);
+      // Public pages are shared by both roles, but an administrator must
+      // still land in the management console after logging in. Otherwise
+      // the public page wins over the backend's /admin/dashboard redirect.
+      const fromCurrentPage = payload.role !== 'admin' && canRoleAccessPath(payload.role, currentPath);
       const target = fromCurrentPage
         ? currentPath
         : fromPending

@@ -1,22 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  Wallet, 
   ShieldCheck, 
   Award, 
-  TrendingUp, 
-  Users, 
   Plus, 
-  ChevronRight, 
   FileText, 
   Lock, 
   Database,
-  ArrowUpRight,
   MapPin,
   Building2,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  CheckCircle2,
+  CircleDashed,
+  Sparkles
 } from 'lucide-react';
-import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { api, type EnterpriseAssetData, NETWORK_ERROR_MESSAGE } from '@/src/services/api';
 
@@ -63,174 +60,166 @@ export default function Assets() {
   const tags = Array.isArray(data.tags) ? data.tags : [];
   const qualifications = Array.isArray(data.qualifications) ? data.qualifications : [];
   const dataAuth = Array.isArray(data.data_auth) ? data.data_auth : [];
-  const teamMembers = Array.isArray(data.team_members) ? data.team_members : [];
   const creditBreakdown = Array.isArray(data.credit_breakdown) ? data.credit_breakdown : [];
+  const activeAuthCount = dataAuth.filter((item) => item.status === '已连接').length;
 
   return (
-    <div className="space-y-12">
+    <div className="mx-auto w-full max-w-[1440px] space-y-8 pb-8">
       {/* Identity Banner */}
-      <section className="bg-brand-solid text-white rounded-[3rem] p-12 relative overflow-hidden shadow-2xl">
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-gradient-to-br from-white/10 to-transparent blur-3xl rounded-full -mr-64 -mt-64"></div>
+      <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#155EEF] via-[#2563EB] to-[#123A73] p-6 text-white shadow-[0_20px_55px_-28px_rgba(21,94,239,.7)] sm:p-8 lg:p-10">
+        <div className="pointer-events-none absolute -right-28 -top-36 h-[460px] w-[460px] rounded-full bg-white/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-40 left-1/3 h-[300px] w-[560px] rounded-full bg-cyan-300/10 blur-3xl" />
         
-        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-12">
-          <div className="flex items-center gap-10">
-            <div className="w-32 h-32 bg-white rounded-[2.5rem] flex items-center justify-center text-black font-black text-4xl shadow-xl shrink-0 uppercase">
+        <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-5 sm:gap-7">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-[22px] bg-white text-3xl font-black text-brand shadow-xl sm:h-24 sm:w-24 sm:text-4xl">
               {data.name.slice(0, 1)}
             </div>
-            <div>
-              <div className="flex items-center gap-4 mb-3">
-                <h1 className="text-4xl font-extrabold tracking-tight">{data.name}</h1>
+            <div className="min-w-0">
+              <div className="mb-2 flex flex-wrap items-center gap-3">
+                <h1 className="truncate text-2xl font-extrabold tracking-tight text-white sm:text-3xl lg:text-4xl">{data.name}</h1>
                 {data.is_certified && (
-                  <span className="px-3 py-1 bg-blue-500/20 text-blue-400 text-[10px] font-black rounded uppercase tracking-widest border border-blue-500/30">已认证</span>
+                  <span className="rounded-full border border-emerald-200/30 bg-emerald-300/15 px-3 py-1 text-[10px] font-bold tracking-widest text-emerald-100">已认证</span>
                 )}
               </div>
-              <div className="flex flex-wrap gap-6 text-sm text-neutral-400 font-medium mt-4">
-                <span className="flex items-center gap-2"><MapPin className="w-4 h-4" /> {data.location}</span>
-                <span className="flex items-center gap-2"><Building2 className="w-4 h-4" /> 制造业 · {data.industry_tag}</span>
+              <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-blue-100/80">
+                <span className="flex items-center gap-2"><MapPin className="h-4 w-4 text-blue-200" /> {data.location}</span>
+                <span className="flex items-center gap-2"><Building2 className="h-4 w-4 text-blue-200" /> 制造业 · {data.industry_tag}</span>
                 {tags.slice(0, 1).map((tag, i) => (
-                  <span key={i} className="flex items-center gap-2"><Award className="w-4 h-4" /> {tag}</span>
+                  <span key={i} className="flex items-center gap-2"><Award className="h-4 w-4 text-blue-200" /> {tag}</span>
                 ))}
               </div>
             </div>
           </div>
           
-          <div className="flex gap-8 shrink-0">
-            <div className="text-center">
-              <div className="text-5xl font-black tracking-tighter">{data.credit_score == null ? '未公开' : data.credit_score}</div>
-              <div className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest mt-2">履约信用分</div>
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:gap-8 lg:pr-2">
+            <div className="rounded-2xl border border-white/15 bg-white/10 px-5 py-4 text-left backdrop-blur-sm sm:min-w-[128px] sm:text-center">
+              <div className="text-3xl font-black tracking-tight sm:text-4xl">{data.credit_score == null ? '—' : data.credit_score}</div>
+              <div className="mt-1 text-[10px] font-bold tracking-widest text-blue-100/70">履约信用分</div>
             </div>
-            <div className="w-px h-16 bg-white/10"></div>
-            <div className="text-center">
-              <div className="text-5xl font-black tracking-tighter">{data.patent_count}</div>
-              <div className="text-[10px] text-neutral-400 font-bold uppercase tracking-widest mt-2">核心专利</div>
+            <div className="rounded-2xl border border-white/15 bg-white/10 px-5 py-4 text-left backdrop-blur-sm sm:min-w-[128px] sm:text-center">
+              <div className="text-3xl font-black tracking-tight sm:text-4xl">{data.patent_count}</div>
+              <div className="mt-1 text-[10px] font-bold tracking-widest text-blue-100/70">核心专利</div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Grid Content */}
-      <section className="grid grid-cols-12 gap-10">
+      <section className="grid grid-cols-12 gap-6 lg:gap-8">
         {/* Left: Certifications & Data */}
-        <div className="col-span-12 lg:col-span-8 space-y-10">
+        <div className="col-span-12 space-y-8 lg:col-span-8">
           {/* Certifications */}
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xl font-bold">企业资质与证书</h3>
-              <button className="text-xs font-bold text-neutral-400 hover:text-black flex items-center gap-1 transition-colors">
+          <div className="space-y-4">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="eyebrow">Business credentials</p>
+                <h3 className="mt-1 text-xl font-bold text-ink">企业资质与证书</h3>
+              </div>
+              <button className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-bold text-ink-muted transition-colors hover:bg-brand-soft hover:text-brand">
                 上传新证书 <Plus className="w-4 h-4" />
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid gap-3 sm:grid-cols-2">
               {qualifications.map((cert, i) => (
-                <div key={i} className="p-6 bg-white rounded-3xl border border-neutral-100 shadow-sm flex items-center justify-between group cursor-pointer hover:shadow-md transition-all">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-neutral-50 rounded-2xl flex items-center justify-center text-neutral-400 group-hover:text-black transition-colors">
-                      <FileText className="w-6 h-6" />
+                <div key={i} className="group flex items-center justify-between rounded-2xl border border-border bg-surface-raised p-4 shadow-elevation-1 transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-elevation-2">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand transition-colors group-hover:bg-brand group-hover:text-white">
+                      <FileText className="h-5 w-5" />
                     </div>
-                    <div>
-                      <h4 className="text-sm font-bold">{cert.title}</h4>
-                      <p className="text-[10px] text-neutral-400 mt-1">{cert.date}</p>
+                    <div className="min-w-0">
+                      <h4 className="truncate text-sm font-bold text-ink">{cert.title}</h4>
+                      <p className="mt-1 text-[10px] text-ink-muted">{cert.date}</p>
                     </div>
                   </div>
-                  {cert.status === '有效' && <ShieldCheck className="w-5 h-5 text-blue-500" />}
+                  {cert.status === '有效' ? <ShieldCheck className="h-5 w-5 shrink-0 text-success" /> : <CircleDashed className="h-5 w-5 shrink-0 text-ink-faint" />}
                 </div>
               ))}
               {qualifications.length === 0 && (
-                <div className="col-span-2 py-8 text-center text-sm text-neutral-400 border-2 border-dashed border-neutral-100 rounded-3xl">
-                  暂无资质信息
+                <div className="col-span-2 flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface-raised px-6 py-10 text-center">
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-brand-soft text-brand"><FileText className="h-5 w-5" /></div>
+                  <p className="text-sm font-semibold text-ink-soft">暂无资质信息</p>
+                  <p className="mt-1 text-xs text-ink-muted">上传证书后，企业可信度信息会在这里集中展示</p>
                 </div>
               )}
             </div>
           </div>
 
           {/* Data Auth */}
-          <div className="space-y-6">
-            <h3 className="text-xl font-bold">数据授权接口</h3>
-            <div className="bg-white rounded-[2.5rem] border border-neutral-100 shadow-sm overflow-hidden">
-              <div className="p-8 border-b border-neutral-50 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <Database className="w-5 h-5 text-black" />
-                  <span className="text-sm font-bold">外部系统同步状态</span>
-                </div>
-                <span className="text-[10px] text-neutral-400 font-bold">最后同步：10分钟前</span>
+          <div className="space-y-4">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="eyebrow">Connected sources</p>
+                <h3 className="mt-1 text-xl font-bold text-ink">数据授权接口</h3>
               </div>
-              <div className="divide-y divide-neutral-50">
+              <span className="rounded-full bg-success-soft px-2.5 py-1 text-[11px] font-bold text-success">{activeAuthCount} 个已连接</span>
+            </div>
+            <div className="overflow-hidden rounded-2xl border border-border bg-surface-raised shadow-elevation-1">
+              <div className="flex items-center justify-between border-b border-border/60 px-5 py-4 sm:px-6">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-soft text-brand"><Database className="h-4 w-4" /></span>
+                  <div><span className="block text-sm font-bold text-ink">外部系统同步状态</span><span className="mt-0.5 block text-[10px] text-ink-muted">数据授权后自动同步业务信息</span></div>
+                </div>
+                <span className="hidden text-[10px] font-bold text-ink-muted sm:block">最后同步：10分钟前</span>
+              </div>
+              <div className="divide-y divide-border/50">
                 {dataAuth.map((sys, i) => (
-                  <div key={i} className="p-8 flex items-center justify-between hover:bg-neutral-50/50 transition-colors">
-                    <div className="flex items-center gap-6">
-                      <div className="w-10 h-10 bg-neutral-100 rounded-xl flex items-center justify-center">
-                        <Building2 className="w-5 h-5 text-neutral-400" />
+                  <div key={i} className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-surface-subtle/60 sm:px-6">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-subtle">
+                        <Building2 className="h-5 w-5 text-ink-muted" />
                       </div>
-                      <div>
-                        <h4 className="text-sm font-bold">{sys.name}</h4>
-                        <p className="text-[10px] text-neutral-400 mt-1">同步内容：{sys.data}</p>
+                      <div className="min-w-0">
+                        <h4 className="truncate text-sm font-bold text-ink">{sys.name}</h4>
+                        <p className="mt-1 truncate text-[10px] text-ink-muted">同步内容：{sys.data}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-6">
+                    <div className="flex shrink-0 items-center gap-3">
                       <span className={cn(
-                        "px-3 py-1 rounded-full text-[10px] font-bold",
-                        sys.status === '已连接' ? "bg-blue-50 text-blue-600" : "bg-neutral-100 text-neutral-400"
+                        "rounded-full px-2.5 py-1 text-[10px] font-bold",
+                        sys.status === '已连接' ? "bg-success-soft text-success" : "bg-surface-subtle text-ink-muted"
                       )}>{sys.status}</span>
-                      <button className="p-2 hover:bg-white rounded-lg transition-all">
-                        {sys.status === '已连接' ? <Lock className="w-4 h-4 text-neutral-400" /> : <Plus className="w-4 h-4 text-neutral-400" />}
+                      <button aria-label={sys.status === '已连接' ? '查看授权状态' : '连接外部系统'} className="rounded-lg p-2 transition-all hover:bg-surface-subtle">
+                        {sys.status === '已连接' ? <Lock className="h-4 w-4 text-ink-muted" /> : <Plus className="h-4 w-4 text-ink-muted" />}
                       </button>
                     </div>
                   </div>
                 ))}
+                {dataAuth.length === 0 && <div className="flex flex-col items-center justify-center px-6 py-10 text-center"><CircleDashed className="mb-3 h-7 w-7 text-ink-faint" /><p className="text-sm font-semibold text-ink-soft">暂无授权接口</p><p className="mt-1 text-xs text-ink-muted">连接外部系统后，可在这里查看同步状态</p></div>}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right: Team & Credit */}
-        <div className="col-span-12 lg:col-span-4 space-y-10">
+        {/* Right: Credit */}
+        <div className="col-span-12 lg:col-span-4">
           {/* Credit Score Detail */}
-          <div className="bg-surface-container-highest rounded-[2.5rem] p-10 space-y-8 shadow-sm">
-            <h4 className="text-lg font-bold">信用分构成</h4>
-            <div className="space-y-6">
+          <div className="rounded-2xl border border-border bg-surface-container-highest/70 p-6 shadow-elevation-1 sm:p-7">
+            <div className="mb-7 flex items-start justify-between gap-4">
+              <div><p className="eyebrow text-brand">Trust profile</p><h4 className="mt-1 text-lg font-bold text-ink">信用分构成</h4></div>
+              <Sparkles className="h-5 w-5 text-brand" />
+            </div>
+            <div className="space-y-5">
               {creditBreakdown.map((item, i) => (
                 <div key={i} className="space-y-2">
-                  <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest">
-                    <span>{item.label}</span>
-                    <span>{item.score}</span>
+                  <div className="flex justify-between text-xs font-bold">
+                    <span className="text-ink-soft">{item.label}</span>
+                    <span className="text-brand">{item.score}<span className="ml-0.5 text-[10px] text-ink-muted">分</span></span>
                   </div>
-                  <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-white/70">
                     <div 
-                      className={cn("h-full transition-all duration-1000", item.score > 80 ? 'bg-brand-solid' : 'bg-neutral-400')}
+                      className={cn("h-full rounded-full transition-all duration-1000", item.score > 80 ? 'bg-brand-solid' : 'bg-ink-faint')}
                       style={{ width: `${Math.max(0, Math.min(100, item.score))}%` }}>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
-            <p className="text-[11px] text-neutral-500 leading-relaxed italic">
+            {creditBreakdown.length === 0 && <div className="rounded-xl border border-dashed border-border bg-white/30 px-4 py-6 text-center text-xs text-ink-muted">暂无可用信用事件</div>}
+            <p className="mt-7 flex items-start gap-2 border-t border-white/60 pt-5 text-[11px] leading-relaxed text-ink-muted">
+              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
               * 这里只展示已持久化的信用事件和授权数据；缺少证据时不会补出信用分。
             </p>
-          </div>
-
-          {/* Team Management */}
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-bold">团队成员</h3>
-              <button className="text-xs font-bold text-black border border-neutral-200 px-3 py-1.5 rounded-lg hover:bg-neutral-50 transition-colors">管理</button>
-            </div>
-            <div className="space-y-3">
-              {teamMembers.map((member, i) => (
-                <div key={i} className="p-4 bg-white rounded-2xl border border-neutral-100 shadow-sm flex items-center justify-between group cursor-pointer hover:bg-neutral-50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-brand-solid text-white rounded-full flex items-center justify-center font-bold text-xs shrink-0">{member.avatar}</div>
-                    <div>
-                      <h4 className="text-sm font-bold truncate max-w-[120px]">{member.name}</h4>
-                      <p className="text-[10px] text-neutral-400 truncate max-w-[120px]">{member.role}</p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-neutral-300 group-hover:text-black shrink-0" />
-                </div>
-              ))}
-              <button className="w-full py-4 border-2 border-dashed border-neutral-200 rounded-2xl text-xs font-bold text-neutral-500 hover:border-brand-solid hover:text-black transition-all flex items-center justify-center gap-2">
-                <Plus className="w-4 h-4" /> 邀请新成员
-              </button>
-            </div>
           </div>
         </div>
       </section>

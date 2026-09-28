@@ -33,8 +33,8 @@ def create_test_accounts():
         for ent in all_enterprises:
             print(f"  - ID: {ent.id}, 名称: {ent.name}, 角色: {ent.role}, is_admin: {ent.is_admin}")
         
-        # 创建/更新政府端账号 admin
-        print("\n创建/更新政府端账号 admin...")
+        # 创建/更新管理员账号 admin
+        print("\n创建/更新管理员账号 admin...")
         admin = Enterprise.query.filter_by(name='admin').first()
         if admin:
             print(f"  admin 账号已存在 (ID: {admin.id})")
@@ -101,7 +101,7 @@ def create_test_accounts():
         
         print("\n" + "=" * 50)
         print("测试账号创建完成!")
-        print("  政府端账号: admin / admin")
+        print("  管理员账号: admin / admin")
         print("  企业端账号: test_ent / 123456")
         print("=" * 50)
 

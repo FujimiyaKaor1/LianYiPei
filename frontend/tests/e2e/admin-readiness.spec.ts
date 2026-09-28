@@ -39,4 +39,22 @@ test('管理员首页展示生产就绪门禁且不暴露敏感配置', async ({
   await expect(page.getByText('应用密钥', { exact: true })).toBeVisible();
   await expect(page.getByText('询价显式审批', { exact: true })).toBeVisible();
   await expect(page.getByText(/sk-|API_KEY|password/i)).toHaveCount(0);
+  const sidebar = page.locator('aside').first();
+  const collapseButton = page.getByRole('button', { name: '收起导航栏' });
+  await expect(collapseButton).toBeVisible();
+  await expect(sidebar.getByText('管理首页')).toBeVisible();
+
+  const expandedBox = await sidebar.boundingBox();
+  await collapseButton.click();
+
+  await expect(page.getByRole('button', { name: '展开导航栏' })).toBeVisible();
+  await expect(sidebar.getByText('管理首页')).toBeHidden();
+  const collapsedBox = await sidebar.boundingBox();
+  expect(expandedBox).not.toBeNull();
+  expect(collapsedBox).not.toBeNull();
+  expect(collapsedBox!.width).toBeLessThan(expandedBox!.width);
+
+  await page.getByRole('button', { name: '展开导航栏' }).click();
+  await expect(page.getByRole('button', { name: '收起导航栏' })).toBeVisible();
+  await expect(sidebar.getByText('管理首页')).toBeVisible();
 });

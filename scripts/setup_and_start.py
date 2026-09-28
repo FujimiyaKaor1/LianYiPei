@@ -51,7 +51,7 @@ def main():
     print("\n" + "=" * 55)
     print("  启动应用: python run.py")
     print("  访问: 前端 http://localhost:3000（后端 http://localhost:5050）")
-    print("  政府账号: admin / admin  |  企业账号: test_ent / 123456")
+    print("  管理员账号: admin / admin  |  企业账号: test_ent / 123456")
     print("=" * 55)
 
     # 3. 启动（增加：自动启动 model_service + 等待端口就绪）

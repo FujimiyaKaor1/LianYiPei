@@ -126,7 +126,7 @@ async function publicSegment(page) {
   await visit(page, '公开平台 · 工厂搜索', '/search', { pan: 'input,button', pause: 700 });
   const searchInput = page.getByTestId('public-search-input');
   if (await searchInput.isVisible().catch(() => false)) {
-    await searchInput.fill('工业电机');
+    await searchInput.fill('精密零部件');
     await page.getByTestId('public-search-submit').click();
     await delay(1200);
   }
@@ -187,19 +187,6 @@ async function sellerSegment(page) {
   for (const [route, label] of pages) await visit(page, label, route, { pan: 'h1,h2,button,a', pause: 650 });
 }
 
-async function governmentSegment(page) {
-  await login(page, '成都市产业链协同专班', '123456', '政府端 · 登录');
-  const pages = [
-    ['/gov', '政府端 · 监管首页'],
-    ['/gov/screen', '政府端 · 数字大屏'],
-    ['/gov/labels', '政府端 · 质量标签'],
-    ['/gov/alerts', '政府端 · 预警中心'],
-    ['/gov/supply-chain', '政府端 · 产业链图谱'],
-    ['/gov/recruitment', '政府端 · 招商决策'],
-  ];
-  for (const [route, label] of pages) await visit(page, label, route, { pan: 'h1,h2,button,a', pause: 750 });
-}
-
 async function adminSegment(page) {
   await login(page, 'admin', 'admin', '管理员端 · 登录');
   const pages = [
@@ -216,13 +203,12 @@ async function adminSegment(page) {
 }
 
 const segments = process.argv.slice(2).filter((argument) => !argument.startsWith('--'));
-const requested = segments.length ? segments : ['public', 'enterprise', 'seller', 'government', 'admin'];
+const requested = segments.length ? segments : ['public', 'enterprise', 'seller', 'admin'];
 const jobs = {
   public: ['01-public-platform', publicSegment],
   enterprise: ['02-enterprise-platform', enterpriseSegment],
   seller: ['03-seller-demo-platform', sellerSegment],
-  government: ['04-government-platform', governmentSegment],
-  admin: ['05-admin-platform', adminSegment],
+  admin: ['04-admin-platform', adminSegment],
 };
 
 const manifest = [];

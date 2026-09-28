@@ -8,24 +8,26 @@ from flask_login import current_user, login_required
 
 
 def user_effective_role(user) -> str:
-    """返回 'admin' | 'enterprise'。government 与 admin 等价；兼容仅有 is_admin 而无 role 列的旧数据。"""
+    """返回当前产品角色。历史 government 账号只作兼容识别，不再获得登录或接口权限。"""
     if user is None or not getattr(user, "is_authenticated", False):
         return "enterprise"
     r = getattr(user, "role", None)
-    if r == "government":
-        return "admin"
     if r in ("admin", "enterprise"):
         return r
+    if r == "government":
+        return "disabled"
     return "admin" if getattr(user, "is_admin", False) else "enterprise"
 
 
 def user_session_role(user) -> str:
-    """SPA 用原始角色：'admin' | 'government' | 'enterprise'（不与 government 合并）。"""
+    """SPA 用当前产品角色：'admin' | 'enterprise'。"""
     if user is None or not getattr(user, "is_authenticated", False):
         return "enterprise"
     r = getattr(user, "role", None)
-    if r in ("admin", "government", "enterprise"):
+    if r in ("admin", "enterprise"):
         return r
+    if r == "government":
+        return "disabled"
     return "admin" if getattr(user, "is_admin", False) else "enterprise"
 
 

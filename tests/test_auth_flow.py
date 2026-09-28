@@ -101,3 +101,70 @@ def test_login_rejects_blank_credentials_without_database_error(client, _db):
 
     assert response.status_code == 400
     assert response.get_json()["ok"] is False
+
+
+def test_spa_login_switches_to_the_enterprise_named_in_new_credentials(client, _db):
+    first = _enterprise("原采购企业")
+    second = _enterprise("湖南星瀚精密制造有限公司")
+
+    assert client.post(
+        "/auth/login",
+        data={"name": first.name, "password": "test123456"},
+        headers={"X-Login-Modal": "1"},
+    ).status_code == 200
+
+    switched = client.post(
+        "/auth/login",
+        data={"name": second.name, "password": "test123456"},
+        headers={"X-Login-Modal": "1"},
+    )
+
+    assert switched.status_code == 200
+    assert client.get("/api/session").get_json()["user"]["id"] == second.id
+
+
+def test_government_account_is_retired(client, _db):
+    government = Enterprise(name="历史政府账号", role="government", verification_status="approved")
+    government.set_password("gov123456")
+    db.session.add(government)
+    db.session.commit()
+
+    response = client.post(
+        "/auth/login",
+        data={"name": government.name, "password": "gov123456"},
+        headers={"X-Login-Modal": "1"},
+    )
+
+    assert response.status_code == 403
+    assert response.get_json()["code"] == "government_portal_removed"
+    assert client.get("/api/session").get_json()["authenticated"] is False
+
+
+def test_admin_and_enterprise_share_the_enterprise_management_flow(client, test_admin, test_enterprise):
+    test_enterprise.verification_status = "approved"
+    test_enterprise.is_verified = True
+    test_admin.verification_status = "approved"
+    test_admin.is_verified = True
+    db.session.commit()
+    enterprise_client = client
+    enterprise_login = enterprise_client.post(
+        "/auth/login",
+        data={"name": test_enterprise.name, "password": "test123456"},
+        headers={"X-Login-Modal": "1"},
+    )
+    assert enterprise_login.status_code == 200
+    assert enterprise_client.get("/api/user/me").get_json()["id"] == test_enterprise.id
+    assert enterprise_client.get("/admin/api/verifications").status_code == 403
+
+    enterprise_client.post("/auth/logout", headers={"X-Login-Modal": "1"})
+    admin_client = enterprise_client
+    admin_login = admin_client.post(
+        "/auth/login",
+        data={"name": test_admin.name, "password": "admin123456"},
+        headers={"X-Login-Modal": "1"},
+    )
+    assert admin_login.status_code == 200
+    assert admin_login.get_json()["redirect"] == "/admin/dashboard"
+    verification_data = admin_client.get("/admin/api/verifications?status=all").get_json()
+    assert any(item["id"] == test_enterprise.id for item in verification_data["items"])
+    assert admin_client.get("/gov").status_code == 404

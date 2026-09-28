@@ -41,8 +41,17 @@ export function IntentQuoteModal({
   onClose,
   onSuccess,
 }: IntentQuoteModalProps) {
+  const isDemoScenario = enterpriseProfile?.name === '湖南星瀚精密制造有限公司' || productName.includes('精密零部件');
+  const quoteTemplate = {
+    quantity: '100',
+    unit: '件',
+    targetPrice: '48',
+    budgetRange: '45-55',
+    remarks: '按精密零部件采购需求报价；交期 30 天内，要求出厂检验报告，支持含税报价。',
+  };
+
   // 表单状态
-  const [quantity, setQuantity] = useState('100');
+  const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('件');
   const [targetPrice, setTargetPrice] = useState('');
   const [budgetRange, setBudgetRange] = useState('');
@@ -53,12 +62,23 @@ export function IntentQuoteModal({
   const [error, setError] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<AIQuoteSuggestion | null>(null);
+  const [demoTemplateApplied, setDemoTemplateApplied] = useState(false);
   const [step, setStep] = useState<'form' | 'confirm' | 'success'>('form');
+
+  const applyDemoTemplate = () => {
+    setQuantity(quoteTemplate.quantity);
+    setUnit(quoteTemplate.unit);
+    setTargetPrice(quoteTemplate.targetPrice);
+    setBudgetRange(quoteTemplate.budgetRange);
+    setRemarks(quoteTemplate.remarks);
+    setDemoTemplateApplied(true);
+    setError(null);
+  };
 
   // 重置表单
   useEffect(() => {
     if (open) {
-      setQuantity('100');
+      setQuantity('');
       setUnit('件');
       setTargetPrice('');
       setBudgetRange('');
@@ -66,8 +86,9 @@ export function IntentQuoteModal({
       setError(null);
       setStep('form');
       setAiSuggestion(null);
+      setDemoTemplateApplied(false);
     }
-  }, [open]);
+  }, [open, enterpriseProfile?.name, productName]);
 
   // 获取AI建议
   const handleGetAISuggestion = async () => {
@@ -209,6 +230,17 @@ export function IntentQuoteModal({
                   <p className="text-[10px] text-neutral-500 mt-3 pt-3 border-t border-blue-100">
                     {aiSuggestion.basis}
                   </p>
+                </div>
+              ) : isDemoScenario ? (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={applyDemoTemplate}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {demoTemplateApplied ? '一键重填' : '一键智能填报'}
+                  </button>
                 </div>
               ) : (
                 <button

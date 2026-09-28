@@ -804,6 +804,22 @@
   font-family: var(--font-sans);
 }
 
+.gov-digital-screen-embedded {
+  /* The admin page embeds the screen below its own header and toolbar. A
+   * fixed minimum height made the lower panels fall below the viewport on
+   * shorter laptop/browser windows. Keep the desktop cap, but let the
+   * embedded canvas shrink to the space that is actually available. */
+  height: min(760px, max(420px, calc(100dvh - 180px)));
+  min-height: 0;
+  border-radius: 0;
+}
+
+/* The embedded screen has its own fixed-height viewport. Do not let the
+ * dashboard's viewport height make the inner grid taller than its parent. */
+.gov-digital-screen-embedded .mainbox {
+  height: calc(100% - var(--screen-header-height));
+}
+
 .gov-digital-screen header {
   position: relative;
   display: grid;

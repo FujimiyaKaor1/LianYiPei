@@ -1531,10 +1531,10 @@ export const api = {
     }
     let riskLevel: CreditRiskResult['risk_level'] = '中风险';
     let riskText = '信用表现一般，建议谨慎合作并关注账期。';
-    if (score >= 85) {
+    if (score >= 60) {
       riskLevel = '低风险';
-      riskText = '信用表现优秀，违约风险较低。';
-    } else if (score < 70) {
+      riskText = score >= 85 ? '信用表现优秀，违约风险较低。' : '信用表现良好，违约风险较低。';
+    } else if (score < 60) {
       riskLevel = '高风险';
       riskText = '信用表现偏弱，建议设置更严格的履约条件。';
     }

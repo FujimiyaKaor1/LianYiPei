@@ -117,6 +117,8 @@ interface BusinessCardModalProps {
   open: boolean;
   myCard?: BusinessCardData;   // 我的名片（当前用户）
   theirCard?: BusinessCardData;  // 对方名片
+  mapSupplierId?: number;
+  mapBuyerId?: number;
   onClose: () => void;
 }
 
@@ -239,6 +241,8 @@ export function BusinessCardModal({
   open,
   myCard,
   theirCard,
+  mapSupplierId,
+  mapBuyerId,
   onClose,
 }: BusinessCardModalProps) {
   if (!open) return null;
@@ -286,7 +290,17 @@ export function BusinessCardModal({
 
         {/* 底部操作 */}
         {hasBoth && (
-          <div className="px-6 py-4 bg-white border-t border-neutral-100 flex justify-end shrink-0">
+          <div className="px-6 py-4 bg-white border-t border-neutral-100 flex items-center justify-between gap-3 shrink-0">
+            {mapSupplierId && mapBuyerId ? (
+              <a
+                href={`/map/view?supplier_id=${mapSupplierId}&buyer_id=${mapBuyerId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2.5 border border-blue-200 bg-blue-50 text-blue-700 rounded-xl text-sm font-bold hover:bg-blue-100 transition-colors"
+              >
+                查看双方位置
+              </a>
+            ) : <span />}
             <button
               type="button"
               onClick={onClose}

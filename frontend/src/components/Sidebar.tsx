@@ -1,11 +1,11 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
+  ArrowRightLeft,
   LayoutDashboard,
   Network, 
   Settings, 
   Wallet, 
-  CalendarDays,
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { useAuth } from '@/src/context/AuthContext';
@@ -23,12 +23,7 @@ export const navGroups = [
     label: '供需协同',
     items: [
       { icon: Network, label: '供需匹配', path: '/matching' },
-    ],
-  },
-  {
-    label: '履约运营',
-    items: [
-      { icon: CalendarDays, label: '产能日历', path: '/capacity-calendar' },
+      { icon: ArrowRightLeft, label: '企业协同', path: '/sales-console' },
     ],
   },
   {
@@ -46,7 +41,7 @@ export function EnterpriseTopNav() {
 
   return (
     <nav
-      className="flex min-h-[56px] flex-shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-surface/92 px-4 shadow-[0_1px_0_rgba(15,23,42,0.04)] backdrop-blur-xl md:px-6"
+      className="flex min-h-[56px] flex-shrink-0 items-center justify-center gap-2 overflow-x-auto border-b border-border bg-surface/92 px-4 shadow-[0_1px_0_rgba(15,23,42,0.04)] backdrop-blur-xl md:px-6"
       aria-label="企业工作台导航"
     >
       {navItems.map((item) => (

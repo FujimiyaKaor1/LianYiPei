@@ -32,7 +32,7 @@ export default function Dashboard() {
   useEffect(() => { if (user?.role === 'enterprise') void load(); }, [user?.id]);
   const metrics = summary?.metrics;
   const maxTrend = Math.max(...(trends?.inquiries || []), ...(trends?.quotes || []), 1);
-  const quickActions = [{ label: '找工厂', path: '/search', icon: Factory }, { label: '匹配结果', path: '/matching', icon: TrendingUp }, { label: '查看报价', path: '/matching?panel=quotes', icon: ClipboardList }, { label: '订单工作流', path: '/orders', icon: Activity }, { label: '产能日历', path: '/capacity-calendar', icon: Factory }];
+  const quickActions = [{ label: '找工厂', path: '/search', icon: Factory }, { label: '匹配结果', path: '/matching', icon: TrendingUp }, { label: '查看报价', path: '/matching?panel=quotes', icon: ClipboardList }, { label: '订单工作流', path: '/orders', icon: Activity }];
   return <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-5">
     <section className="panel flex flex-wrap items-start justify-between gap-4 p-6"><div><p className="eyebrow text-brand">Enterprise cockpit</p><h1 className="mt-1 text-2xl font-black text-ink">{user?.enterpriseName || '企业'}经营看板</h1><p className="mt-2 text-xs text-ink-muted">近 30 天经营摘要 · 数据来源：业务记录 · {summary?.is_demo ? '演示数据' : '真实数据'}</p></div><button type="button" onClick={() => void load()} disabled={loading} className="btn-secondary btn-sm gap-1.5"><RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />刷新数据</button></section>
     <DataState error={error} loading={loading && !summary} onRetry={() => void load()} />

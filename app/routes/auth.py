@@ -193,13 +193,11 @@ def _safe_relative_path(candidate: str | None) -> str | None:
 
 
 def _default_spa_home(effective_role: str) -> str:
-    return "/gov" if effective_role == "admin" else "/"
+    return "/admin/dashboard" if effective_role == "admin" else "/"
 
 
 def _spa_home_for_user(user) -> str:
     r = user_session_role(user)
-    if r == "government":
-        return "/gov"
     if r == "admin":
         return "/admin/dashboard"
     return "/"
@@ -312,11 +310,21 @@ def login():
     spa_modal = request.headers.get('X-Login-Modal') == '1'
 
     if current_user.is_authenticated:
-        # SPA 弹窗 POST 时避免返回 302 HTML，导致前端按 JSON 解析失败、误报「登录失败」
-        if request.method == 'POST' and spa_modal:
-            home = _spa_home_for_user(current_user)
-            return jsonify({'ok': True, 'redirect': home, 'role': user_session_role(current_user)})
-        return redirect(_spa_home_for_user(current_user))
+        # A credentials-bearing SPA login is also the account-switch action.
+        # Do not short-circuit it with the existing session; otherwise every
+        # subsequent login attempt keeps returning the previous enterprise.
+        can_switch_account = (
+            request.method == 'POST'
+            and spa_modal
+            and bool((request.form.get('name') or '').strip())
+            and bool(request.form.get('password'))
+        )
+        if not can_switch_account:
+            # SPA 弹窗 POST 时避免返回 302 HTML，导致前端按 JSON 解析失败、误报「登录失败」
+            if request.method == 'POST' and spa_modal:
+                home = _spa_home_for_user(current_user)
+                return jsonify({'ok': True, 'redirect': home, 'role': user_session_role(current_user)})
+            return redirect(_spa_home_for_user(current_user))
 
     if request.method == 'POST':
         name = (request.form.get('name') or '').strip()
@@ -334,6 +342,13 @@ def login():
             if spa_modal:
                 return jsonify({'ok': False, 'error': '企业名称或密码错误'}), 401
             flash('企业名称或密码错误', 'danger')
+            return redirect(url_for('main.index', login='1'))
+
+        if enterprise.role == 'government':
+            message = '政府端已下线，该账号不再提供登录服务。请使用管理员端或企业端账号。'
+            if spa_modal:
+                return jsonify({'ok': False, 'error': message, 'code': 'government_portal_removed'}), 403
+            flash(message, 'warning')
             return redirect(url_for('main.index', login='1'))
 
         # 检查审核状态

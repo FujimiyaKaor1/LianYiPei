@@ -426,12 +426,12 @@ class InquiryChatService:
     @staticmethod
     def _score_to_risk(score: float) -> tuple[str, str]:
         """信用分 → 风险等级 + 描述"""
-        if score >= 85:
-            return "低风险", "信用表现优秀，违约风险极低"
-        elif score >= 75:
-            return "中风险", "信用表现良好，建议适度关注账期"
-        elif score >= 70:
-            return "中风险", "信用表现一般，建议关注履约情况"
+        # 商机页将 60 分及以上视为偏低风险；85 分以上仍保留更强的
+        # “优秀”描述，但不再把 60~69 分的正常企业误判为高风险。
+        if score >= 60:
+            if score >= 85:
+                return "低风险", "信用表现优秀，违约风险极低"
+            return "低风险", "信用表现良好，违约风险较低"
         else:
             return "高风险", "信用表现偏弱，建议设置更严格的履约条件"
 

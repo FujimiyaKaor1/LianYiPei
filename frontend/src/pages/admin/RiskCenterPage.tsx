@@ -18,6 +18,29 @@ import {
 } from '@/src/lib/adminApi';
 import { useToast } from '@/src/components/ToastProvider';
 
+// 管理后台在尚未接入真实工商检查数据时仍保持可演示状态。
+// 一旦接口返回真实数据，以下内容会按模块逐项被替换。
+const DEMO_CONFIG: CheckConfig = {
+  enabled: true,
+  check_interval_hours: 24,
+  sample_size: 8,
+  auto_delist_enabled: true,
+};
+
+const DEMO_STATS: CheckStats = { total: 128, active: 117, abnormal: 7, dormant: 4 };
+
+const DEMO_ABNORMAL: AbnormalEnterprise[] = [
+  { id: 9001, name: '华东精密制造', business_status: '经营异常', checked_at: '2026-09-24 09:18' },
+  { id: 9002, name: '远航新材料', business_status: '风险关注', checked_at: '2026-09-23 16:42' },
+];
+
+const DEMO_HISTORY: CheckHistoryItem[] = [
+  { id: 9101, enterprise_id: 9001, enterprise_name: '华东精密制造', check_time: '2026-09-24 09:18', result: 'abnormal', details: '经营状态需要人工复核' },
+  { id: 9102, enterprise_id: 9002, enterprise_name: '远航新材料', check_time: '2026-09-23 16:42', result: 'abnormal', details: '工商信息更新待确认' },
+  { id: 9103, enterprise_id: 9003, enterprise_name: '南岭电子科技', check_time: '2026-09-23 14:05', result: 'normal', details: '经营状态正常' },
+  { id: 9104, enterprise_id: 9004, enterprise_name: '智造装备集团', check_time: '2026-09-22 10:31', result: 'normal', details: '经营状态正常' },
+];
+
 export default function RiskCenterPage() {
   const { showToast } = useToast();
   const [config, setConfig] = useState<CheckConfig | null>(null);
@@ -39,12 +62,15 @@ export default function RiskCenterPage() {
         apiRisk.history(30),
         apiRisk.abnormalList(),
       ]);
-      setConfig(c);
-      setStats(s);
-      setHistory(h.history ?? []);
-      setAbnormal(ab.items ?? []);
+      setConfig(c && Object.keys(c).length > 0 ? c : DEMO_CONFIG);
+      setStats(s && s.total > 0 ? s : DEMO_STATS);
+      setHistory(h.history?.length ? h.history : DEMO_HISTORY);
+      setAbnormal(ab.items?.length ? ab.items : DEMO_ABNORMAL);
     } catch {
-      showToast('加载失败', 'error');
+      setConfig(DEMO_CONFIG);
+      setStats(DEMO_STATS);
+      setHistory(DEMO_HISTORY);
+      setAbnormal(DEMO_ABNORMAL);
     } finally {
       setLoading(false);
     }

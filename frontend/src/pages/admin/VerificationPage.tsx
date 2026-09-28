@@ -17,6 +17,7 @@ import {
   VerificationDetail,
 } from '@/src/lib/adminApi';
 import { useToast } from '@/src/components/ToastProvider';
+import GovDigitalScreen from '@/src/pages/gov/GovDigitalScreen';
 
 type StatusFilter = 'pending' | 'approved' | 'rejected' | 'all';
 
@@ -145,7 +146,18 @@ export default function VerificationPage() {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="-mt-6 space-y-5">
+      <section className="overflow-hidden rounded-2xl border border-slate-800 bg-[#06142e] shadow-sm">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-700/70 bg-slate-950/40 px-4 py-3">
+          <div>
+            <h2 className="text-sm font-bold text-white">平台产业数据总览</h2>
+            <p className="mt-1 text-xs text-slate-400">供需、企业分布、风险预警与招商任务实时汇总</p>
+          </div>
+          <span className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2.5 py-1 text-[10px] font-semibold text-cyan-300">管理员可见</span>
+        </div>
+        <GovDigitalScreen embedded />
+      </section>
+
       {/* 统计卡片 */}
       <div className="grid gap-4 sm:grid-cols-4">
         {stats && (

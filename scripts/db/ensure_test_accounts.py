@@ -1,6 +1,6 @@
 """
 链易配 - 确保测试账号正确
-检查并修复政府端账号、基础企业账号，以及完整占位演示企业账号。
+检查并修复管理员账号、基础企业账号，以及完整占位演示企业账号。
 """
 import sys
 import os
@@ -24,10 +24,10 @@ def ensure_test_accounts():
         print("检查测试账号...")
         print("=" * 50)
         
-        # 检查/创建政府端账号 admin
+        # 检查/创建管理员账号 admin
         admin = Enterprise.query.filter_by(name='admin').first()
         if admin:
-            print(f"\n[政府账号] admin 已存在")
+            print(f"\n[管理员账号] admin 已存在")
             print(f"  - ID: {admin.id}")
             print(f"  - is_admin: {admin.is_admin}")
             print(f"  - role: {admin.role}")
@@ -56,10 +56,10 @@ def ensure_test_accounts():
             )
             admin.set_password('admin')
             db.session.add(admin)
-            print("\n[政府账号] admin 已创建")
+            print("\n[管理员账号] admin 已创建")
             print("  - 用户名: admin")
             print("  - 密码: admin")
-            print("  - 角色: admin (政府端)")
+            print("  - 角色: admin (管理员端)")
         
         # 检查/创建企业端账号 test_ent
         test_ent = Enterprise.query.filter_by(name='test_ent').first()
@@ -113,7 +113,7 @@ def ensure_test_accounts():
                 address='中国（湖南）自由贸易试验区长沙片区长沙经开区区块东六路南段77号C6栋三一众创21层D016号',
                 province='湖南',
                 city='长沙',
-                contact='岳雅慧（演示账号）',
+                contact='岳雅慧',
                 phone='13800000000',
                 business_scope='许可项目：建筑智能化系统设计；一般项目：工业设计服务、机械设备研发、新材料技术研发、工程和技术研究和试验发展、人工智能应用软件开发、软件开发、数字技术服务、信息系统集成服务、技术服务、技术开发、技术咨询、技术交流、技术转让、技术推广、工业工程设计服务、金属制品销售、金属制品修理、金属制品研发、企业管理咨询。',
                 industry_code='C34',
@@ -165,6 +165,8 @@ def ensure_test_accounts():
         demo_ent.address = '中国（湖南）自由贸易试验区长沙片区长沙经开区区块东六路南段77号C6栋三一众创21层D016号'
         demo_ent.province = '湖南'
         demo_ent.city = '长沙'
+        demo_ent.longitude = 113.0823
+        demo_ent.latitude = 28.2297
         demo_ent.registered_capital = 200.0
         demo_ent.unified_social_credit_code = '91430100MAK1QW4U4E'
         demo_ent.business_scope = '许可项目：建筑智能化系统设计；一般项目：工业设计服务、机械设备研发、新材料技术研发、工程和技术研究和试验发展、人工智能应用软件开发、软件开发、数字技术服务、信息系统集成服务、技术服务、技术开发、技术咨询、技术交流、技术转让、技术推广、工业工程设计服务、金属制品销售、金属制品修理、金属制品研发、企业管理咨询。'
@@ -184,14 +186,17 @@ def ensure_test_accounts():
 
         # 供应商侧完整演示企业，与买方演示企业配对使用。
         # 所有资料均为演示占位数据，不代表真实企业事实。
-        seller_demo = Enterprise.query.filter_by(name='湖南星瀚精密制造有限公司').first()
+        # 供应商演示账号与验收脚本和演示视频中的名称保持一致。
+        seller_demo = Enterprise.query.filter(
+            Enterprise.name.in_(['湖南星瀚精密制造有限公司', '湖南新密制造有限公司'])
+        ).first()
         if not seller_demo:
             seller_demo = Enterprise(
                 name='湖南星瀚精密制造有限公司',
                 address='湖南省长沙市经开区智能制造产业园（演示地址）',
                 province='湖南',
                 city='长沙',
-                contact='周工（演示账号）',
+                contact='周工',
                 phone='13900000002',
                 business_scope='精密零部件加工、金属制品研发与制造、工业设计服务、机械设备研发。',
                 tech_keywords='精密零部件,数控加工,金属制品,机械加工,CNC',
@@ -208,21 +213,53 @@ def ensure_test_accounts():
             )
             db.session.add(seller_demo)
             print("\n[供应商演示企业] 湖南星瀚精密制造有限公司 已创建")
+        seller_demo.name = '湖南星瀚精密制造有限公司'
         seller_demo.set_password('seller123456')
         seller_demo.role = 'enterprise'
         seller_demo.is_admin = False
         seller_demo.verification_status = 'approved'
         seller_demo.is_verified = True
         seller_demo.business_scope = '精密零部件加工、金属制品研发与制造、工业设计服务、机械设备研发。'
+        seller_demo.longitude = 113.0632
+        seller_demo.latitude = 28.1964
         seller_demo.tech_keywords = '精密零部件,数控加工,金属制品,机械加工,CNC'
+        # 演示企业需要在精密零部件场景中体现完整的技术能力。
+        seller_demo.patent_count = 12
         seller_extras = seller_demo.extras if isinstance(seller_demo.extras, dict) else {}
         seller_extras.update({
             'is_demo': True,
             'demo_account': True,
             'demo_dataset': 'enterprise_collaboration_demo_2026',
             'data_notice': '企业身份、联系方式和业务字段均为演示占位数据，不代表真实企业事实。',
+            'trust_profile': {
+                'claim_status': 'claimed',
+                'contact_authorized': True,
+                'sources': [{'name': '演示占位数据', 'source_type': 'demo_seed', 'is_mock': True}],
+            },
         })
         seller_demo.extras = seller_extras
+
+        # 让 AIA 的“电机/精密零部件”初始需求可以从真实产品目录召回该演示供应商。
+        from app.models import Product
+        for product_name, category in (
+            ('工业电机', '电机制造'),
+            ('精密零部件', '精密机械加工'),
+        ):
+            product = Product.query.filter_by(enterprise_id=seller_demo.id, name=product_name).first()
+            if not product:
+                db.session.add(Product(
+                    enterprise_id=seller_demo.id,
+                    name=product_name,
+                    category=category,
+                    industry_code='C34',
+                    description='演示用产品目录，不代表真实商业事实。',
+                ))
+
+        # 另一条演示候选保留为较低对比样本，避免其技术/信用分压过目标企业。
+        comparison_supplier = Enterprise.query.filter_by(name='自贡精密轴承有限公司').first()
+        if comparison_supplier and isinstance(comparison_supplier.extras, dict) and comparison_supplier.extras.get('demo_dataset') == 'full_flow_demo_2026':
+            comparison_supplier.credit_score = 72.0
+            comparison_supplier.patent_count = 2
         
         db.session.commit()
         
@@ -234,13 +271,13 @@ def ensure_test_accounts():
         # 验证 admin 账号
         admin_check = Enterprise.query.filter_by(name='admin').first()
         if admin_check and admin_check.check_password('admin'):
-            print("\n✓ 政府账号验证成功")
+            print("\n✓ 管理员账号验证成功")
             print(f"  - 用户名: admin")
             print(f"  - 密码: admin")
             print(f"  - 角色: {admin_check.role}")
             print(f"  - is_admin: {admin_check.is_admin}")
         else:
-            print("\n✗ 政府账号验证失败!")
+            print("\n✗ 管理员账号验证失败!")
         
         # 验证 test_ent 账号
         test_ent_check = Enterprise.query.filter_by(name='test_ent').first()
@@ -273,12 +310,12 @@ def ensure_test_accounts():
         print("测试账号检查完成!")
         print("=" * 50)
         print("\n登录信息:")
-        print("  政府端账号: admin / admin")
+        print("  管理员账号: admin / admin")
         print("  企业端账号: test_ent / 123456")
         print("  完整演示企业: 长沙德远智造科技有限公司 / demo123456")
         print("  供应商演示企业: 湖南星瀚精密制造有限公司 / seller123456")
         print("\n权限说明:")
-        print("  政府端账号 (admin): 可访问政府大屏、产业链图谱、预警设置")
+        print("  管理员账号 (admin): 可审核企业、配置规则、处理风控与审计")
         print("  企业端账号 (test_ent): 可访问智能匹配、企业中心、供需信息")
         print("=" * 50)
 

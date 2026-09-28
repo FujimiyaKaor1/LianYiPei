@@ -1,4 +1,4 @@
-export type SessionRole = 'admin' | 'government' | 'enterprise';
+export type SessionRole = 'admin' | 'enterprise';
 
 export const GUEST_HOME_PATH = '/aisearch/';
 
@@ -22,12 +22,7 @@ export function isPlatformAdmin(role: string | undefined | null): boolean {
   return role === 'admin';
 }
 
-export function canAccessGovPortal(role: string | undefined | null): boolean {
-  return role === 'admin' || role === 'government';
-}
-
 export function loginHomePathForRole(role: string | undefined | null): string {
-  if (role === 'government') return '/gov';
   if (role === 'admin') return '/admin/dashboard';
   return '/dashboard';
 }
@@ -45,9 +40,7 @@ export function isPublicGuestPath(path: string): boolean {
 export function canRoleAccessPath(role: string | undefined | null, path: string | undefined | null): boolean {
   if (!role || !path || !path.startsWith('/')) return false;
   if (path.startsWith('/admin')) return role === 'admin';
-  if (path.startsWith('/gov') || path.startsWith('/supervision')) {
-    return role === 'admin' || role === 'government';
-  }
+  if (path.startsWith('/gov') || path.startsWith('/supervision')) return false;
   if (isPublicGuestPath(path)) return true;
   if (ENTERPRISE_PRIVATE_ROUTES.some((route) => path === route || path.startsWith(`${route}/`))) {
     return role === 'enterprise';

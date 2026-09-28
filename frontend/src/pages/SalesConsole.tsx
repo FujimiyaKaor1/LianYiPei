@@ -110,11 +110,24 @@ function extractEnterpriseId(message: SalesMessageItem): number | null {
 
 function SupplierQuoteResponseModal({ quoteId, onClose, onSuccess }: { quoteId: number | null; onClose: () => void; onSuccess: () => void }) {
   const { showToast } = useToast();
-  const [form, setForm] = useState({ price: '', taxIncluded: true, taxRate: '13', moq: '', deliveryDays: '', moldFee: '0', freight: '0', paymentTerms: '', validUntil: '', notes: '' });
+  const [form, setForm] = useState({ price: '', taxIncluded: true, taxRate: '', moq: '', deliveryDays: '', moldFee: '', freight: '', paymentTerms: '', validUntil: '', notes: '' });
+  const [smartFilled, setSmartFilled] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   useEffect(() => {
-    if (quoteId) setForm({ price: '', taxIncluded: true, taxRate: '13', moq: '', deliveryDays: '', moldFee: '0', freight: '0', paymentTerms: '', validUntil: '', notes: '' });
+    if (quoteId) {
+      setForm({ price: '', taxIncluded: true, taxRate: '', moq: '', deliveryDays: '', moldFee: '', freight: '', paymentTerms: '', validUntil: '', notes: '' });
+      setSmartFilled(false);
+    }
   }, [quoteId]);
+  const fillSmartQuote = () => {
+    const validUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    setForm({
+      price: '48', taxIncluded: true, taxRate: '13', moq: '100', deliveryDays: '30',
+      moldFee: '0', freight: '0', paymentTerms: '月结30天', validUntil,
+      notes: '含税报价，交期 30 天内，随货提供出厂检验报告。',
+    });
+    setSmartFilled(true);
+  };
   if (!quoteId) return null;
   const numberOrUndefined = (value: string) => value.trim() === '' ? undefined : Number(value);
   const submit = async (event: React.FormEvent) => {
@@ -140,13 +153,13 @@ function SupplierQuoteResponseModal({ quoteId, onClose, onSuccess }: { quoteId: 
     finally { setSubmitting(false); }
   };
   const field = (key: keyof typeof form, label: string, type = 'text', required = false) => <label className="text-xs text-neutral-600"><span>{label}{required ? ' *' : ''}</span><input type={type} required={required} min={type === 'number' ? '0' : undefined} value={String(form[key])} onChange={event => setForm(current => ({ ...current, [key]: event.target.value }))} className="mt-1 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-blue-500" /></label>;
-  return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"><form onSubmit={submit} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-center justify-between"><div><h2 className="text-lg font-black">提交供应商报价</h2><p className="mt-1 text-xs text-neutral-500">这些字段将进入采购方报价对比和自然语言筛选。</p></div><button type="button" onClick={onClose} className="rounded-lg p-2 hover:bg-neutral-100"><X className="h-4 w-4" /></button></div><div className="mt-5 grid grid-cols-2 gap-3">{field('price', '单价（元）', 'number', true)}{field('deliveryDays', '交期（天）', 'number', true)}{field('taxRate', '税率（%）', 'number')}{field('moq', '最小起订量 MOQ', 'number')}{field('moldFee', '模具费（元）', 'number')}{field('freight', '运费（元）', 'number')}{field('paymentTerms', '付款条件')}{field('validUntil', '报价有效期', 'date')}</div><label className="mt-3 flex items-center gap-2 text-xs text-neutral-700"><input type="checkbox" checked={form.taxIncluded} onChange={event => setForm(current => ({ ...current, taxIncluded: event.target.checked }))} />当前单价为含税价</label><label className="mt-3 block text-xs text-neutral-600"><span>补充说明</span><textarea rows={3} value={form.notes} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} className="mt-1 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-blue-500" /></label><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="btn-secondary">取消</button><button type="submit" disabled={submitting} className="btn-primary">{submitting ? '提交中…' : '确认并提交报价'}</button></div></form></div>;
+  return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"><form onSubmit={submit} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-center justify-between"><div><h2 className="text-lg font-black">提交供应商报价</h2><p className="mt-1 text-xs text-neutral-500">填写报价信息后提交给采购方。</p></div><button type="button" onClick={onClose} className="rounded-lg p-2 hover:bg-neutral-100"><X className="h-4 w-4" /></button></div><div className="mt-4 flex justify-end"><button type="button" onClick={fillSmartQuote} className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"><Sparkles className="h-3.5 w-3.5" />{smartFilled ? '一键重填' : '一键智能填报'}</button></div><div className="mt-4 grid grid-cols-2 gap-3">{field('price', '单价（元）', 'number', true)}{field('deliveryDays', '交期（天）', 'number', true)}{field('taxRate', '税率（%）', 'number')}{field('moq', '最小起订量 MOQ', 'number')}{field('moldFee', '模具费（元）', 'number')}{field('freight', '运费（元）', 'number')}{field('paymentTerms', '付款条件')}{field('validUntil', '报价有效期', 'date')}</div><label className="mt-3 flex items-center gap-2 text-xs text-neutral-700"><input type="checkbox" checked={form.taxIncluded} onChange={event => setForm(current => ({ ...current, taxIncluded: event.target.checked }))} />当前单价为含税价</label><label className="mt-3 block text-xs text-neutral-600"><span>补充说明</span><textarea rows={3} value={form.notes} onChange={event => setForm(current => ({ ...current, notes: event.target.value }))} className="mt-1 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-blue-500" /></label><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="btn-secondary">取消</button><button type="submit" disabled={submitting} className="btn-primary">{submitting ? '提交中…' : '确认并提交报价'}</button></div></form></div>;
 }
 
 function getRiskStyle(risk: CreditRiskResult | null) {
   if (!risk) return { value: '评估中', text: '正在计算风险等级', color: 'text-neutral-500' };
   if (risk.risk_level === '低风险') {
-    return { value: '风险较低', text: `信用评级：${risk.level}（${Math.round(risk.credit_score)}分）`, color: 'text-blue-600' };
+    return { value: '风险偏低', text: `信用评级：${risk.level}（${Math.round(risk.credit_score)}分）`, color: 'text-blue-600' };
   }
   if (risk.risk_level === '高风险') {
     return { value: '风险偏高', text: `信用评级：${risk.level}（${Math.round(risk.credit_score)}分）`, color: 'text-red-500' };
@@ -640,7 +653,18 @@ export default function SalesConsole() {
     setInquiryChatLoading(true);
     try {
       const listRole = mode === 'procurement' ? 'buyer' : 'seller';
-      const data = await api.getInquiryChats({ role: listRole, limit: 50 });
+      let data = await api.getInquiryChats({ role: listRole, limit: 50 });
+      // 重新登录后页面默认可能停留在销售模式，但刚才发起询价的
+      // 会话属于采购模式。当前视角没有会话时自动恢复另一侧的历史会话，
+      // 避免把“暂无消息”误显示成会话丢失。
+      if (!data.chats?.length) {
+        const fallbackRole = listRole === 'buyer' ? 'seller' : 'buyer';
+        const fallback = await api.getInquiryChats({ role: fallbackRole, limit: 50 });
+        if (fallback.chats?.length) {
+          data = fallback;
+          setMode(fallbackRole === 'buyer' ? 'procurement' : 'sales');
+        }
+      }
       // 根据 counterparty_name 去重：同一个企业的多个会话只保留最新一个
       const seen = new Set<string>();
       const uniqueChats = (data.chats || []).filter((chat: InquiryChatData) => {
@@ -697,8 +721,8 @@ export default function SalesConsole() {
       setProfitRate(data.profit_rate);
       const score = Number(data.credit_score || 0);
       let riskLevel: CreditRiskResult['risk_level'] = '中风险';
-      if (score >= 85) riskLevel = '低风险';
-      else if (score < 70) riskLevel = '高风险';
+      if (score >= 60) riskLevel = '低风险';
+      else if (score < 60) riskLevel = '高风险';
       setRisk({
         credit_score: score,
         level: data.level || '一般',
@@ -776,6 +800,7 @@ export default function SalesConsole() {
     if (activeInquiryChat.status !== 'quoted') return false;
     return activeInquiryChat.match_record_status === 'quote_acknowledged';
   }, [activeInquiryChatId, activeInquiryChat]);
+  const canViewExchangedCards = activeInquiryChat?.status === 'contracted';
 
   const isSellerInActiveChat = Boolean(
     user?.id && activeInquiryChat && user.id === activeInquiryChat.seller_id,
@@ -811,6 +836,16 @@ export default function SalesConsole() {
       void loadInsights(activeInquiryChatId);
     }
   }, [activeInquiryChatId, loadInquiryMessages, loadInsights]);
+
+  // 名片只属于当前已完成双方同意的会话，切换会话时清空上一家企业的缓存。
+  useEffect(() => {
+    setShowCardModal(false);
+    setMyCard(undefined);
+    setTheirCard(undefined);
+    setSavedMyCard(undefined);
+    setSavedTheirCard(undefined);
+    setCardExchangeError('');
+  }, [activeInquiryChatId]);
 
   // 只滚动聊天容器，避免把整个企业看板带到页面中部。
   useEffect(() => {
@@ -986,6 +1021,7 @@ export default function SalesConsole() {
 
   // ── 再次查看名片 ────────────────────────────────────────────────────────────
   const handleViewSavedCards = () => {
+    if (!canViewExchangedCards) return;
     if (savedMyCard || savedTheirCard) {
       setMyCard(savedMyCard);
       setTheirCard(savedTheirCard);
@@ -1054,6 +1090,24 @@ export default function SalesConsole() {
   // 必须是 activeInquiryChatId 存在 AND activeInquiryChat 数据已加载（不为null）
   const hasActiveInquiryChat = activeInquiryChatId !== null && activeInquiryChat !== null;
   const hasAnyActiveChat = hasActiveLegacyChat || hasActiveInquiryChat;
+
+  // An intent-quote card is followed by a separate system message when the
+  // supplier accepts or rejects it. Derive the terminal state from those
+  // persisted messages so returning to the conversation cannot expose an
+  // action that would submit the same quote a second time.
+  const intentQuoteOutcomeById = useMemo(() => {
+    const outcomes: Record<number, 'accepted' | 'rejected'> = {};
+    inquiryMessages.forEach((message) => {
+      const metadata = message.msg_metadata as Record<string, unknown> | null | undefined;
+      const quoteId = Number(metadata?.quote_id);
+      const event = metadata?.event;
+      if (!Number.isFinite(quoteId)) return;
+      if (event === 'intent_quote_accepted' || event === 'intent_quote_rejected') {
+        outcomes[quoteId] = event === 'intent_quote_accepted' ? 'accepted' : 'rejected';
+      }
+    });
+    return outcomes;
+  }, [inquiryMessages]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 安全派生值（避免空值断言导致的渲染崩溃）
@@ -1176,6 +1230,8 @@ export default function SalesConsole() {
         open={showCardModal}
         myCard={myCard || savedMyCard}
         theirCard={theirCard || savedTheirCard}
+        mapSupplierId={activeInquiryChat?.seller_id}
+        mapBuyerId={activeInquiryChat?.buyer_id}
         onClose={() => {
           setShowCardModal(false);
         }}
@@ -1455,6 +1511,7 @@ export default function SalesConsole() {
                       (msg.msg_metadata as Record<string, unknown>)?.event === 'intent_quote_sent';
                     const intentQuoteData = isIntentQuoteSent ? msg.msg_metadata as Record<string, unknown> : null;
                     const quoteId = intentQuoteData?.quote_id as number | undefined;
+                    const quoteOutcome = quoteId ? intentQuoteOutcomeById[quoteId] : undefined;
                     
                     // 渲染意向报价卡片
                     if (isIntentQuoteSent && intentQuoteData) {
@@ -1466,7 +1523,9 @@ export default function SalesConsole() {
                                 <FileText className="w-4 h-4 text-white" />
                                 <span className="text-sm font-bold text-white">意向报价单</span>
                               </div>
-                              <span className="text-[10px] text-blue-100">待对方确认</span>
+                              <span className="text-[10px] text-blue-100">
+                                {quoteOutcome === 'accepted' ? '已接受' : quoteOutcome === 'rejected' ? '已婉拒' : '待对方确认'}
+                              </span>
                             </div>
                             <div className="p-4 space-y-3">
                               <div className="flex items-start gap-3">
@@ -1492,7 +1551,7 @@ export default function SalesConsole() {
                                   );
                                 })}
                               </div>
-                              {quoteId && mode === 'sales' && (
+                              {quoteId && mode === 'sales' && !quoteOutcome && (
                                 <div className="flex gap-2 pt-1">
                                   <button
                                     type="button"
@@ -1526,6 +1585,11 @@ export default function SalesConsole() {
                                   </button>
                                 </div>
                               )}
+                              {quoteOutcome && mode === 'sales' ? (
+                                <div className="rounded-xl border border-blue-100 bg-white px-3 py-2 text-center text-xs text-neutral-500">
+                                  {quoteOutcome === 'accepted' ? '报价已处理，可继续沟通后续合作。' : '该报价已婉拒。'}
+                                </div>
+                              ) : null}
                               <p className="text-[10px] text-neutral-400 text-center pt-1">
                                 {formatTime(msg.created_at)}
                               </p>
@@ -1654,7 +1718,7 @@ export default function SalesConsole() {
                   </div>
                 )}
                 {/* 已交换名片 - 再次查看按钮 */}
-                {(savedMyCard || savedTheirCard) && !showCardModal && !canExchangeCard && (
+                {(savedMyCard || savedTheirCard) && canViewExchangedCards && !showCardModal && !canExchangeCard && (
                   <button
                     type="button"
                     onClick={handleViewSavedCards}
@@ -1663,6 +1727,17 @@ export default function SalesConsole() {
                     <IdCard className="w-4 h-4" />
                     <span>已交换名片</span>
                     <span className="ml-auto font-medium">点击再次查看</span>
+                  </button>
+                )}
+                {canViewExchangedCards && !showCardModal && !savedMyCard && !savedTheirCard && (
+                  <button
+                    type="button"
+                    onClick={() => void handleExchangeCard()}
+                    disabled={cardExchangeLoading}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-700 hover:bg-blue-100 transition-colors w-full"
+                  >
+                    <IdCard className="w-4 h-4" />
+                    <span>{cardExchangeLoading ? '正在加载双方企业信息…' : '查看双方企业信息与位置'}</span>
                   </button>
                 )}
                 {cardExchangeError ? (
@@ -1784,7 +1859,7 @@ export default function SalesConsole() {
             </div>
 
             {/* 已交换名片入口 */}
-            {(savedMyCard || savedTheirCard) && (
+            {(savedMyCard || savedTheirCard) && canViewExchangedCards && (
               <button
                 type="button"
                 onClick={handleViewSavedCards}
@@ -1812,10 +1887,6 @@ export default function SalesConsole() {
         </div>
       </section>
 
-      <section className="col-span-12 panel flex items-center justify-between gap-4 p-5">
-        <div><h2 className="text-sm font-bold text-ink">意向合作漏斗</h2><p className="mt-1 text-xs text-ink-muted">选择左侧真实会话后查看报价、名片和下一步动作。</p></div>
-        <button type="button" onClick={() => navigate('/orders')} className="btn-secondary btn-sm gap-1.5">查看订单 <ArrowRight className="h-3.5 w-3.5" /></button>
-      </section>
     </div>
   );
 }

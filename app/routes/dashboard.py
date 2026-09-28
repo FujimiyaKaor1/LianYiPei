@@ -85,7 +85,7 @@ def graph_data():
 @dashboard.route('/dashboard/api/stats')
 @role_required('admin')
 def api_stats():
-    enterprise_count = Enterprise.query.count()
+    enterprise_count = Enterprise.query.filter(Enterprise.role == "enterprise").count()
     supply_count = Inquiry.query.filter(
         Inquiry.direction == "supply", Inquiry.status.in_(("open", "active"))
     ).count()

@@ -17,7 +17,7 @@ from sqlalchemy import String, and_, cast, false, func, or_
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.authz import role_required, user_effective_role, user_session_role
-from app.models import Enterprise, Inquiry, Product, Quote, Transaction, IndustryNewsArticle, IndustryNewsSource, MatchFeedback
+from app.models import BusinessCard, Enterprise, Inquiry, Product, Quote, Transaction, IndustryNewsArticle, IndustryNewsSource, MatchFeedback
 from app.services.industry_news_service import ALLOWED_CATEGORIES, fetch_newsapi, newsapi_query_for_category, persist_newsapi_articles
 from app.services import map_service
 from app.services import finance_service
@@ -828,7 +828,7 @@ def map_distance():
 @api_bp.route("/session", methods=["GET"])
 def api_session():
     """供 Vite/React 读取当前 Flask-Login 会话（需 fetch 携带 Cookie，开发环境通过代理同域）。"""
-    if not current_user.is_authenticated:
+    if not current_user.is_authenticated or user_session_role(current_user) == "disabled":
         return jsonify({"authenticated": False, "user": None})
     name = current_user.name or ""
     return jsonify(
@@ -847,7 +847,7 @@ def api_session():
 @api_bp.route("/user/me", methods=["GET"])
 def api_user_me():
     """与 SPA 约定的「当前企业」信息；未登录返回 401。"""
-    if not current_user.is_authenticated:
+    if not current_user.is_authenticated or user_session_role(current_user) == "disabled":
         return jsonify({"error": "未登录"}), 401
     name = current_user.name or ""
     return jsonify(
@@ -1954,7 +1954,7 @@ def api_public_agent_market():
     sales_enablement = github_skill(
         "sales-enablement", "Sales Enablement", "销售话术、跟进节奏与成交材料",
         "coreyhaines31/marketingskills", "skills/sales-enablement",
-        ["解压 ZIP", "将 skills/sales-enablement 放入项目的 .agents/skills/", "重启 Codex 后，提出销售赋能或客户跟进任务"],
+        ["解压 ZIP", "将 skills/sales-enablement 放入项目的 .agents/skills/"],
     )
     cold_email = github_skill(
         "cold-email", "Cold Email", "生成 B2B 冷启动邮件和跟进序列",
@@ -2403,6 +2403,18 @@ def api_enterprise_profile_mini(ent_id: int):
     if not ent:
         return jsonify({"error": "企业不存在"}), 404
 
+    # 名片、联系方式和位置只在双方已完成交易同意后的名片交换记录中解锁。
+    # 本企业查看自己的资料不受影响；查看其他企业时，即使知道企业 ID，
+    # 也只能拿到不含位置和联系方式的公开摘要。
+    current_id = int(current_user.id)
+    has_completed_exchange = ent_id == current_id or BusinessCard.query.filter(
+        BusinessCard.status == "completed",
+        or_(
+            and_(BusinessCard.initiator_id == current_id, BusinessCard.recipient_id == ent_id),
+            and_(BusinessCard.initiator_id == ent_id, BusinessCard.recipient_id == current_id),
+        ),
+    ).first() is not None
+
     # 资质标签
     tags = []
     if ent.is_green_factory:
@@ -2428,11 +2440,11 @@ def api_enterprise_profile_mini(ent_id: int):
         "enterprise": {
             "id": ent.id,
             "name": ent.name,
-            "address": ent.address or f"{ent.province or ''}{ent.city or ''}",
-            "longitude": ent.longitude,
-            "latitude": ent.latitude,
-            "contact": ent.contact or "",
-            "phone": ent.phone or "",
+            "address": (ent.address or f"{ent.province or ''}{ent.city or ''}") if has_completed_exchange else "双方同意交易后解锁",
+            "longitude": ent.longitude if has_completed_exchange else None,
+            "latitude": ent.latitude if has_completed_exchange else None,
+            "contact": ent.contact or "" if has_completed_exchange else "",
+            "phone": ent.phone or "" if has_completed_exchange else "",
             "main_business": main_business,
             "business_scope": ent.business_scope or "",
             "credit_score": int(ent.credit_score) if ent.credit_score is not None else None,

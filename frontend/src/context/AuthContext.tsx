@@ -16,7 +16,7 @@ export type AuthUser = {
   /** 与数据库 Enterprise.name 一致 */
   name: string;
   enterpriseName: string;
-  /** 来自 /api/session：'admin' | 'government' | 'enterprise' */
+  /** 来自 /api/session：'admin' | 'enterprise' */
   role: string;
 };
 

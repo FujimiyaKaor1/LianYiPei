@@ -327,10 +327,11 @@ def indisea_replica():
 def spa_catchall(path):
     """兜底路由：所有未命中的 GET 请求返回 React SPA（支持前端路由刷新）。"""
     if request.method != 'GET':
-        from flask import abort
+        abort(404)
+    # 政府端已完整下线：不要把历史 URL 静默交给 SPA，避免旧入口看起来仍然可用。
+    if path == 'gov' or path.startswith('gov/') or path == 'supervision' or path.startswith('supervision/'):
         abort(404)
     skip_prefixes = ('api/', 'auth/', 'static/', 'admin/', 'login', 'logout', 'favicon')
     if path.startswith(skip_prefixes):
-        from flask import abort
         abort(404)
     return _render_spa()

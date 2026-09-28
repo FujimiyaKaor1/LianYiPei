@@ -14,12 +14,64 @@ async function mockAgent(page: import('@playwright/test').Page) {
   }) }));
 }
 
+test('AIA 候选工厂点击询价留在当前会话并生成发送前预览', async ({ page }) => {
+  const authenticatedUser = { id: 8, name: '测试采购企业', enterprise_name: '测试采购企业', role: 'enterprise' };
+  await page.route('**/api/session', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ authenticated: true, user: authenticatedUser }) }));
+  await page.route('**/api/chain-xiaoyi/sessions**', async route => {
+    if (route.request().method() === 'POST') {
+      await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ success: true, session, model_status: modelStatus }) });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, sessions: [] }) });
+  });
+  await page.route('**/api/chain-xiaoyi/tasks**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, tasks: [], total: 0 }) }));
+  await page.route('**/api/chain-xiaoyi/sessions/42/claim', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, session }) }));
+  await page.route('**/api/chain-xiaoyi/sessions/42/messages', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      success: true,
+      reply: '已找到 1 家候选工厂。',
+      intent: { product: '工业电机' },
+      needs_clarification: false,
+      suggestions: [],
+      model_status: modelStatus,
+      match_result: { total: 1, degraded: true, explanation_provider: 'rules', results: [{ id: 7, name: '数据库工厂', province: '四川省', city: '成都市', business_scope: '电机制造', score: 88, confidence_index: 88, dimensions: {}, trusted_labels: [], reason: '产品匹配', data_updated_at: '2026-09-17', degraded: true, contact_eligible: true }] },
+    }),
+  }));
+  await page.route('**/api/inquiry/send', route => route.fulfill({
+    status: 201,
+    contentType: 'application/json',
+    body: JSON.stringify({ success: true, inquiry_id: 501, match_feedback_id: 601 }),
+  }));
+  await page.route('**/api/inquiry-chat/create', route => route.fulfill({
+    status: 201,
+    contentType: 'application/json',
+    body: JSON.stringify({ success: true, chat_id: 701, is_new: true, chat: {} }),
+  }));
+  await page.route('**/api/chain-xiaoyi/sessions/42/rfq-draft', route => route.fulfill({
+    status: 201,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      success: true,
+      task: { id: 90, type: 'rfq', status: 'awaiting_approval', requires_approval: true },
+      preview: { status: 'awaiting_approval', supplier_count: 1, channels: ['site'], disclosed_fields: { product: '工业电机' }, content: '请按采购需求提供含税报价、最早交期和有效期。', suppliers: [{ id: 7, name: '数据库工厂', city: '成都市', contact_authorized: true }] },
+    }),
+  }));
+
+  await page.goto('/aia?q=%E5%B7%A5%E4%B8%9A%E7%94%B5%E6%9C%BA');
+  await expect(page.getByRole('heading', { name: '数据库工厂' })).toBeVisible();
+  await page.getByRole('button', { name: '询价', exact: true }).click();
+  await expect(page).toHaveURL(/http:\/\/localhost:5050\/sales-console\?chat_id=701&desk=procurement/);
+});
+
 test('首页自然语言参数自动进入会话并展示数据库候选', async ({ page }) => {
   await mockAgent(page);
   await page.goto('/aia?q=%E6%89%BE%E5%9B%9B%E5%B7%9D%E5%B7%A5%E4%B8%9A%E7%94%B5%E6%9C%BA');
   await expect(page.locator('h3:visible', { hasText: '数据库工厂' })).toBeVisible();
   await expect(page.locator('span:visible', { hasText: '88分' })).toBeVisible();
   await expect(page.getByText(/数据库九维算法决定/)).toBeVisible();
+  await expect(page.getByText('网络请求失败，请检查后端服务')).toHaveCount(0);
 });
 
 test('移动端可打开历史和结果抽屉', async ({ page }) => {

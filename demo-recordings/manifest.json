@@ -1,10 +1,23 @@
 {
   "baseUrl": "http://127.0.0.1:3000",
-  "recordedAt": "2026-09-23T03:29:58.766Z",
+  "recordedAt": "2026-09-23T05:08:54.492Z",
+  "fullDemo": "lianyipei-full-demo.webm",
   "segments": [
+    {
+      "segment": "public",
+      "file": "01-public-platform.webm"
+    },
     {
       "segment": "enterprise",
       "file": "02-enterprise-platform.webm"
+    },
+    {
+      "segment": "seller",
+      "file": "03-seller-demo-platform.webm"
+    },
+    {
+      "segment": "admin",
+      "file": "04-admin-platform.webm"
     }
   ]
 }

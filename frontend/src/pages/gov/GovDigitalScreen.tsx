@@ -443,7 +443,7 @@ function useNow() {
   return now;
 }
 
-export default function GovDigitalScreen() {
+export default function GovDigitalScreen({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
   const now = useNow();
   const [data, setData] = useState<ScreenData>(EMPTY_DATA);
@@ -770,7 +770,7 @@ export default function GovDigitalScreen() {
   };
 
   return (
-    <div className="gov-digital-screen" data-testid="gov-digital-screen">
+    <div className={cn('gov-digital-screen', embedded && 'gov-digital-screen-embedded')} data-testid="gov-digital-screen">
       <header>
         <div className="screen-status">
           <span className={cn('status-dot', onlineCount === Object.keys(sources).length ? 'online' : 'degraded')} />
@@ -795,9 +795,11 @@ export default function GovDigitalScreen() {
           <button type="button" onClick={requestFullscreen} title="全屏投放" aria-label="全屏投放">
             <Maximize2 className="h-4 w-4" />
           </button>
-          <button type="button" onClick={() => navigate('/gov')} title="返回监管首页" aria-label="返回监管首页">
-            <ArrowLeft className="h-4 w-4" />
-          </button>
+          {!embedded && (
+            <button type="button" onClick={() => navigate('/gov')} title="返回监管首页" aria-label="返回监管首页">
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </header>
 

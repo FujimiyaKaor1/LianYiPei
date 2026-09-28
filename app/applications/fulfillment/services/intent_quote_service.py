@@ -185,6 +185,12 @@ class IntentQuoteService:
         if quote.seller_id != seller_id:
             return None, "只有供应方可以接受意向报价"
 
+        # Accept is intentionally idempotent. A browser retry (or a user
+        # returning to an already processed conversation) must not surface a
+        # false failure after the quote has already been accepted.
+        if quote.status == "accepted":
+            return quote, ""
+
         if quote.status != "pending":
             return None, f"当前状态为 {quote.status}，无法接受"
 
@@ -277,6 +283,15 @@ class IntentQuoteService:
             if record and record.status not in ("contracted",):
                 record.status = "quote_acknowledged"
                 record.updated_at = datetime.utcnow()
+
+        # Keep the InquiryChat lifecycle in sync with the accepted quote.
+        # The exchange-card flow uses this state together with the match
+        # record status to unlock both companies' contact and map details.
+        if quote.chat_id:
+            chat = InquiryChat.query.get(quote.chat_id)
+            if chat and chat.status == "active":
+                chat.status = "quoted"
+                chat.updated_at = datetime.utcnow()
 
         # 发送系统消息
         if quote.chat_id:

@@ -17,6 +17,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 from flask_login import current_user
 
+from app import db
 from app.authz import role_required
 from app.models import Enterprise
 from app.services.inquiry_chat_service import InquiryChatService
@@ -128,7 +129,6 @@ def api_create_or_get_chat():
     if is_new:
         record.status = "inquiry_sent"
         record.updated_at = datetime.utcnow()
-        from app import db
         db.session.commit()
 
         _svc.send_message(
@@ -144,7 +144,6 @@ def api_create_or_get_chat():
         chat.mode = "procurement"
     else:
         chat.mode = "sales"
-    from app import db
     db.session.commit()
 
     return jsonify({
@@ -643,7 +642,6 @@ def api_seller_accept_quote(chat_id: int):
     record.status = "quote_acknowledged"
     record.updated_at = datetime.utcnow()
     chat.updated_at = datetime.utcnow()
-    from app import db
     db.session.commit()
 
     _svc.send_message(
@@ -769,7 +767,6 @@ def api_exchange_card(chat_id: int):
         chat.status = "contracted"
         chat.updated_at = datetime.utcnow()
 
-    from app import db
     db.session.commit()
 
     # 发送系统消息（双方可见）

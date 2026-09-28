@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Home, LogOut, Moon, Search, Sun, User } from 'lucide-react';
+import { Bell, Home, LogOut, Search, User } from 'lucide-react';
 import { useAuth } from '@/src/context/AuthContext';
-import { useTheme } from '@/src/context/ThemeContext';
 import { useToast } from '@/src/components/ToastProvider';
 import { api } from '@/src/services/api';
 import { GUEST_HOME_PATH } from '@/src/lib/rbac';
@@ -17,7 +16,6 @@ export function TopBar({ title, showSearch = true }: TopBarProps) {
   const { user, loading, logout, requestLogin } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { theme, toggleTheme } = useTheme();
   const { showToast } = useToast();
   const [unreadCount, setUnreadCount] = useState(0);
   const [globalSearch, setGlobalSearch] = useState('');
@@ -128,20 +126,6 @@ export function TopBar({ title, showSearch = true }: TopBarProps) {
               用户登录
             </button>
           )}
-
-          <button
-            type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-ink-soft shadow-elevation-1 transition-colors hover:border-border-hover hover:text-ink"
-            onClick={toggleTheme}
-            aria-pressed={theme === 'dark'}
-            title={theme === 'dark' ? '切换浅色模式' : '切换深色模式'}
-          >
-            {theme === 'dark' ? (
-              <Sun className="h-4.5 w-4.5" />
-            ) : (
-              <Moon className="h-4.5 w-4.5" />
-            )}
-          </button>
 
           <button
             className="relative flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-ink-soft shadow-elevation-1 transition-colors hover:border-border-hover hover:text-ink"

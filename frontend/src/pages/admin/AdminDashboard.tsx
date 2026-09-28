@@ -6,7 +6,6 @@ import {
   CircleAlert,
   ArrowRight,
   Database,
-  KeyRound,
   LayoutDashboard,
   ScrollText,
   RefreshCw,
@@ -28,7 +27,6 @@ const actions = [
   { icon: UserCheck, label: '入驻审核', sub: '企业资质、角色与准入状态', path: '/admin/dashboard/onboarding' },
   { icon: Settings2, label: '规则配置', sub: '信用、预警与匹配权重', path: '/admin/dashboard/rules' },
   { icon: ShieldAlert, label: '风控中心', sub: '风险事件与处置闭环', path: '/admin/dashboard/risk' },
-  { icon: KeyRound, label: '接口管理', sub: '外部数据源与 API 权限', path: '/admin/dashboard/api-management' },
 ] as const;
 
 function toneClasses(tone: (typeof stats)[number]['tone']) {

@@ -84,3 +84,15 @@ def test_resending_existing_pending_intent_quote_is_idempotent(
     persisted = db.session.get(IntentQuote, quote_id)
     assert persisted.seller_reply_price == 276.8
     assert persisted.seller_reply_details["tax_rate"] == 13
+    assert db.session.get(InquiryChat, chat.id).status == "quoted"
+    assert db.session.get(MatchRecord, match.id).status == "quote_acknowledged"
+
+    # Refreshing the conversation or retrying after a network timeout must
+    # not turn a completed acceptance into a user-facing error.
+    accepted_again = client.post(f"/api/intent-quote/{quote_id}/accept", json={
+        "reply_price": 276.8,
+        "reply_notes": "含税含运费",
+        "reply_details": {"tax_included": True, "delivery_days": 25},
+    })
+    assert accepted_again.status_code == 200, accepted_again.get_json()
+    assert accepted_again.get_json()["status"] == "accepted"

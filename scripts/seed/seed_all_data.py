@@ -140,25 +140,6 @@ def seed_mysql(app):
                 db.session.add(te)
                 db.session.commit()
                 print("  [MySQL] 已创建企业账号 test_ent / 123456")
-            # 政府端 SPA：须 role=government；与本脚本的固定账号保持一致
-            if not Enterprise.query.filter_by(role='government').first():
-                gov = Enterprise(
-                    name='政府产业监管局',
-                    address='广东省深圳市（监管演示）',
-                    contact='监管',
-                    phone='00000000002',
-                    role='government',
-                    is_admin=True,
-                    credit_score=88.0,
-                    province='广东',
-                    city='深圳',
-                    verification_status='approved',
-                    is_verified=True,
-                )
-                gov.set_password('123456')
-                db.session.add(gov)
-                db.session.commit()
-                print("  [MySQL] 已创建政府账号 政府产业监管局 / 123456")
             for row in Enterprise.query.filter_by(is_admin=True).all():
                 if getattr(row, 'role', None) != 'admin':
                     row.role = 'admin'
@@ -289,24 +270,6 @@ def seed_mysql(app):
         db.session.add(admin)
         db.session.commit()
 
-        print("  [MySQL] 创建政府监管账号（链易配政府端 /gov）...")
-        gov = Enterprise(
-            name='政府产业监管局',
-            address='广东省深圳市（监管演示）',
-            contact='监管',
-            phone='00000000002',
-            role='government',
-            is_admin=True,
-            credit_score=88.0,
-            province='广东',
-            city='深圳',
-            verification_status='approved',
-            is_verified=True,
-        )
-        gov.set_password('123456')
-        db.session.add(gov)
-        db.session.commit()
-
         print("  [MySQL] 创建固定企业测试账号 test_ent...")
         test_ent = Enterprise(
             name='test_ent',
@@ -381,7 +344,6 @@ def main():
 
     print("\n" + "=" * 50)
     print("初始化完成！")
-    print("  政府端（/gov）: 企业名称「政府产业监管局」/ 密码 123456")
     print("  管理员后台: 企业名称「admin」/ 密码 admin")
     print("  企业测试号: test_ent / 123456")
     print("  访问: http://localhost:5000")

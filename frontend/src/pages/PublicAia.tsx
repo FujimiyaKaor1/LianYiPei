@@ -6,10 +6,29 @@ import { useAuth } from '@/src/context/AuthContext';
 import { PublicSiteHeader } from '@/src/components/PublicSiteHeader';
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
-const QUICK_PROMPTS = ['找华东能做精密注塑、30天交付的工厂', '找支持出口的汽车零部件工厂', '找有产能的工业电机供应商'];
+type DemoWorkflowStatus = 'idle' | 'sent' | 'accepted' | 'confirmed';
+const DEMO_QUERY = '找华东能做精密注塑、30天交付的工厂';
+
+function isDemoQuery(value: string) {
+  return value.trim() === DEMO_QUERY;
+}
+const QUICK_PROMPTS = ['找华东能做精密注塑、30天交付的工厂', '找支持出口的汽车零部件工厂', '找有产能的精密零部件供应商'];
 const DIMENSION_NAMES: Record<string, string> = { product: '产品', distance: '距离', capacity: '产能', green: '绿色', semantic: '语义', credit: '信用', tech: '技术', history: '合作', gnn: '图谱' };
 const RFQ_PROGRESS_STATUSES = ['queued', 'running', 'sent', 'partial_failure', 'timed_out', 'completed', 'fulfillment_in_progress', 'fulfillment_exception', 'fulfillment_completed'];
 const RFQ_QUOTE_STATUSES = ['sent', 'partial_failure', 'timed_out', 'completed', 'fulfillment_in_progress', 'fulfillment_exception', 'fulfillment_completed'];
+
+const DEMO_FACTORIES: ChainXiaoYiMatchItem[] = [
+  { id: 901, name: '苏州精锐精密制造有限公司', province: '江苏省', city: '苏州市', business_scope: '精密注塑、模具开发、汽车零部件', score: 96, confidence_index: 0.94, dimensions: { product: { score: 0.98, desc: '精密注塑与汽车零部件能力高度匹配' }, distance: { score: 0.91 }, capacity: { score: 0.95 }, green: { score: 0.86 }, semantic: { score: 0.97 }, credit: { score: 0.93 } }, trusted_labels: ['已核验', '支持出口', '可快速打样'], reason: '精密注塑与汽车零部件能力高度匹配，具备稳定量产产线，历史交付记录良好。', data_freshness: { status: 'fresh', is_latest: true, age_days: 3 }, data_updated_at: '2026-09-20', degraded: false, contact_eligible: true, trust_profile: { claim_status: 'claimed', contact_authorized: true, sources: [] } },
+  { id: 902, name: '宁波拓源塑胶科技有限公司', province: '浙江省', city: '宁波市', business_scope: '精密注塑、双色注塑、消费电子结构件', score: 92, confidence_index: 0.9, dimensions: { product: { score: 0.94 }, distance: { score: 0.88 }, capacity: { score: 0.9 }, green: { score: 0.82 }, semantic: { score: 0.93 }, credit: { score: 0.89 } }, trusted_labels: ['已核验', '有出口经验', 'ISO 9001'], reason: '具备多材料注塑和模具协同能力，可覆盖中小批量快速交付。', data_freshness: { status: 'fresh', is_latest: true, age_days: 7 }, data_updated_at: '2026-09-16', degraded: false, contact_eligible: true, trust_profile: { claim_status: 'claimed', contact_authorized: true, sources: [] } },
+  { id: 903, name: '常州华岳汽车部件厂', province: '江苏省', city: '常州市', business_scope: '汽车内外饰件、精密零部件', score: 88, confidence_index: 0.86, dimensions: { product: { score: 0.9 }, distance: { score: 0.9 }, capacity: { score: 0.84 }, green: { score: 0.8 }, semantic: { score: 0.88 }, credit: { score: 0.86 } }, trusted_labels: ['已核验', '汽车行业经验'], reason: '汽车零部件配套经验丰富，生产排期相对灵活，可作为备选供应商。', data_freshness: { status: 'fresh', is_latest: true, age_days: 11 }, data_updated_at: '2026-09-12', degraded: false, contact_eligible: false, trust_profile: { claim_status: 'unclaimed', contact_authorized: false, sources: [] } },
+];
+
+function buildDemoResponse(content: string): { intent: Record<string, unknown>; match_result: ChainXiaoYiMatchResult; reply: string; suggestions: string[] } {
+  const product = content.includes('注塑') ? '精密注塑件' : content.includes('电机') ? '工业电机' : '精密零部件';
+  const region = content.match(/华东|江苏|浙江|上海|广东/)?.[0] || '华东';
+  const delivery = content.match(/(\d+)\s*天/)?.[1];
+  return { intent: { product, region, delivery_days: delivery ? Number(delivery) : 30, processes: ['精密注塑'], is_export: content.includes('出口') }, match_result: { total: DEMO_FACTORIES.length, results: DEMO_FACTORIES, degraded: false, explanation_provider: 'demo' }, reply: `我已理解你的需求：在${region}寻找${product}${delivery ? `，${delivery}天内交付` : ''}的供应商。已按产品能力、交付能力、距离、信用和数据新鲜度完成匹配，先为你整理出 ${DEMO_FACTORIES.length} 家候选工厂。`, suggestions: ['只看已核验且支持出口的工厂', '只看30天内能交付的工厂', '把前两家加入询价清单'] };
+}
 
 function freshnessLabel(item: ChainXiaoYiMatchItem) {
   const freshness = item.data_freshness;
@@ -48,6 +67,7 @@ export default function PublicAia() {
   const [params] = useSearchParams();
   const { user, loading: authLoading, requestLogin } = useAuth();
   const initialQuery = params.get('q') || params.get('query') || '';
+  const [demoActive, setDemoActive] = useState(false);
   const [query, setQuery] = useState(initialQuery);
   const [session, setSession] = useState<ChainXiaoYiSession | null>(null);
   const [history, setHistory] = useState<ChainXiaoYiSession[]>([]);
@@ -82,13 +102,11 @@ export default function PublicAia() {
   const [batchOrderDrafts, setBatchOrderDrafts] = useState<Array<Record<string, unknown>>>([]);
   const [batchFormalOrders, setBatchFormalOrders] = useState<Array<Record<string, unknown>>>([]);
   const [batchQuoteQuery, setBatchQuoteQuery] = useState('每个采购项只看含税价最低且30天内能交付的一家');
+  const [demoWorkflow, setDemoWorkflow] = useState<DemoWorkflowStatus>('idle');
+  const [demoSupplier, setDemoSupplier] = useState<ChainXiaoYiMatchItem | null>(null);
   const autoSent = useRef(false);
+  const lastSubmittedQuery = useRef('');
   const fileInput = useRef<HTMLInputElement | null>(null);
-
-  const openSupplierMatching = (supplier: ChainXiaoYiMatchItem) => {
-    const product = String(intent.product || query || supplier.name || '').trim();
-    navigate(`/matching?query=${encodeURIComponent(product)}&supplier_id=${supplier.id}`);
-  };
 
   const handleSupplierInquiry = (supplier: ChainXiaoYiMatchItem) => {
     // 会话尚在同步时不触发登录弹窗，避免已登录用户被误判为游客。
@@ -97,7 +115,51 @@ export default function PublicAia() {
       requestLogin();
       return;
     }
-    openSupplierMatching(supplier);
+    if (demoActive) {
+      setError('演示流程将在工厂同意后由你确认订单');
+      return;
+    }
+    if (!supplier.contact_eligible) {
+      setError('该工厂尚未认领或未授权触达，暂不能发起询价');
+      return;
+    }
+    void startInquiryChat(supplier);
+  };
+
+  const startInquiryChat = async (supplier: ChainXiaoYiMatchItem): Promise<boolean> => {
+    if (!user) { requestLogin('/aia'); return; }
+    setLoading(true); setError(''); setStage('正在建立企业互动会话');
+    try {
+      const productName = String(intent.product || query || '精密零部件').trim();
+      const dimScores = Object.fromEntries(
+        Object.entries(supplier.dimensions || {}).map(([key, value]) => [key, Number(value.score || 0)]),
+      );
+      const inquiry = await api.sendInquiry({
+        supplier_id: supplier.id,
+        product_name: productName,
+        content: `你好，我对贵公司的 ${productName} 感兴趣，希望进一步沟通合作细节。`,
+        dim_scores: dimScores,
+        match_score: Number(supplier.score || 0),
+      });
+      if (!inquiry.success) throw new Error('询价创建失败');
+      const chat = await api.createInquiryChat({
+        buyer_id: user.id,
+        seller_id: supplier.id,
+        match_feedback_id: inquiry.match_feedback_id,
+        is_anonymous: false,
+        product_name: productName,
+        match_score: Number(supplier.score || 0),
+        dim_scores: dimScores,
+      });
+      setStage('已建立会话，正在打开企业互动窗口');
+      // 企业协同由 Flask 企业端统一承载；使用 5050 的同源入口，确保
+      // 会话加载、企业身份和后续消息都落在真实的企业工作台中。
+      window.location.assign(`http://localhost:5050/sales-console?chat_id=${encodeURIComponent(String(chat.chat_id))}&desk=procurement`);
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '企业互动会话创建失败，请稍后重试');
+      return false;
+    } finally { setLoading(false); setStage(''); }
   };
 
   const refreshHistory = async () => {
@@ -119,10 +181,43 @@ export default function PublicAia() {
   const send = async (content: string, allowWhileLoading = false) => {
     const clean = content.trim();
     if (!clean || (loading && !allowWhileLoading)) return;
+    lastSubmittedQuery.current = clean;
     setLoading(true); setError(''); setStage('正在理解需求');
     setMessages(previous => [...previous, { role: 'user', content: clean }]);
     setQuery('');
     try {
+      const useDemoFlow = isDemoQuery(clean);
+      const shouldUseDemoFlow = params.get('agent') === 'demo' && useDemoFlow;
+      setDemoActive(shouldUseDemoFlow);
+      setDemoSupplier(null);
+      if (shouldUseDemoFlow) {
+        // 演示结果仍需落到链小易会话中，确保历史记录和当前页面一致。
+        // 这里只保存会话/消息，不使用后端返回的九维结果覆盖演示结果。
+        const active = await ensureSession();
+        const persistedResponse = await api.sendChainXiaoYiMessage(active.id, clean);
+        if (user) await refreshHistory();
+        setStage('正在提取产品、地区和交期条件');
+        await new Promise(resolve => window.setTimeout(resolve, 500));
+        setStage('正在匹配工厂能力与交付记录');
+        await new Promise(resolve => window.setTimeout(resolve, 700));
+        const response = buildDemoResponse(clean);
+        const persistedFirst = persistedResponse.match_result?.results?.[0];
+        const firstFactory = persistedFirst || response.match_result.results[0];
+        if (persistedFirst) {
+          response.match_result = { ...response.match_result, results: [persistedFirst, ...response.match_result.results.slice(1)] };
+        }
+        setDemoSupplier(firstFactory);
+        setIntent(response.intent); setMatches(response.match_result); setSuggestions(response.suggestions);
+        setSelectedSuppliers(response.match_result.results.filter(item => item.contact_eligible).map(item => item.id));
+        setDemoWorkflow('sent');
+        setMessages(previous => [...previous, { role: 'assistant', content: `${response.reply}\n\n已将完整采购需求直接发送给第一评分工厂「${firstFactory.name}」，当前等待对方确认接单。` }]);
+        setResultsOpen(true);
+        window.setTimeout(() => {
+          setDemoWorkflow('accepted');
+          setMessages(previous => [...previous, { role: 'assistant', content: `「${firstFactory.name}」已同意承接本次采购需求。订单信息已整理完成，最后一步请由你人工确认。` }]);
+        }, 1800);
+        return;
+      }
       const active = await ensureSession();
       setStage('数据库正在召回并计算九维分数');
       const response = await api.sendChainXiaoYiMessage(active.id, clean);
@@ -183,6 +278,16 @@ export default function PublicAia() {
     } finally { setLoading(false); setStage(''); }
   };
 
+  const retryLastRequest = async () => {
+    const lastQuery = lastSubmittedQuery.current.trim();
+    if (!lastQuery || loading) return;
+    setMessages(previous => {
+      const last = previous[previous.length - 1];
+      return last?.role === 'user' && last.content === lastQuery ? previous.slice(0, -1) : previous;
+    });
+    await send(lastQuery, true);
+  };
+
   useEffect(() => {
     if (!autoSent.current && initialQuery.trim()) { autoSent.current = true; void send(initialQuery); }
   // Initial URL input is intentionally submitted once.
@@ -199,6 +304,7 @@ export default function PublicAia() {
   }, [user?.id, session?.id]);
 
   const openHistory = async (item: ChainXiaoYiSession) => {
+    setError('');
     try {
       const detail = await api.getChainXiaoYiSession(item.id);
       setSession(detail.session); setIntent(detail.intent || {}); setMatches(detail.match_result || null);
@@ -209,6 +315,7 @@ export default function PublicAia() {
   };
 
   const openTask = async (item: ChainXiaoYiTaskInboxItem) => {
+    setError('');
     try {
       const detail = await api.getChainXiaoYiSession(item.session_id);
       setSession(detail.session); setIntent(detail.intent || {}); setMatches(detail.match_result || null);
@@ -350,12 +457,12 @@ export default function PublicAia() {
     finally { setLoading(false); }
   };
 
-  const createRfqPreview = async () => {
+  const createRfqPreview = async (supplierIds = selectedSuppliers) => {
     if (!user) { requestLogin('/aia'); return; }
-    if (!session || !selectedSuppliers.length) return;
+    if (!session || !supplierIds.length) return;
     setLoading(true); setError(''); setStage('正在生成询价发送预览');
     try {
-      const response = await api.createChainXiaoYiRfqDraft(session.id, intent, selectedSuppliers, '请按采购需求提供含税报价、最早交期和有效期。', rfqChannels);
+      const response = await api.createChainXiaoYiRfqDraft(session.id, intent, supplierIds, '请按采购需求提供含税报价、最早交期和有效期。', rfqChannels);
       setRfqTask({ ...response.task, preview: response.preview });
     } catch (err) { setError(err instanceof Error ? err.message : '询价预览生成失败'); }
     finally { setLoading(false); setStage(''); }
@@ -558,7 +665,7 @@ export default function PublicAia() {
   };
 
   const HistoryPanel = <aside className="flex h-full flex-col border-r border-public-border bg-white p-4">
-    <button type="button" onClick={() => { setSession(null); setMessages([]); setMatches(null); setIntent({}); setSuggestions([]); setItemMatches([]); setActiveItemIndex(null); setMaterialSelections({}); setBatchRfqPreview(null); setHistoryOpen(false); }} className="btn-public-primary w-full"><Plus className="h-4 w-4" />新建会话</button>
+    <button type="button" onClick={() => { setSession(null); setMessages([]); setMatches(null); setIntent({}); setSuggestions([]); setDemoActive(false); setDemoSupplier(null); setDemoWorkflow('idle'); setItemMatches([]); setActiveItemIndex(null); setMaterialSelections({}); setBatchRfqPreview(null); setHistoryOpen(false); }} className="btn-public-primary w-full"><Plus className="h-4 w-4" />新建会话</button>
     {user && taskInbox.length > 0 && <div className="mt-5"><h2 className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-public-muted"><Check className="h-4 w-4" />待办任务</h2><div className="mt-2 space-y-2">{taskInbox.slice(0, 6).map(item => <button key={item.id} type="button" onClick={() => void openTask(item)} className="w-full rounded-lg border border-amber-200 bg-amber-50 p-3 text-left"><p className="truncate text-xs font-bold text-amber-900">{item.product || (item.type === 'rfq' ? '询价任务' : '材料采购任务')}</p><p className="mt-1 text-[10px] text-amber-700">{{ review_and_approve: '待审批发送', resolve_fields: '待确认字段', send_rfq: '待发送', processing: '后台处理中', retry_failed: '发送失败待重试', await_supplier_quotes: '等待/查看报价', resume_task: '已暂停，可恢复' }[item.next_action || ''] || item.status}</p></button>)}</div></div>}
     <h2 className="mt-6 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-public-muted"><History className="h-4 w-4" />历史会话</h2>
     {!user ? <button type="button" onClick={() => requestLogin('/aia')} className="mt-4 rounded-lg bg-public-bg p-4 text-left text-xs leading-5 text-public-muted">登录后查看历史会话并继续追问</button> : <div className="mt-3 space-y-2 overflow-y-auto">{history.map(item => <div key={item.id} className="group rounded-lg border border-public-border p-3"><button type="button" onClick={() => void openHistory(item)} className="w-full text-left"><p className="truncate text-sm font-bold">{item.title || '找厂会话'}</p><p className="mt-1 text-[11px] text-public-muted">{item.match_count ?? 0} 家候选 · {item.updated_at?.slice(0, 10)}</p></button><button type="button" aria-label="归档会话" onClick={() => void archive(item)} className="mt-2 text-public-muted opacity-0 transition group-hover:opacity-100"><Archive className="h-3.5 w-3.5" /></button></div>)}</div>}
@@ -591,10 +698,34 @@ export default function PublicAia() {
     ? <button type="button" disabled={loading} onClick={() => void retryRfq()} className="mb-3 w-full rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-left text-[11px] font-bold text-amber-800">{taskProgress.counts.timed_out} 家供应商已超时，点击重新触达</button>
     : null;
 
+  const confirmDemoOrder = async () => {
+    if (!user) { requestLogin('/aia'); return; }
+    if (!demoSupplier) { setError('尚未找到可建立企业交互的真实工厂'); return; }
+    const created = await startInquiryChat(demoSupplier);
+    if (created) {
+      setDemoWorkflow('confirmed');
+      setMessages(previous => [...previous, { role: 'assistant', content: `已由你确认订单，并已在企业交互中建立与「${demoSupplier.name}」的真实会话。` }]);
+    }
+  };
+
+  const demoWorkflowPanel = demoActive && matches?.results[0]
+    ? <div className="mb-3 rounded-xl border border-public-brand/20 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3"><p className="text-xs font-black">智能采购进度</p><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${demoWorkflow === 'accepted' || demoWorkflow === 'confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>{demoWorkflow === 'sent' ? '等待工厂同意' : demoWorkflow === 'accepted' ? '工厂已同意' : demoWorkflow === 'confirmed' ? '订单已确认' : '准备中'}</span></div>
+      <div className="mt-3 space-y-2 text-[11px]">
+        <div className="flex items-start gap-2"><span className="mt-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] text-white">✓</span><div><p className="font-bold">已匹配第一评分工厂</p><p className="text-public-muted">{matches.results[0].name} · {Math.round(matches.results[0].score)} 分</p></div></div>
+        <div className="flex items-start gap-2"><span className={`mt-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] text-white ${demoWorkflow === 'idle' ? 'bg-public-border' : 'bg-emerald-500'}`}>✓</span><div><p className="font-bold">已发送采购需求，等待工厂确认</p><p className="text-public-muted">采购数量、交期和工艺要求已一并发送</p></div></div>
+        <div className="flex items-start gap-2"><span className={`mt-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] text-white ${demoWorkflow === 'accepted' || demoWorkflow === 'confirmed' ? 'bg-emerald-500' : 'bg-public-border'}`}>✓</span><div><p className="font-bold">工厂确认承接</p><p className="text-public-muted">{demoWorkflow === 'sent' ? '正在等待对方回复…' : demoWorkflow === 'accepted' || demoWorkflow === 'confirmed' ? '已同意承接本次采购需求' : '等待发送'}</p></div></div>
+      </div>
+      {demoWorkflow === 'accepted' && <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3"><p className="font-bold text-emerald-800">订单信息已就绪</p><p className="mt-1 text-emerald-700">工厂已同意，是否创建订单由你最后确认。</p><button type="button" disabled={loading} onClick={() => void confirmDemoOrder()} className="btn-public-primary btn-sm mt-3 w-full">人工确认并进入企业交互</button></div>}
+      {demoWorkflow === 'confirmed' && <div className="mt-3 rounded-lg bg-emerald-50 p-3 text-[11px] text-emerald-800"><p className="font-bold">订单已确认，进入执行</p><p className="mt-1">后续合同与付款仍按企业规则处理。</p></div>}
+    </div>
+    : null;
+
   const ResultsPanel = <aside className="h-full overflow-y-auto border-l border-public-border bg-public-bg p-4">
     {orderConfirmationPanel}
     {taskAuditPanel}
     {timeoutRetryPanel}
+    {demoWorkflowPanel}
     {itemMatches.length > 0 && <div className="mb-3 rounded-xl border border-public-border bg-white p-3"><p className="text-xs font-black">材料采购项 · 已自动分别找厂</p><div className="mt-2 flex flex-wrap gap-2">{itemMatches.map(item => <button key={item.item_index} type="button" onClick={() => selectMaterialItem(item)} className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold ${activeItemIndex === item.item_index ? 'border-public-brand bg-public-brand-soft text-public-brand' : 'border-public-border text-public-muted'}`}>#{item.item_index} {String(item.intent.product || '待确认产品')} · {item.match_result.total}家</button>)}</div><button type="button" disabled={loading || Boolean(batchRfqPreview)} onClick={() => void createBatchRfqPreview()} className="btn-public-primary btn-sm mt-3 w-full">{batchRfqPreview ? '已生成统一询价审批卡' : '生成全部采购项统一询价预览'}</button>{batchRfqPreview && <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800"><p>将发送 {batchRfqPreview.item_count} 个采购项，共 {batchRfqPreview.supplier_count} 个供应商触达记录。</p><p className="mt-1">渠道：{batchRfqPreview.channels.join('、')}。每个采购项的产品、数量、规格和询价正文已纳入预览。</p>{batchRfqPreview.quote_deadline_at && <p className="mt-1">供应商回复截止：{new Date(batchRfqPreview.quote_deadline_at).toLocaleString('zh-CN')}，逾期未回复会自动标记为超时。</p>}{batchRfqPreview.status === 'awaiting_approval' ? <button type="button" disabled={loading} onClick={() => void approveBatchRfq()} className="btn-public-primary btn-sm mt-2 w-full">一次确认并全部加入发送队列</button> : <p className="mt-2 font-bold text-emerald-700">已确认，后台发送中</p>}</div>}</div>}
     {procurementTask && batchRfqPreview && batchRfqPreview.status !== 'awaiting_approval' && <div className="mb-3 rounded-xl border border-public-brand/20 bg-white p-3">
       <div className="flex items-center justify-between"><p className="text-xs font-black">全部采购项报价与选厂</p><button type="button" disabled={loading} onClick={() => void refreshBatchQuotes()} className="text-[11px] text-public-brand">刷新全部报价</button></div>
@@ -624,7 +755,7 @@ export default function PublicAia() {
       <div className="hidden min-h-0 lg:block">{HistoryPanel}</div>
       <main className="flex min-w-0 flex-1 flex-col bg-white">
         <header className="flex items-center justify-between border-b border-public-border px-4 py-3"><button type="button" aria-label="打开历史" onClick={() => setHistoryOpen(true)} className="lg:hidden"><Menu className="h-5 w-5" /></button><div className="text-center"><h1 className="font-black">链小易 · AI 找工厂</h1><p className="text-[10px] text-public-muted">数据库九维算法决定召回、排序与分数</p></div><button type="button" aria-label="打开结果" onClick={() => setResultsOpen(true)} className="lg:hidden"><PanelRight className="h-5 w-5" /></button></header>
-        <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8"><div className="mx-auto max-w-3xl space-y-5">{messages.length === 0 && <section className="py-12 text-center"><span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-public-brand text-white"><Sparkles className="h-7 w-7" /></span><h2 className="mt-5 text-2xl font-black">用一句话描述你要找的工厂</h2><p className="mt-2 text-sm text-public-muted">产品、工艺、地区、数量、交期和资质都可以直接说</p><div className="mt-6 flex flex-wrap justify-center gap-2">{QUICK_PROMPTS.map(prompt => <button key={prompt} type="button" onClick={() => void send(prompt)} className="rounded-full border border-public-border px-3 py-2 text-xs hover:border-public-brand hover:text-public-brand">{prompt}</button>)}</div></section>}{messages.map((message, index) => <div key={`${message.role}-${index}`} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === 'user' ? 'bg-public-brand text-white' : 'bg-public-bg text-public-text'}`}>{message.role === 'assistant' && <MessageSquare className="mr-2 inline h-4 w-4 text-public-brand" />}{message.content}</div></div>)}{Object.keys(intent).length > 0 && <IntentChips intent={intent} />}{procurementDraft?.conflicts?.map(conflict => <div key={conflict.field} className="rounded-xl border border-amber-200 bg-amber-50 p-3"><p className="text-xs font-black text-amber-900">材料中的“{conflict.field}”存在冲突，请确认：</p><div className="mt-2 flex flex-wrap gap-2">{conflict.values.map((value, index) => <button key={`${conflict.field}-${index}`} type="button" disabled={loading} onClick={() => void confirmMaterialField(conflict.field, value)} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs text-amber-900">{String(value)}</button>)}</div></div>)}{suggestions.length > 0 && <div className="flex flex-wrap gap-2">{suggestions.map(item => <button key={item} type="button" onClick={() => setQuery(item)} className="rounded-full bg-public-bg px-3 py-1.5 text-[11px] text-public-muted">{item}<ChevronRight className="ml-1 inline h-3 w-3" /></button>)}</div>}{loading && <div className="flex items-center gap-2 text-sm text-public-muted"><Loader2 className="h-4 w-4 animate-spin text-public-brand" />{stage}</div>}{error && <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}</div></div>
+        <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8"><div className="mx-auto max-w-3xl space-y-5">{messages.length === 0 && <section className="py-12 text-center"><span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-public-brand text-white"><Sparkles className="h-7 w-7" /></span><h2 className="mt-5 text-2xl font-black">用一句话描述你要找的工厂</h2><p className="mt-2 text-sm text-public-muted">产品、工艺、地区、数量、交期和资质都可以直接说</p><div className="mt-6 flex flex-wrap justify-center gap-2">{QUICK_PROMPTS.map(prompt => <button key={prompt} type="button" onClick={() => void send(prompt)} className="rounded-full border border-public-border px-3 py-2 text-xs hover:border-public-brand hover:text-public-brand">{prompt}</button>)}</div></section>}{messages.map((message, index) => <div key={`${message.role}-${index}`} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 ${message.role === 'user' ? 'bg-public-brand text-white' : 'bg-public-bg text-public-text'}`}>{message.role === 'assistant' && <MessageSquare className="mr-2 inline h-4 w-4 text-public-brand" />}{message.content}</div></div>)}{Object.keys(intent).length > 0 && <IntentChips intent={intent} />}{procurementDraft?.conflicts?.map(conflict => <div key={conflict.field} className="rounded-xl border border-amber-200 bg-amber-50 p-3"><p className="text-xs font-black text-amber-900">材料中的“{conflict.field}”存在冲突，请确认：</p><div className="mt-2 flex flex-wrap gap-2">{conflict.values.map((value, index) => <button key={`${conflict.field}-${index}`} type="button" disabled={loading} onClick={() => void confirmMaterialField(conflict.field, value)} className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs text-amber-900">{String(value)}</button>)}</div></div>)}{suggestions.length > 0 && <div className="flex flex-wrap gap-2">{suggestions.map(item => <button key={item} type="button" onClick={() => setQuery(item)} className="rounded-full bg-public-bg px-3 py-1.5 text-[11px] text-public-muted">{item}<ChevronRight className="ml-1 inline h-3 w-3" /></button>)}</div>}{loading && <div className="flex items-center gap-2 text-sm text-public-muted"><Loader2 className="h-4 w-4 animate-spin text-public-brand" />{stage}</div>}{error && <div className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><span>{error}</span>{lastSubmittedQuery.current && <button type="button" disabled={loading} onClick={() => void retryLastRequest()} className="shrink-0 rounded-md border border-red-300 px-2.5 py-1 text-xs font-bold hover:bg-red-100">重试</button>}</div>}</div></div>
         <form onSubmit={submit} className="border-t border-public-border bg-white p-4"><div className="mx-auto flex max-w-3xl items-end gap-2 rounded-xl border border-public-border bg-public-bg p-2 focus-within:border-public-brand"><button type="button" aria-label="上传采购材料" onClick={() => user ? fileInput.current?.click() : requestLogin('/aia')} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-public-border bg-white text-public-muted hover:text-public-brand"><FileUp className="h-4 w-4" /></button><input ref={fileInput} type="file" multiple accept=".csv,.xlsx,.pdf,.docx" className="hidden" onChange={event => { const files = Array.from(event.currentTarget.files || []) as File[]; if (files.length) void uploadMaterials(files); event.currentTarget.value = ''; }} /><textarea value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(query); } }} rows={2} maxLength={2000} placeholder="说出需求，或直接上传 Excel、PDF、Word 采购材料" className="min-h-12 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none" /><button type="submit" disabled={loading || !query.trim()} className="flex h-10 w-10 items-center justify-center rounded-lg bg-public-brand text-white disabled:opacity-40"><Send className="h-4 w-4" /></button></div><p className="mx-auto mt-2 max-w-3xl text-center text-[10px] text-public-muted">可一次上传多个材料；系统合并字段并标记冲突，对外发送询价前必须由你确认。</p></form>
       </main>
       <div className="hidden min-h-0 lg:block">{ResultsPanel}</div>
